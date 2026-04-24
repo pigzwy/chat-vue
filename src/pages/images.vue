@@ -617,9 +617,9 @@ async function submitImageTask() {
 </script>
 
 <template>
-  <div class="flex-1 overflow-auto bg-muted/40">
-    <div class="grid min-h-full gap-5 p-4 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6">
-      <section class="min-h-[640px] rounded-3xl border border-default bg-default p-6 shadow-sm sm:p-8">
+  <div class="flex-1 min-h-0 overflow-hidden bg-muted/40">
+    <div class="grid h-full min-h-0 gap-5 p-4 pt-0 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6 lg:pt-0">
+      <section class="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-default bg-default p-5 shadow-sm sm:p-6">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h1 class="text-xl font-bold text-highlighted">
@@ -640,7 +640,7 @@ async function submitImageTask() {
 
         <div
           v-if="!queue.length"
-          class="flex min-h-[500px] flex-col items-center justify-center text-center"
+          class="flex min-h-0 flex-1 flex-col items-center justify-center text-center"
         >
           <div class="flex size-24 items-center justify-center rounded-3xl bg-muted text-muted shadow-inner">
             <UIcon
@@ -658,136 +658,149 @@ async function submitImageTask() {
 
         <div
           v-else
-          class="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          class="mt-8 min-h-0 flex-1 overflow-y-auto pr-1"
         >
-          <article
-            v-for="item in queue"
-            :key="item.id"
-            class="cursor-pointer rounded-2xl border bg-elevated/40 p-4 transition"
-            :class="selectedTaskId === item.id ? 'border-primary ring-2 ring-primary/20' : 'border-default hover:border-muted'"
-            @click="selectImageTask(item)"
-          >
-            <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted text-muted">
-              <UBadge
-                v-if="selectedTaskId === item.id"
-                label="正在编辑"
-                color="primary"
-                variant="solid"
-                class="absolute left-3 top-3 z-10 rounded-full"
-              />
-              <img
-                v-if="item.imageUrl"
-                :src="item.imageUrl"
-                :alt="item.revisedPrompt || item.prompt"
-                class="size-full object-cover"
-              >
-              <div
-                v-if="item.imageUrl"
-                class="absolute inset-0 flex items-center justify-center gap-3 bg-black/0 opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100"
-              >
-                <UButton
-                  type="button"
-                  icon="i-lucide-eye"
-                  color="neutral"
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <article
+              v-for="item in queue"
+              :key="item.id"
+              class="cursor-pointer rounded-2xl border bg-elevated/40 p-4 transition"
+              :class="selectedTaskId === item.id ? 'border-primary ring-2 ring-primary/20' : 'border-default hover:border-muted'"
+              @click="selectImageTask(item)"
+            >
+              <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted text-muted">
+                <UBadge
+                  v-if="selectedTaskId === item.id"
+                  label="正在编辑"
+                  color="primary"
                   variant="solid"
-                  size="lg"
-                  class="rounded-full"
-                  aria-label="Preview image"
-                  @click.stop="previewImage(item)"
+                  class="absolute left-3 top-3 z-10 rounded-full"
                 />
                 <UButton
-                  type="button"
-                  icon="i-lucide-download"
-                  color="neutral"
-                  variant="solid"
-                  size="lg"
-                  class="rounded-full"
-                  aria-label="Download image"
-                  @click.stop="downloadImage(item)"
-                />
-                <UButton
+                  v-if="item.status === 'error'"
                   type="button"
                   icon="i-lucide-trash"
                   color="error"
                   variant="solid"
-                  size="lg"
-                  class="rounded-full"
-                  aria-label="Delete image"
+                  size="sm"
+                  class="absolute right-3 top-3 z-10 rounded-full"
+                  aria-label="Delete failed image"
                   @click.stop="deleteImageTask(item)"
                 />
-              </div>
-              <UIcon
-                v-else-if="item.status === 'generating'"
-                name="i-lucide-loader-circle"
-                class="size-8 animate-spin"
-              />
-              <UIcon
-                v-else-if="item.status === 'error'"
-                name="i-lucide-circle-alert"
-                class="size-8 text-error"
-              />
-              <UIcon
-                v-else
-                name="i-lucide-image-plus"
-                class="size-8"
-              />
-            </div>
-            <div
-              v-if="getTaskById(item.parentId)"
-              class="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-2.5 py-2"
-            >
-              <img
-                v-if="getTaskById(item.parentId)?.imageUrl"
-                :src="getTaskById(item.parentId)?.imageUrl"
-                :alt="getTaskById(item.parentId)?.prompt"
-                class="size-8 rounded-lg object-cover"
-              >
-              <div class="min-w-0">
-                <p class="text-xs font-medium text-highlighted">
-                  编辑自 {{ getTaskNumber(getTaskById(item.parentId)) || '上一张' }}
-                </p>
-                <p class="line-clamp-1 text-xs text-muted">
-                  {{ getTaskById(item.parentId)?.prompt }}
-                </p>
-              </div>
-            </div>
-            <div class="mt-4 flex items-center justify-between gap-2">
-              <div class="flex min-w-0 items-center gap-2">
-                <UBadge
-                  :label="item.status === 'completed' ? '已完成' : item.status === 'error' ? '失败' : '生成中'"
-                  :color="item.status === 'completed' ? 'success' : item.status === 'error' ? 'error' : 'neutral'"
-                  variant="subtle"
-                />
-                <span
-                  v-if="getTaskDurationSeconds(item)"
-                  class="shrink-0 text-xs text-muted"
+                <img
+                  v-if="item.imageUrl"
+                  :src="item.imageUrl"
+                  :alt="item.revisedPrompt || item.prompt"
+                  class="size-full object-cover"
                 >
-                  耗时 {{ getTaskDurationSeconds(item) }}s
-                </span>
+                <div
+                  v-if="item.imageUrl"
+                  class="absolute right-3 top-3 z-10 flex gap-2 opacity-0 transition group-hover:opacity-100"
+                >
+                  <UButton
+                    type="button"
+                    icon="i-lucide-eye"
+                    color="neutral"
+                    variant="solid"
+                    size="sm"
+                    class="rounded-full"
+                    aria-label="Preview image"
+                    @click.stop="previewImage(item)"
+                  />
+                  <UButton
+                    type="button"
+                    icon="i-lucide-download"
+                    color="neutral"
+                    variant="solid"
+                    size="sm"
+                    class="rounded-full"
+                    aria-label="Download image"
+                    @click.stop="downloadImage(item)"
+                  />
+                  <UButton
+                    type="button"
+                    icon="i-lucide-trash"
+                    color="error"
+                    variant="solid"
+                    size="sm"
+                    class="rounded-full"
+                    aria-label="Delete image"
+                    @click.stop="deleteImageTask(item)"
+                  />
+                </div>
+                <UIcon
+                  v-else-if="item.status === 'generating'"
+                  name="i-lucide-loader-circle"
+                  class="size-8 animate-spin"
+                />
+                <UIcon
+                  v-else-if="item.status === 'error'"
+                  name="i-lucide-circle-alert"
+                  class="size-8 text-error"
+                />
+                <UIcon
+                  v-else
+                  name="i-lucide-image-plus"
+                  class="size-8"
+                />
               </div>
-              <UBadge
-                v-if="item.type === 'edit'"
-                label="编辑"
-                color="neutral"
-                variant="outline"
-              />
-              <span class="text-xs text-muted">{{ item.resolution }} · {{ item.ratio }} · {{ item.size }}</span>
-            </div>
-            <p
-              v-if="item.error"
-              class="mt-3 line-clamp-2 text-sm text-error"
-            >
-              {{ item.error }}
-            </p>
-            <p class="mt-3 line-clamp-3 text-sm text-muted">
-              {{ item.prompt }}
-            </p>
-          </article>
+              <div
+                v-if="getTaskById(item.parentId)"
+                class="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-2.5 py-2"
+              >
+                <img
+                  v-if="getTaskById(item.parentId)?.imageUrl"
+                  :src="getTaskById(item.parentId)?.imageUrl"
+                  :alt="getTaskById(item.parentId)?.prompt"
+                  class="size-8 rounded-lg object-cover"
+                >
+                <div class="min-w-0">
+                  <p class="text-xs font-medium text-highlighted">
+                    编辑自 {{ getTaskNumber(getTaskById(item.parentId)) || '上一张' }}
+                  </p>
+                  <p class="line-clamp-1 text-xs text-muted">
+                    {{ getTaskById(item.parentId)?.prompt }}
+                  </p>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center justify-between gap-2">
+                <div class="flex min-w-0 items-center gap-2">
+                  <UBadge
+                    :label="item.status === 'completed' ? '已完成' : item.status === 'error' ? '失败' : '生成中'"
+                    :color="item.status === 'completed' ? 'success' : item.status === 'error' ? 'error' : 'neutral'"
+                    variant="subtle"
+                  />
+                  <span
+                    v-if="getTaskDurationSeconds(item)"
+                    class="shrink-0 text-xs text-muted"
+                  >
+                    耗时 {{ getTaskDurationSeconds(item) }}s
+                  </span>
+                </div>
+                <UBadge
+                  v-if="item.type === 'edit'"
+                  label="编辑"
+                  color="neutral"
+                  variant="outline"
+                />
+                <span class="text-xs text-muted">{{ item.resolution }} · {{ item.ratio }} · {{ item.size }}</span>
+              </div>
+              <p
+                v-if="item.error"
+                class="mt-3 line-clamp-2 text-sm text-error"
+              >
+                {{ item.error }}
+              </p>
+              <p class="mt-3 line-clamp-3 text-sm text-muted">
+                {{ item.prompt }}
+              </p>
+            </article>
+          </div>
         </div>
       </section>
 
-      <section class="flex min-h-[640px] flex-col rounded-3xl border border-default bg-default shadow-sm">
-        <div class="border-b border-default p-5">
+      <section class="flex h-full min-h-0 flex-col rounded-3xl border border-default bg-default shadow-sm">
+        <div class="border-b border-default p-4 sm:p-5">
           <div class="flex items-start justify-between gap-3">
             <div>
               <h2 class="text-lg font-bold text-highlighted">
@@ -810,7 +823,7 @@ async function submitImageTask() {
           </div>
         </div>
 
-        <div class="flex flex-1 items-center justify-center overflow-auto px-6 py-6 text-center">
+        <div class="flex min-h-0 flex-1 items-center justify-center overflow-auto px-6 py-6 text-center">
           <div v-if="!selectedTask">
             <div class="mx-auto flex size-16 items-center justify-center rounded-2xl bg-muted text-muted">
               <UIcon

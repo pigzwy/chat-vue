@@ -95,6 +95,14 @@ defineShortcuts({
       </div>
     </div>
 
+    <div class="pointer-events-none fixed right-4 top-3 z-50">
+      <UColorModeButton
+        color="neutral"
+        variant="ghost"
+        class="pointer-events-auto rounded-full bg-default/95 ring ring-default shadow-sm backdrop-blur"
+      />
+    </div>
+
     <UDashboardSidebar
       v-if="!isImagesRoute"
       id="default"
@@ -102,7 +110,7 @@ defineShortcuts({
       :min-size="12"
       collapsible
       resizable
-      class="border-r-0 pt-18 pb-4"
+      class="border-r-0 pt-4 pb-4"
     >
       <template #header="{ collapsed }">
         <ULink
@@ -119,28 +127,40 @@ defineShortcuts({
             class="text-xl font-bold text-highlighted"
           >pigcoder</span>
         </ULink>
-
-        <div
-          v-if="!collapsed"
-          class="flex items-center gap-1.5 ms-auto"
-        >
-          <UDashboardSearchButton collapsed />
-        </div>
       </template>
 
       <template #default="{ collapsed }">
-        <div class="flex flex-col gap-1.5">
+        <div
+          v-if="!collapsed"
+          class="flex items-center gap-2"
+        >
+          <UDashboardSearchButton
+            collapsed
+            class="shrink-0"
+          />
           <UButton
-            v-bind="collapsed ? { icon: 'i-lucide-plus' } : { label: 'New chat' }"
+            icon="i-lucide-plus"
+            label="New chat"
+            variant="soft"
+            to="/"
+            class="shrink-0"
+            @click="open = false"
+          />
+        </div>
+
+        <div
+          v-else
+          class="flex flex-col gap-1.5"
+        >
+          <UButton
+            icon="i-lucide-plus"
             variant="soft"
             block
             to="/"
+            aria-label="New chat"
             @click="open = false"
           />
-
-          <template v-if="collapsed">
-            <UDashboardSearchButton collapsed />
-          </template>
+          <UDashboardSearchButton collapsed />
         </div>
 
         <UNavigationMenu
@@ -186,8 +206,8 @@ defineShortcuts({
     />
 
     <div
-      class="flex-1 flex mx-4 mb-4 mt-18 rounded-lg ring ring-default bg-default/75 shadow min-w-0 overflow-hidden"
-      :class="!isImagesRoute && 'lg:ml-0'"
+      class="flex-1 flex min-w-0 overflow-hidden"
+      :class="isImagesRoute ? 'mt-18' : 'mx-4 mb-4 mt-18 rounded-lg ring ring-default bg-default/75 shadow lg:ml-0'"
     >
       <RouterView :key="route.path" />
     </div>

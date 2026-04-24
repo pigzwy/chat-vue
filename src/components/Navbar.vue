@@ -10,8 +10,6 @@
     <template #right>
       <slot />
 
-      <UColorModeButton />
-
       <UButton
         color="neutral"
         variant="ghost"
