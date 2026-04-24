@@ -14,13 +14,14 @@ ENV NUXT_UI_PRO_LICENSE=$NUXT_UI_PRO_LICENSE
 COPY . .
 RUN pnpm vite build
 
-FROM node:22-alpine AS runtime
+FROM base AS runtime
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3009
-WORKDIR /app
 
 RUN addgroup -S app && adduser -S app -G app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile
 COPY --from=build --chown=app:app /app/.output ./.output
 RUN mkdir -p /app/.data && chown -R app:app /app/.data
 
