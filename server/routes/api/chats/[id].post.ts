@@ -1,5 +1,5 @@
-import type { FileUIPart, UIMessage } from 'ai'
-import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, generateText, smoothStream, stepCountIs, streamText } from 'ai'
+import type { UIMessage } from 'ai'
+import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, smoothStream, stepCountIs, streamText } from 'ai'
 import { gateway } from '@ai-sdk/gateway'
 import { z } from 'zod'
 import type { AnthropicLanguageModelOptions } from '@ai-sdk/anthropic'
@@ -8,8 +8,6 @@ import type { GoogleLanguageModelOptions } from '@ai-sdk/google'
 // import { google } from '@ai-sdk/google'
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai'
 import { openai } from '@ai-sdk/openai'
-import { useChatSession } from '../../../utils/session'
-import { useDrizzle, tables, eq, and } from '../../../utils/drizzle'
 import { defineHandler, HTTPError } from 'nitro'
 import { getValidatedRouterParams, readValidatedBody } from 'nitro/h3'
 import { weatherTool } from '../../../utils/tools/weather'
@@ -59,28 +57,8 @@ function buildProviderOptions(model: string, usesSub2api: boolean, reasoningEffo
   return undefined
 }
 
-function getTitlePromptSource(message?: UIMessage) {
-  if (!message) return ''
-
-  return JSON.stringify({
-    ...message,
-    parts: message.parts.map((part) => {
-      if (part.type !== 'file') return part
-
-      const file = part as FileUIPart
-      return {
-        type: 'file',
-        mediaType: file.mediaType,
-        filename: file.filename
-      }
-    })
-  })
-}
-
 export default defineHandler(async (event) => {
-  const session = await useChatSession(event)
-
-  const { id } = await getValidatedRouterParams(event, z.object({
+  await getValidatedRouterParams(event, z.object({
     id: z.string()
   }).parse)
 
@@ -96,42 +74,8 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ statusCode: 400, statusMessage: 'Invalid model' })
   }
 
-  const db = useDrizzle()
-
-  const chat = await db.query.chats.findFirst({
-    where: (chat, { eq }) => and(eq(chat.id, id as string), eq(chat.userId, session.id!)),
-    with: {
-      messages: true
-    }
-  })
-  if (!chat) {
-    throw new HTTPError({ statusCode: 404, statusMessage: 'Chat not found' })
-  }
-
-  if (!chat.title) {
-    const { text: title } = await generateText({
-      model: apiKey ? createSub2apiChatModel(apiKey, model) : gateway('openai/gpt-4.1-nano'),
-      system: `You are a title generator for a chat:
-          - Generate a short title based on the first user's message
-          - The title should be less than 30 characters long
-          - The title should be a summary of the user's message
-          - Do not use quotes (' or ") or colons (:) or any other punctuation
-          - Do not use markdown, just plain text`,
-      prompt: getTitlePromptSource(messages[0])
-    })
-
-    await db.update(tables.chats).set({ title }).where(eq(tables.chats.id, id as string))
-  }
-
-  const lastMessage = messages[messages.length - 1]
-  if (lastMessage?.role === 'user' && messages.length > 1) {
-    await db.insert(tables.messages).values({
-      id: lastMessage.id,
-      chatId: id as string,
-      role: 'user',
-      parts: lastMessage.parts
-    }).onConflictDoUpdate({ target: tables.messages.id, set: { parts: lastMessage.parts } })
-  }
+  // SQL 聊天存储已停用：会话、标题、消息和投票都由前端 localStorage 管理。
+  // 这里不再查询 chats 表，也不再把用户消息或助手回复写入 messages 表。
 
   const abortController = new AbortController()
   event.runtime?.node?.req?.on('close', () => abortController.abort())
@@ -177,26 +121,10 @@ export default defineHandler(async (event) => {
         experimental_transform: smoothStream()
       })
 
-      if (!chat.title) {
-        writer.write({
-          type: 'data-chat-title',
-          data: { message: 'Generating title...' },
-          transient: true
-        })
-      }
-
       writer.merge(result.toUIMessageStream({
         sendSources: true,
         sendReasoning: true
       }))
-    },
-    onFinish: async ({ messages }) => {
-      await db.insert(tables.messages).values(messages.map(message => ({
-        id: message.id,
-        chatId: chat.id,
-        role: message.role as 'user' | 'assistant',
-        parts: message.parts
-      }))).onConflictDoNothing()
     }
   })
 

@@ -1,41 +1,32 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { $fetch } from 'ofetch'
 import { Chat } from '@ai-sdk/vue'
 import { DefaultChatTransport } from 'ai'
 import type { UIMessage } from 'ai'
 import { useModels } from '../../composables/useModels'
-import { useChats } from '../../composables/useChats'
+import { useChats, type LocalVote } from '../../composables/useChats'
 import { useCsrf } from '../../composables/useCsrf'
 import { useRoute } from 'vue-router'
 import ChatMessageContent from '../../components/chat/message/MessageContent.vue'
 import ChatMessageActions from '../../components/chat/message/MessageActions.vue'
-import ChatVisibility from '../../components/chat/ChatVisibility.vue'
 import ChatIndicator from '../../components/chat/Indicator.vue'
 import ChatAttachmentPreviewList from '../../components/chat/AttachmentPreviewList.vue'
 import Navbar from '../../components/Navbar.vue'
 import ReasoningEffortSelect from '../../components/ReasoningEffortSelect.vue'
 import { chatAttachmentAccept, chatAttachmentLimit } from '../../utils/chatAttachments'
 import { useChatAttachments } from '../../composables/useChatAttachments'
-import type { Vote } from '../../../server/utils/drizzle'
 
 const route = useRoute<'/chat/[id]'>()
 const toast = useToast()
 const { apiKey, model, reasoningEffort } = useModels()
-const { fetchChats } = useChats()
+const { fetchChats, getChat, updateChatMessages, updateChatVotes } = useChats()
 const { csrf, headerName } = useCsrf()
 
-const data = await $fetch(`/api/chats/${route.params.id}`).catch(() => null)
+const data = ref(getChat(route.params.id as string))
 
-const isOwner = computed(() => data?.isOwner ?? false)
-const visibility = ref<'public' | 'private'>(data?.visibility ?? 'private')
+const isOwner = computed(() => data.value?.isOwner ?? false)
 
-const votes = ref<Vote[]>([])
-if (isOwner.value) {
-  $fetch(`/api/chats/votes/${route.params.id}`).then((v) => {
-    votes.value = v
-  }).catch(() => {})
-}
+const votes = ref<LocalVote[]>(data.value?.votes ?? [])
 
 const input = ref('')
 const attachmentInput = ref<HTMLInputElement | null>(null)
@@ -51,10 +42,10 @@ const {
 } = useChatAttachments()
 
 const chat = new Chat({
-  id: data?.id,
-  messages: data?.messages,
+  id: data.value?.id,
+  messages: data.value?.messages || [],
   transport: new DefaultChatTransport({
-    api: `/api/chats/${data?.id}`,
+    api: `/api/chats/${data.value?.id}`,
     headers: { [headerName]: csrf() },
     prepareSendMessagesRequest({ body, id, messageId, messages, trigger }) {
       return {
@@ -73,8 +64,11 @@ const chat = new Chat({
   }),
   onData: (dataPart) => {
     if (dataPart.type === 'data-chat-title') {
-      fetchChats()
+      void fetchChats()
     }
+  },
+  onFinish({ messages }) {
+    persistMessages(messages)
   },
   onError(error) {
     const { message } = typeof error.message === 'string' && error.message[0] === '{' ? JSON.parse(error.message) : error
@@ -86,6 +80,15 @@ const chat = new Chat({
     })
   }
 })
+
+function persistMessages(messages = chat.messages) {
+  if (!data.value?.id) return
+
+  // 聊天消息已停用 SQL 入库，流式结束后直接写入浏览器 localStorage。
+  updateChatMessages(data.value.id, messages)
+  data.value = getChat(data.value.id)
+  void fetchChats()
+}
 
 function pickAttachmentFiles() {
   if (chat.status !== 'ready') return
@@ -109,14 +112,18 @@ async function handleSubmit(e?: Event) {
 
     const attachmentParts = hasAttachments.value ? await toMessageParts() : []
     if (attachmentParts.length) {
-      void chat.sendMessage({
+      const request = chat.sendMessage({
         parts: [
           ...(text ? [{ type: 'text' as const, text }] : []),
           ...attachmentParts
         ]
       })
+      persistMessages()
+      void request.catch(() => persistMessages())
     } else {
-      void chat.sendMessage({ text })
+      const request = chat.sendMessage({ text })
+      persistMessages()
+      void request.catch(() => persistMessages())
     }
     input.value = ''
     clearAttachments()
@@ -144,42 +151,16 @@ function cancelEdit() {
 }
 
 async function saveEdit(message: UIMessage, text: string) {
-  try {
-    await $fetch(`/api/chats/messages/${data!.id}`, {
-      method: 'DELETE',
-      headers: { [headerName]: csrf() },
-      body: { messageId: message.id, type: 'edit' }
-    })
-  } catch {
-    toast.add({
-      description: 'Failed to update message',
-      icon: 'i-lucide-alert-circle',
-      color: 'error'
-    })
-    return
-  }
-
   editingMessageId.value = null
-  chat.sendMessage({ text, messageId: message.id })
+  const request = chat.sendMessage({ text, messageId: message.id })
+  persistMessages()
+  void request.catch(() => persistMessages())
 }
 
 async function regenerateMessage(message: UIMessage) {
-  try {
-    await $fetch(`/api/chats/messages/${data!.id}`, {
-      method: 'DELETE',
-      headers: { [headerName]: csrf() },
-      body: { messageId: message.id, type: 'regenerate' }
-    })
-  } catch {
-    toast.add({
-      description: 'Failed to regenerate message',
-      icon: 'i-lucide-alert-circle',
-      color: 'error'
-    })
-    return
-  }
-
-  chat.regenerate({ messageId: message.id })
+  const request = chat.regenerate({ messageId: message.id })
+  persistMessages()
+  void request.catch(() => persistMessages())
 }
 
 function getVote(messageId: string) {
@@ -189,7 +170,6 @@ function getVote(messageId: string) {
 }
 
 async function vote(message: UIMessage, isUpvoted: boolean) {
-  const snapshot = votes.value.map(v => ({ ...v }))
   const toggling = getVote(message.id) === isUpvoted
   const next = toggling ? null : isUpvoted
 
@@ -197,28 +177,16 @@ async function vote(message: UIMessage, isUpvoted: boolean) {
     ? votes.value.filter(v => v.messageId !== message.id)
     : [
         ...votes.value.filter(v => v.messageId !== message.id),
-        { chatId: data!.id, messageId: message.id, isUpvoted: next }
+        { chatId: data.value!.id, messageId: message.id, isUpvoted: next }
       ]
 
-  try {
-    await $fetch(`/api/chats/votes/${data!.id}`, {
-      method: 'POST',
-      headers: { [headerName]: csrf() },
-      body: next === null ? { messageId: message.id } : { messageId: message.id, isUpvoted: next }
-    })
-  } catch {
-    votes.value = snapshot
-    toast.add({
-      description: 'Failed to save vote',
-      icon: 'i-lucide-alert-circle',
-      color: 'error'
-    })
-  }
+  updateChatVotes(data.value!.id, votes.value)
 }
 
 onMounted(() => {
-  if (isOwner.value && data?.messages?.length === 1) {
-    chat.regenerate()
+  if (isOwner.value && data.value?.messages?.length === 1) {
+    const request = chat.regenerate()
+    void request.catch(() => persistMessages())
   }
 })
 </script>
@@ -231,14 +199,7 @@ onMounted(() => {
     :ui="{ body: 'p-0 sm:p-0 overscroll-none' }"
   >
     <template #header>
-      <Navbar>
-        <ChatVisibility
-          v-if="isOwner"
-          :chat-id="data!.id"
-          :visibility="visibility"
-          @update:visibility="visibility = $event"
-        />
-      </Navbar>
+      <Navbar />
     </template>
 
     <template #body>

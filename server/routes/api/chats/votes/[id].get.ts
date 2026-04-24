@@ -1,25 +1,6 @@
-import { defineHandler, HTTPError } from 'nitro'
-import { getValidatedRouterParams } from 'nitro/h3'
-import { z } from 'zod'
-import { useChatSession } from '../../../../utils/session'
-import { useDrizzle, tables, eq, and } from '../../../../utils/drizzle'
+import { defineHandler } from 'nitro'
 
-export default defineHandler(async (event) => {
-  const session = await useChatSession(event)
-
-  const { id } = await getValidatedRouterParams(event, z.object({
-    id: z.string()
-  }).parse)
-
-  const db = useDrizzle()
-
-  const chat = await db.query.chats.findFirst({
-    where: (chat, { eq }) => and(eq(chat.id, id as string), eq(chat.userId, session.id!))
-  })
-
-  if (!chat) {
-    throw new HTTPError({ statusCode: 404, statusMessage: 'Chat not found' })
-  }
-
-  return await db.select().from(tables.votes).where(eq(tables.votes.chatId, id as string))
+export default defineHandler(async () => {
+  // SQL 投票读取已停用：投票状态存储在本地聊天记录里。
+  return []
 })

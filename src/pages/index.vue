@@ -2,9 +2,7 @@
 import { ref, computed } from 'vue'
 import type { UIMessage } from 'ai'
 import { useRouter } from 'vue-router'
-import { $fetch } from 'ofetch'
 import { useChats } from '../composables/useChats'
-import { useCsrf } from '../composables/useCsrf'
 import { useChatAttachments } from '../composables/useChatAttachments'
 import { useModels } from '../composables/useModels'
 import { chatAttachmentAccept, chatAttachmentLimit } from '../utils/chatAttachments'
@@ -12,8 +10,7 @@ import ChatAttachmentPreviewList from '../components/chat/AttachmentPreviewList.
 import Navbar from '../components/Navbar.vue'
 import ReasoningEffortSelect from '../components/ReasoningEffortSelect.vue'
 
-const { fetchChats } = useChats()
-const { csrf, headerName } = useCsrf()
+const { fetchChats, createChat: createLocalChat } = useChats()
 const { model } = useModels()
 const toast = useToast()
 const input = ref('')
@@ -75,14 +72,7 @@ async function createChat(prompt: string, includeAttachments = false) {
     }
 
     const attachmentParts = includeAttachments ? await toMessageParts() : []
-    const chat = await $fetch('/api/chats', {
-      method: 'POST',
-      headers: { [headerName]: csrf() },
-      body: {
-        input: text,
-        parts: buildInitialParts(text, attachmentParts)
-      }
-    })
+    const chat = createLocalChat(text, buildInitialParts(text, attachmentParts))
 
     if (includeAttachments) {
       clearAttachments()

@@ -2,17 +2,14 @@
 import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { useRoute, useRouter } from 'vue-router'
-import { $fetch } from 'ofetch'
 import ModalConfirm from '../components/ModalConfirm.vue'
 import { useChats } from '../composables/useChats'
-import { useCsrf } from '../composables/useCsrf'
 
 const router = useRouter()
 const route = useRoute()
 const toast = useToast()
 const overlay = useOverlay()
-const { csrf, headerName } = useCsrf()
-const { groups, fetchChats } = useChats()
+const { groups, fetchChats, deleteChat: deleteLocalChat } = useChats()
 
 await fetchChats()
 
@@ -45,10 +42,7 @@ async function deleteChat(id: string) {
     return
   }
 
-  await $fetch(`/api/chats/${id}`, {
-    method: 'DELETE',
-    headers: { [headerName]: csrf() }
-  })
+  deleteLocalChat(id)
 
   toast.add({
     title: 'Chat deleted',
@@ -56,7 +50,7 @@ async function deleteChat(id: string) {
     icon: 'i-lucide-trash'
   })
 
-  fetchChats()
+  await fetchChats()
 
   if ((route as RouteLocationNormalizedLoaded<'/chat/[id]'>).params?.id === id) {
     router.push('/')

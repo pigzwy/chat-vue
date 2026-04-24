@@ -180,11 +180,27 @@ function toStoredTask(task: ImageTask): StoredImageTask {
   }
 }
 
-function fromStoredTask(task: StoredImageTask): ImageTask | null {
+function createImageTaskId() {
+  return crypto.randomUUID()
+}
+
+function normalizeStoredTaskId(id: string | undefined, usedIds: Set<string>) {
+  if (id && !usedIds.has(id)) {
+    usedIds.add(id)
+    return id
+  }
+
+  const nextId = createImageTaskId()
+  usedIds.add(nextId)
+  return nextId
+}
+
+function fromStoredTask(task: StoredImageTask, usedIds: Set<string>): ImageTask | null {
   if (!isImageRatio(task.ratio) || !isImageResolution(task.resolution)) return null
 
   return {
     ...task,
+    id: normalizeStoredTaskId(task.id, usedIds),
     type: task.type === 'edit' ? 'edit' : 'generation',
     status: task.status === 'generating' ? 'error' : task.status,
     error: task.status === 'generating' ? 'Task was interrupted by refresh' : task.error,
@@ -201,8 +217,9 @@ function loadStoredTasks() {
   const parsed = parseJson<StoredImageTask[]>(text)
   if (!Array.isArray(parsed)) return []
 
+  const usedIds = new Set<string>()
   return parsed
-    .map(fromStoredTask)
+    .map(task => fromStoredTask(task, usedIds))
     .filter((task): task is ImageTask => Boolean(task))
 }
 
@@ -243,7 +260,7 @@ function pickFiles() {
 
 function createUploadedImage(file: File): UploadedImage {
   return {
-    id: crypto.randomUUID(),
+    id: createImageTaskId(),
     file,
     previewUrl: URL.createObjectURL(file),
     name: file.name,
@@ -477,7 +494,15 @@ async function deleteImageTask(task: ImageTask) {
   const result = await instance.result
   if (!result) return
 
-  queue.value = queue.value.filter(item => item.id !== task.id)
+  // 只删除用户点击的这一张。旧 localStorage 数据可能存在重复 id，不能按 id 批量过滤。
+  const targetIndex = queue.value.findIndex(item => item === task)
+  const fallbackIndex = queue.value.filter(item => item.id === task.id).length === 1
+    ? queue.value.findIndex(item => item.id === task.id)
+    : -1
+  const index = targetIndex === -1 ? fallbackIndex : targetIndex
+  if (index === -1) return
+
+  queue.value.splice(index, 1)
 
   if (selectedTaskId.value === task.id) {
     selectedTaskId.value = ''
@@ -542,7 +567,7 @@ async function submitImageTask() {
   const sourceTask = uploadedSources.length ? null : selectedTask.value
 
   const task: ImageTask = {
-    id: crypto.randomUUID(),
+    id: createImageTaskId(),
     type: sourceTask || uploadedSources.length ? 'edit' : 'generation',
     parentId: sourceTask?.id,
     sourceImageIds: sourceTask ? [sourceTask.id] : undefined,
