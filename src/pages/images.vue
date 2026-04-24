@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useModels } from '../composables/useModels'
 import { useCsrf } from '../composables/useCsrf'
 
 type ImageRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'Auto'
 type ImageResolution = '1K' | '2K' | '4K'
+type ImageTaskType = 'generation' | 'edit'
 type TaskStatus = 'generating' | 'completed' | 'error'
 
 interface ImageGenerationResponse {
@@ -24,6 +25,9 @@ interface RequestError extends Error {
 
 interface ImageTask {
   id: string
+  type: ImageTaskType
+  parentId?: string
+  sourceImageIds?: string[]
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
@@ -34,7 +38,12 @@ interface ImageTask {
   imageUrl?: string
   revisedPrompt?: string
   error?: string
+  durationSeconds?: number
   createdAt: Date
+}
+
+interface StoredImageTask extends Omit<ImageTask, 'createdAt'> {
+  createdAt: string
 }
 
 const imageGroup = {
@@ -43,6 +52,10 @@ const imageGroup = {
   model: 'gpt-image-2',
   label: 'GPT Image 2'
 } as const
+const imageStorageKey = 'sub2api-image-tasks'
+const imageStorageLimit = 12
+const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
+const resolutionItems: ImageResolution[] = ['1K', '2K', '4K']
 
 const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> = {
   '1K': {
@@ -78,9 +91,10 @@ const prompt = ref('')
 const ratio = ref<ImageRatio>('16:9')
 const resolution = ref<ImageResolution>('2K')
 const files = ref<File[]>([])
-const queue = ref<ImageTask[]>([])
+const queue = ref<ImageTask[]>(loadStoredTasks())
 const fileInput = ref<HTMLInputElement | null>(null)
 const previewTask = ref<ImageTask | null>(null)
+const selectedTaskId = ref('')
 
 const promptLimit = 5000
 const canSubmit = computed(() => prompt.value.trim().length > 0)
@@ -94,9 +108,83 @@ const estimatedCost = computed(() => {
 const imageSize = computed(() => {
   return imageSizeMap[resolution.value][ratio.value]
 })
+const selectedTask = computed(() => {
+  return queue.value.find(item => item.id === selectedTaskId.value && item.imageUrl) || null
+})
+const submitLabel = computed(() => selectedTask.value ? '编辑所选图片' : '生成图片')
+const panelDescription = computed(() => selectedTask.value ? '基于左侧选中的图片继续修改。' : '像聊天一样描述图片需求。')
+const promptPlaceholder = computed(() => selectedTask.value ? '描述你想怎么编辑这张图片...' : '描述你想生成的图片...')
+const selectedHistory = computed(() => {
+  if (!selectedTask.value) return []
 
-const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
-const resolutionItems: ImageResolution[] = ['1K', '2K', '4K']
+  const byId = new Map(queue.value.map(item => [item.id, item]))
+  const history: ImageTask[] = []
+  let current: ImageTask | undefined = selectedTask.value
+  while (current) {
+    history.unshift(current)
+    current = current.parentId ? byId.get(current.parentId) : undefined
+  }
+  return history
+})
+
+function isImageRatio(value: unknown): value is ImageRatio {
+  return typeof value === 'string' && ratioItems.includes(value as ImageRatio)
+}
+
+function isImageResolution(value: unknown): value is ImageResolution {
+  return typeof value === 'string' && resolutionItems.includes(value as ImageResolution)
+}
+
+function toStoredTask(task: ImageTask): StoredImageTask {
+  return {
+    ...task,
+    createdAt: task.createdAt.toISOString()
+  }
+}
+
+function fromStoredTask(task: StoredImageTask): ImageTask | null {
+  if (!isImageRatio(task.ratio) || !isImageResolution(task.resolution)) return null
+
+  return {
+    ...task,
+    type: task.type === 'edit' ? 'edit' : 'generation',
+    status: task.status === 'generating' ? 'error' : task.status,
+    error: task.status === 'generating' ? 'Task was interrupted by refresh' : task.error,
+    createdAt: new Date(task.createdAt)
+  }
+}
+
+function loadStoredTasks() {
+  if (typeof window === 'undefined') return []
+
+  const text = window.localStorage.getItem(imageStorageKey)
+  if (!text) return []
+
+  const parsed = parseJson<StoredImageTask[]>(text)
+  if (!Array.isArray(parsed)) return []
+
+  return parsed
+    .map(fromStoredTask)
+    .filter((task): task is ImageTask => Boolean(task))
+}
+
+function persistTasks(tasks: ImageTask[]) {
+  if (typeof window === 'undefined') return
+
+  let next = tasks.slice(0, imageStorageLimit)
+  while (next.length) {
+    try {
+      window.localStorage.setItem(imageStorageKey, JSON.stringify(next.map(toStoredTask)))
+      return
+    } catch {
+      next = next.slice(0, -1)
+    }
+  }
+
+  window.localStorage.removeItem(imageStorageKey)
+}
+
+watch(queue, persistTasks, { deep: true })
 
 function pickFiles() {
   fileInput.value?.click()
@@ -188,6 +276,52 @@ async function requestImageGeneration(apiKey: string, task: {
   return result
 }
 
+async function imageUrlToFile(imageUrl: string, filename: string) {
+  const response = await fetch(imageUrl)
+  const blob = await response.blob()
+  return new File([blob], filename, { type: blob.type || 'image/png' })
+}
+
+async function requestImageEdit(apiKey: string, task: {
+  prompt: string
+  ratio: ImageRatio
+  resolution: ImageResolution
+  size: string
+}, source: ImageTask) {
+  if (!source.imageUrl) {
+    throw new Error('缺少要编辑的图片')
+  }
+
+  const formData = new FormData()
+  formData.set('apiKey', apiKey)
+  formData.set('prompt', task.prompt)
+  formData.set('ratio', task.ratio)
+  formData.set('resolution', task.resolution)
+  formData.set('size', task.size)
+  formData.set('image', await imageUrlToFile(source.imageUrl, `source-${source.id}.png`))
+
+  const response = await fetch('/api/images/edits', {
+    method: 'POST',
+    headers: {
+      [headerName]: csrf()
+    },
+    body: formData
+  })
+
+  let resultText = await response.text()
+  const result = parseJson<ImageGenerationResponse>(resultText) || {}
+  if (!result.error?.message && resultText.trim().startsWith('<')) {
+    resultText = ''
+  }
+  if (!response.ok) {
+    const error = new Error(result.error?.message || resultText || `图片编辑失败: ${response.status}`) as RequestError
+    error.status = response.status
+    throw error
+  }
+
+  return result
+}
+
 function previewImage(task: ImageTask) {
   if (!task.imageUrl) return
   previewTask.value = task
@@ -208,11 +342,51 @@ function downloadImage(task: ImageTask) {
   link.remove()
 }
 
+function selectImageTask(task: ImageTask) {
+  if (!task.imageUrl) return
+  selectedTaskId.value = selectedTaskId.value === task.id ? '' : task.id
+}
+
+function clearSelectedTask() {
+  selectedTaskId.value = ''
+}
+
+function getTaskById(id?: string) {
+  if (!id) return null
+  return queue.value.find(item => item.id === id) || null
+}
+
+function getTaskNumber(task?: ImageTask | null) {
+  if (!task) return ''
+
+  const index = queue.value.findIndex(item => item.id === task.id)
+  if (index === -1) return ''
+
+  return `#${queue.value.length - index}`
+}
+
+function reusePrompt(task: ImageTask) {
+  prompt.value = task.prompt
+}
+
+function setCurrentTask(task: ImageTask) {
+  if (!task.imageUrl) return
+  selectedTaskId.value = task.id
+}
+
+function getDurationSeconds(startedAt: Date) {
+  return Math.max(1, Math.round((Date.now() - startedAt.getTime()) / 1000))
+}
+
 async function submitImageTask() {
   if (!canSubmit.value) return
+  const sourceTask = selectedTask.value
 
-  const task = {
+  const task: ImageTask = {
     id: crypto.randomUUID(),
+    type: sourceTask ? 'edit' : 'generation',
+    parentId: sourceTask?.id,
+    sourceImageIds: sourceTask ? [sourceTask.id] : undefined,
     prompt: prompt.value.trim(),
     ratio: ratio.value,
     resolution: resolution.value,
@@ -229,7 +403,9 @@ async function submitImageTask() {
     let apiKey = await getApiKeyForGroup(imageGroup.id)
     let result: ImageGenerationResponse
     try {
-      result = await requestImageGeneration(apiKey, task)
+      result = sourceTask
+        ? await requestImageEdit(apiKey, task, sourceTask)
+        : await requestImageGeneration(apiKey, task)
     } catch (error) {
       const status = (error as RequestError).status
       if (status !== 401 && status !== 403) {
@@ -238,7 +414,9 @@ async function submitImageTask() {
 
       clearApiKeyForGroup(imageGroup.id)
       apiKey = await getApiKeyForGroup(imageGroup.id)
-      result = await requestImageGeneration(apiKey, task)
+      result = sourceTask
+        ? await requestImageEdit(apiKey, task, sourceTask)
+        : await requestImageGeneration(apiKey, task)
     }
 
     const image = result.data?.[0]
@@ -249,8 +427,12 @@ async function submitImageTask() {
     updateTask(task.id, {
       status: 'completed' as const,
       imageUrl: toImageUrl(image),
-      revisedPrompt: image.revised_prompt
+      revisedPrompt: image.revised_prompt,
+      durationSeconds: getDurationSeconds(task.createdAt)
     })
+    if (sourceTask) {
+      selectedTaskId.value = task.id
+    }
   } catch (error) {
     const message = toErrorMessage(error)
     updateTask(task.id, {
@@ -276,7 +458,7 @@ async function submitImageTask() {
               图片队列
             </h1>
             <p class="mt-2 text-sm text-muted">
-              生成任务会在这里展示，后续接入接口后用于预览、下载和复用参数。
+              左侧保存生成结果，选中图片后可在右侧继续编辑。
             </p>
           </div>
           <UBadge
@@ -302,7 +484,7 @@ async function submitImageTask() {
             暂无图片队列
           </h2>
           <p class="mt-3 max-w-sm text-sm leading-6 text-muted">
-            在右侧输入画图需求后提交，任务会以卡片形式出现在这里。
+            在右侧输入画图需求后提交，结果会以卡片形式保存在这里。
           </p>
         </div>
 
@@ -313,9 +495,18 @@ async function submitImageTask() {
           <article
             v-for="item in queue"
             :key="item.id"
-            class="rounded-2xl border border-default bg-elevated/40 p-4"
+            class="cursor-pointer rounded-2xl border bg-elevated/40 p-4 transition"
+            :class="selectedTaskId === item.id ? 'border-primary ring-2 ring-primary/20' : 'border-default hover:border-muted'"
+            @click="selectImageTask(item)"
           >
             <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted text-muted">
+              <UBadge
+                v-if="selectedTaskId === item.id"
+                label="正在编辑"
+                color="primary"
+                variant="solid"
+                class="absolute left-3 top-3 z-10 rounded-full"
+              />
               <img
                 v-if="item.imageUrl"
                 :src="item.imageUrl"
@@ -334,7 +525,7 @@ async function submitImageTask() {
                   size="lg"
                   class="rounded-full"
                   aria-label="Preview image"
-                  @click="previewImage(item)"
+                  @click.stop="previewImage(item)"
                 />
                 <UButton
                   type="button"
@@ -344,7 +535,7 @@ async function submitImageTask() {
                   size="lg"
                   class="rounded-full"
                   aria-label="Download image"
-                  @click="downloadImage(item)"
+                  @click.stop="downloadImage(item)"
                 />
               </div>
               <UIcon
@@ -363,11 +554,44 @@ async function submitImageTask() {
                 class="size-8"
               />
             </div>
+            <div
+              v-if="getTaskById(item.parentId)"
+              class="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-2.5 py-2"
+            >
+              <img
+                v-if="getTaskById(item.parentId)?.imageUrl"
+                :src="getTaskById(item.parentId)?.imageUrl"
+                :alt="getTaskById(item.parentId)?.prompt"
+                class="size-8 rounded-lg object-cover"
+              >
+              <div class="min-w-0">
+                <p class="text-xs font-medium text-highlighted">
+                  编辑自 {{ getTaskNumber(getTaskById(item.parentId)) || '上一张' }}
+                </p>
+                <p class="line-clamp-1 text-xs text-muted">
+                  {{ getTaskById(item.parentId)?.prompt }}
+                </p>
+              </div>
+            </div>
             <div class="mt-4 flex items-center justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-2">
+                <UBadge
+                  :label="item.status === 'completed' ? '已完成' : item.status === 'error' ? '失败' : '生成中'"
+                  :color="item.status === 'completed' ? 'success' : item.status === 'error' ? 'error' : 'neutral'"
+                  variant="subtle"
+                />
+                <span
+                  v-if="item.status === 'completed' && item.durationSeconds"
+                  class="shrink-0 text-xs text-muted"
+                >
+                  耗时 {{ item.durationSeconds }}s
+                </span>
+              </div>
               <UBadge
-                :label="item.status === 'completed' ? '已完成' : item.status === 'error' ? '失败' : '生成中'"
-                :color="item.status === 'completed' ? 'success' : item.status === 'error' ? 'error' : 'neutral'"
-                variant="subtle"
+                v-if="item.type === 'edit'"
+                label="编辑"
+                color="neutral"
+                variant="outline"
               />
               <span class="text-xs text-muted">{{ item.resolution }} · {{ item.ratio }} · {{ item.size }}</span>
             </div>
@@ -386,20 +610,30 @@ async function submitImageTask() {
 
       <section class="flex min-h-[640px] flex-col rounded-3xl border border-default bg-default shadow-sm">
         <div class="border-b border-default p-5">
-          <div>
+          <div class="flex items-start justify-between gap-3">
             <div>
               <h2 class="text-lg font-bold text-highlighted">
-                画图
+                {{ submitLabel }}
               </h2>
               <p class="mt-1 text-sm text-muted">
-                像聊天一样描述图片需求。
+                {{ panelDescription }}
               </p>
             </div>
+            <UButton
+              v-if="selectedTask"
+              type="button"
+              icon="i-lucide-plus"
+              label="新建图片"
+              color="neutral"
+              variant="soft"
+              class="shrink-0 rounded-full"
+              @click="clearSelectedTask"
+            />
           </div>
         </div>
 
-        <div class="flex flex-1 items-center justify-center px-6 text-center">
-          <div>
+        <div class="flex flex-1 items-center justify-center overflow-auto px-6 py-6 text-center">
+          <div v-if="!selectedTask">
             <div class="mx-auto flex size-16 items-center justify-center rounded-2xl bg-muted text-muted">
               <UIcon
                 name="i-lucide-sparkles"
@@ -410,8 +644,104 @@ async function submitImageTask() {
               描述你想生成的图片
             </h3>
             <p class="mt-2 max-w-xs text-sm leading-6 text-muted">
-              支持补充产品图、场景、比例和清晰度；当前仅创建本地任务，接口稍后接入。
+              支持补充产品图、场景、比例和清晰度；生成结果会自动进入左侧图库。
             </p>
+          </div>
+          <div
+            v-else
+            class="w-full space-y-5 text-left"
+          >
+            <div class="rounded-2xl border border-default bg-elevated/40 p-3">
+              <div class="flex items-center gap-3">
+                <img
+                  :src="selectedTask.imageUrl"
+                  :alt="selectedTask.prompt"
+                  class="size-20 rounded-xl object-cover"
+                >
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-highlighted">
+                    正在编辑这张图
+                  </p>
+                  <p class="mt-1 line-clamp-2 text-sm text-muted">
+                    {{ selectedTask.prompt }}
+                  </p>
+                  <p class="mt-2 text-xs text-muted">
+                    {{ getTaskNumber(selectedTask) }} · {{ selectedTask.resolution }} · {{ selectedTask.ratio }} · {{ selectedTask.size }}
+                  </p>
+                </div>
+                <UButton
+                  type="button"
+                  icon="i-lucide-x"
+                  color="neutral"
+                  variant="ghost"
+                  class="rounded-full"
+                  aria-label="Clear selected image"
+                  @click="clearSelectedTask"
+                />
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <p class="text-sm font-semibold text-muted">
+                编辑历史
+              </p>
+              <div
+                v-for="historyItem in selectedHistory"
+                :key="historyItem.id"
+                class="rounded-2xl border border-default bg-default p-3 transition"
+                :class="selectedTaskId === historyItem.id ? 'ring-2 ring-primary/15' : ''"
+              >
+                <div class="flex items-start gap-3">
+                  <img
+                    v-if="historyItem.imageUrl"
+                    :src="historyItem.imageUrl"
+                    :alt="historyItem.prompt"
+                    class="size-14 rounded-lg object-cover"
+                  >
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <UBadge
+                        :label="historyItem.type === 'edit' ? '编辑' : '生成'"
+                        color="neutral"
+                        variant="subtle"
+                      />
+                      <span class="text-xs text-muted">{{ getTaskNumber(historyItem) }} · {{ historyItem.resolution }} · {{ historyItem.ratio }}</span>
+                    </div>
+                    <p class="mt-2 line-clamp-2 text-sm text-highlighted">
+                      {{ historyItem.prompt }}
+                    </p>
+                    <p
+                      v-if="getTaskById(historyItem.parentId)"
+                      class="mt-1 text-xs text-muted"
+                    >
+                      编辑自 {{ getTaskNumber(getTaskById(historyItem.parentId)) || '上一张' }}
+                    </p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                      <UButton
+                        type="button"
+                        label="复用"
+                        color="neutral"
+                        variant="ghost"
+                        size="xs"
+                        class="rounded-full"
+                        @click="reusePrompt(historyItem)"
+                      />
+                      <UButton
+                        v-if="historyItem.imageUrl"
+                        type="button"
+                        :label="selectedTaskId === historyItem.id ? '当前图片' : '设为当前'"
+                        color="neutral"
+                        variant="soft"
+                        size="xs"
+                        class="rounded-full"
+                        :disabled="selectedTaskId === historyItem.id"
+                        @click="setCurrentTask(historyItem)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -425,13 +755,13 @@ async function submitImageTask() {
               :maxlength="promptLimit"
               autoresize
               :rows="3"
-              placeholder="描述你想生成的图片..."
+              :placeholder="promptPlaceholder"
               variant="none"
               :ui="{ base: 'resize-none text-base' }"
             />
 
-            <div class="mt-2 flex items-center justify-between gap-3 border-t border-default pt-3">
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <div class="mt-2 flex flex-nowrap items-center justify-between gap-3 border-t border-default pt-3">
+              <div class="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
                 <UPopover>
                   <UButton
                     type="button"
@@ -439,7 +769,7 @@ async function submitImageTask() {
                     color="neutral"
                     variant="outline"
                     :label="`${resolution} · ${ratio}`"
-                    class="rounded-full"
+                    class="shrink-0 rounded-full"
                   />
 
                   <template #content>
@@ -500,8 +830,7 @@ async function submitImageTask() {
                   color="neutral"
                   variant="soft"
                   :label="imageGroup.label"
-                  trailing-icon="i-lucide-lock"
-                  class="rounded-full"
+                  class="shrink-0 rounded-full"
                 />
 
                 <input
@@ -514,24 +843,25 @@ async function submitImageTask() {
                 >
                 <UButton
                   type="button"
-                  icon="i-lucide-plus"
+                  icon="i-lucide-paperclip"
                   color="neutral"
                   variant="ghost"
                   :label="files.length ? `${files.length}/8` : undefined"
-                  class="rounded-full"
+                  class="shrink-0 rounded-full"
                   :disabled="files.length >= 8"
                   @click="pickFiles"
                 />
               </div>
 
-              <div class="flex items-center gap-3">
-                <span class="hidden text-sm text-muted sm:inline">${{ estimatedCost.toFixed(2) }}</span>
+              <div class="flex shrink-0 items-center gap-3">
+                <span class="hidden whitespace-nowrap text-sm text-muted sm:inline">${{ estimatedCost.toFixed(2) }}</span>
                 <UButton
                   type="submit"
                   icon="i-lucide-arrow-up"
                   color="neutral"
                   :disabled="!canSubmit"
-                  class="rounded-full"
+                  :aria-label="submitLabel"
+                  class="shrink-0 rounded-full"
                 />
               </div>
             </div>
