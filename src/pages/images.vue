@@ -152,6 +152,7 @@ const previewImageAlt = computed(() => {
   if (previewTask.value) return previewTask.value.revisedPrompt || previewTask.value.prompt
   return previewUploadedImage.value?.name || 'Uploaded image'
 })
+const previewRevisedPrompt = computed(() => previewTask.value?.revisedPrompt?.trim() || '')
 const selectedHistory = computed(() => {
   if (!selectedTask.value) return []
 
@@ -489,6 +490,17 @@ function downloadImage(task: ImageTask) {
   link.remove()
 }
 
+async function copyRevisedPrompt(text?: string) {
+  if (!text) return
+
+  await navigator.clipboard.writeText(text)
+  toast.add({
+    title: '已复制',
+    description: '模型描述已复制到剪贴板',
+    icon: 'i-lucide-copy'
+  })
+}
+
 async function deleteImageTask(task: ImageTask) {
   const instance = deleteImageModal.open()
   const result = await instance.result
@@ -561,34 +573,44 @@ function getTaskDurationSeconds(task: ImageTask) {
   return Math.max(1, Math.round((timerNow.value - task.createdAt.getTime()) / 1000))
 }
 
-async function submitImageTask() {
-  if (!canSubmit.value) return
-  const uploadedSources = files.value.map(item => item.file)
-  const sourceTask = uploadedSources.length ? null : selectedTask.value
-
-  const task: ImageTask = {
+function createImageTask(input: {
+  prompt: string
+  ratio: ImageRatio
+  resolution: ImageResolution
+  size: string
+  type: ImageTaskType
+  parentId?: string
+  sourceImageIds?: string[]
+}) {
+  return {
     id: createImageTaskId(),
-    type: sourceTask || uploadedSources.length ? 'edit' : 'generation',
-    parentId: sourceTask?.id,
-    sourceImageIds: sourceTask ? [sourceTask.id] : undefined,
-    prompt: prompt.value.trim(),
-    ratio: ratio.value,
-    resolution: resolution.value,
-    size: imageSize.value,
+    type: input.type,
+    parentId: input.parentId,
+    sourceImageIds: input.sourceImageIds,
+    prompt: input.prompt,
+    ratio: input.ratio,
+    resolution: input.resolution,
+    size: input.size,
     model: imageGroup.model,
     groupId: imageGroup.id,
     status: 'generating' as const,
     createdAt: new Date()
-  }
+  } satisfies ImageTask
+}
+
+async function executeImageTask(
+  task: ImageTask,
+  getEditSources: () => Promise<File[]>,
+  options: {
+    selectOnSuccess?: boolean
+    shouldClearUploadedImages?: () => boolean
+  } = {}
+) {
   queue.value.unshift(task)
-  prompt.value = ''
 
   try {
     let apiKey = await getApiKeyForGroup(imageGroup.id, imageApiKeyName)
-    const editSources = [...uploadedSources]
-    if (!editSources.length && sourceTask?.imageUrl) {
-      editSources.push(await imageUrlToFile(sourceTask.imageUrl, `source-${sourceTask.id}.png`))
-    }
+    const editSources = await getEditSources()
 
     let result: ImageGenerationResponse
     try {
@@ -619,10 +641,10 @@ async function submitImageTask() {
       revisedPrompt: image.revised_prompt,
       durationSeconds: getDurationSeconds(task.createdAt)
     })
-    if (sourceTask) {
+    if (options.selectOnSuccess) {
       selectedTaskId.value = task.id
     }
-    if (uploadedSources.length) {
+    if (options.shouldClearUploadedImages?.()) {
       clearUploadedImages()
     }
   } catch (error) {
@@ -638,6 +660,85 @@ async function submitImageTask() {
       color: 'error'
     })
   }
+}
+
+async function getSourcesFromTaskIds(sourceIds: string[]) {
+  const sourceTasks = sourceIds
+    .map(id => getTaskById(id))
+    .filter((task): task is ImageTask => Boolean(task?.imageUrl))
+
+  if (!sourceTasks.length) {
+    throw new Error('找不到要编辑的图片，请重新选择图片后再试')
+  }
+
+  return Promise.all(sourceTasks.map(task => imageUrlToFile(task.imageUrl!, `source-${task.id}.png`)))
+}
+
+async function submitImageTask() {
+  if (!canSubmit.value) return
+  const uploadedSources = files.value.map(item => item.file)
+  const sourceTask = uploadedSources.length ? null : selectedTask.value
+  const sourceImageIds = sourceTask ? [sourceTask.id] : undefined
+
+  const task = createImageTask({
+    type: sourceTask || uploadedSources.length ? 'edit' : 'generation',
+    parentId: sourceTask?.id,
+    sourceImageIds,
+    prompt: prompt.value.trim(),
+    ratio: ratio.value,
+    resolution: resolution.value,
+    size: imageSize.value
+  })
+  prompt.value = ''
+
+  await executeImageTask(
+    task,
+    async () => {
+      if (uploadedSources.length) return uploadedSources
+      if (sourceImageIds?.length) return getSourcesFromTaskIds(sourceImageIds)
+      return []
+    },
+    {
+      selectOnSuccess: Boolean(sourceTask),
+      shouldClearUploadedImages: () => uploadedSources.length > 0
+    }
+  )
+}
+
+async function retryImageTask(task: ImageTask) {
+  if (task.status === 'generating') return
+
+  const sourceImageIds = task.sourceImageIds?.length
+    ? task.sourceImageIds
+    : task.parentId ? [task.parentId] : undefined
+  let usedUploadedSources = false
+
+  const retryTask = createImageTask({
+    type: task.type,
+    parentId: task.parentId,
+    sourceImageIds,
+    prompt: task.prompt,
+    ratio: task.ratio,
+    resolution: task.resolution,
+    size: task.size
+  })
+
+  await executeImageTask(
+    retryTask,
+    async () => {
+      if (task.type !== 'edit') return []
+      if (sourceImageIds?.length) return getSourcesFromTaskIds(sourceImageIds)
+      if (files.value.length) {
+        usedUploadedSources = true
+        return files.value.map(item => item.file)
+      }
+      throw new Error('找不到要编辑的图片，请重新上传或选择图片后再试')
+    },
+    {
+      selectOnSuccess: task.type === 'edit',
+      shouldClearUploadedImages: () => usedUploadedSources
+    }
+  )
 }
 </script>
 
@@ -701,17 +802,31 @@ async function submitImageTask() {
                   variant="solid"
                   class="absolute left-3 top-3 z-10 rounded-full"
                 />
-                <UButton
+                <div
                   v-if="item.status === 'error'"
-                  type="button"
-                  icon="i-lucide-trash"
-                  color="error"
-                  variant="solid"
-                  size="sm"
-                  class="absolute right-3 top-3 z-10 rounded-full"
-                  aria-label="Delete failed image"
-                  @click.stop="deleteImageTask(item)"
-                />
+                  class="absolute right-3 top-3 z-10 flex gap-2"
+                >
+                  <UButton
+                    type="button"
+                    icon="i-lucide-refresh-cw"
+                    color="neutral"
+                    variant="solid"
+                    size="sm"
+                    class="rounded-full"
+                    aria-label="Retry failed image"
+                    @click.stop="retryImageTask(item)"
+                  />
+                  <UButton
+                    type="button"
+                    icon="i-lucide-trash"
+                    color="error"
+                    variant="solid"
+                    size="sm"
+                    class="rounded-full"
+                    aria-label="Delete failed image"
+                    @click.stop="deleteImageTask(item)"
+                  />
+                </div>
                 <img
                   v-if="item.imageUrl"
                   :src="item.imageUrl"
@@ -816,6 +931,21 @@ async function submitImageTask() {
               >
                 {{ item.error }}
               </p>
+              <div
+                v-if="item.revisedPrompt"
+                class="mt-3 rounded-xl bg-muted/60 px-3 py-2"
+              >
+                <div class="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted">
+                  <UIcon
+                    name="i-lucide-sparkles"
+                    class="size-3.5"
+                  />
+                  <span>模型描述</span>
+                </div>
+                <p class="line-clamp-2 text-xs leading-5 text-muted">
+                  {{ item.revisedPrompt }}
+                </p>
+              </div>
               <p class="mt-3 line-clamp-3 text-sm text-muted">
                 {{ item.prompt }}
               </p>
@@ -881,6 +1011,12 @@ async function submitImageTask() {
                   <p class="mt-1 line-clamp-2 text-sm text-muted">
                     {{ selectedTask.prompt }}
                   </p>
+                  <p
+                    v-if="selectedTask.revisedPrompt"
+                    class="mt-1 line-clamp-2 text-xs leading-5 text-muted"
+                  >
+                    模型描述：{{ selectedTask.revisedPrompt }}
+                  </p>
                   <p class="mt-2 text-xs text-muted">
                     {{ getTaskNumber(selectedTask) }} · {{ selectedTask.resolution }} · {{ selectedTask.ratio }} · {{ selectedTask.size }}
                   </p>
@@ -925,6 +1061,12 @@ async function submitImageTask() {
                     </div>
                     <p class="mt-2 line-clamp-2 text-sm text-highlighted">
                       {{ historyItem.prompt }}
+                    </p>
+                    <p
+                      v-if="historyItem.revisedPrompt"
+                      class="mt-1 line-clamp-2 text-xs leading-5 text-muted"
+                    >
+                      模型描述：{{ historyItem.revisedPrompt }}
                     </p>
                     <p
                       v-if="getTaskById(historyItem.parentId)"
@@ -1125,7 +1267,7 @@ async function submitImageTask() {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
       @click.self="closePreview"
     >
-      <div class="relative max-h-full max-w-6xl">
+      <div class="relative flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-default shadow-2xl">
         <UButton
           type="button"
           icon="i-lucide-x"
@@ -1138,8 +1280,35 @@ async function submitImageTask() {
         <img
           :src="previewImageUrl"
           :alt="previewImageAlt"
-          class="max-h-[90vh] max-w-full rounded-2xl object-contain shadow-2xl"
+          class="max-h-[72vh] w-full bg-black object-contain"
         >
+        <div
+          v-if="previewRevisedPrompt"
+          class="border-t border-default p-4 text-left"
+        >
+          <div class="mb-2 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2 text-sm font-semibold text-highlighted">
+              <UIcon
+                name="i-lucide-sparkles"
+                class="size-4"
+              />
+              <span>模型描述</span>
+            </div>
+            <UButton
+              type="button"
+              icon="i-lucide-copy"
+              color="neutral"
+              variant="ghost"
+              size="xs"
+              class="rounded-full"
+              aria-label="Copy revised prompt"
+              @click="copyRevisedPrompt(previewRevisedPrompt)"
+            />
+          </div>
+          <p class="max-h-32 overflow-y-auto text-sm leading-6 text-muted">
+            {{ previewRevisedPrompt }}
+          </p>
+        </div>
       </div>
     </div>
   </div>
