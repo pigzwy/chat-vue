@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useModels } from '../composables/useModels'
 import { useCsrf } from '../composables/useCsrf'
 
@@ -95,6 +95,8 @@ const queue = ref<ImageTask[]>(loadStoredTasks())
 const fileInput = ref<HTMLInputElement | null>(null)
 const previewTask = ref<ImageTask | null>(null)
 const selectedTaskId = ref('')
+const timerNow = ref(Date.now())
+let durationTimer: ReturnType<typeof setInterval> | null = null
 
 const promptLimit = 5000
 const canSubmit = computed(() => prompt.value.trim().length > 0)
@@ -185,6 +187,18 @@ function persistTasks(tasks: ImageTask[]) {
 }
 
 watch(queue, persistTasks, { deep: true })
+
+onMounted(() => {
+  durationTimer = setInterval(() => {
+    timerNow.value = Date.now()
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (durationTimer) {
+    clearInterval(durationTimer)
+  }
+})
 
 function pickFiles() {
   fileInput.value?.click()
@@ -378,6 +392,13 @@ function getDurationSeconds(startedAt: Date) {
   return Math.max(1, Math.round((Date.now() - startedAt.getTime()) / 1000))
 }
 
+function getTaskDurationSeconds(task: ImageTask) {
+  if (task.durationSeconds) return task.durationSeconds
+  if (task.status !== 'generating') return 0
+
+  return Math.max(1, Math.round((timerNow.value - task.createdAt.getTime()) / 1000))
+}
+
 async function submitImageTask() {
   if (!canSubmit.value) return
   const sourceTask = selectedTask.value
@@ -437,7 +458,8 @@ async function submitImageTask() {
     const message = toErrorMessage(error)
     updateTask(task.id, {
       status: 'error' as const,
-      error: message
+      error: message,
+      durationSeconds: getDurationSeconds(task.createdAt)
     })
     toast.add({
       description: message,
@@ -581,10 +603,10 @@ async function submitImageTask() {
                   variant="subtle"
                 />
                 <span
-                  v-if="item.status === 'completed' && item.durationSeconds"
+                  v-if="getTaskDurationSeconds(item)"
                   class="shrink-0 text-xs text-muted"
                 >
-                  耗时 {{ item.durationSeconds }}s
+                  耗时 {{ getTaskDurationSeconds(item) }}s
                 </span>
               </div>
               <UBadge
