@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/libsql'
-import { createClient } from '@libsql/client'
+import { createClient, type Client } from '@libsql/client'
 
 import * as schema from '../database/schema'
 
@@ -8,13 +8,21 @@ export { sql, eq, and, or, asc, desc, inArray } from 'drizzle-orm'
 export const tables = schema
 
 let _db: ReturnType<typeof drizzle<typeof schema>>
+let _client: Client
+
+export function useLibSQLClient() {
+  if (!_client) {
+    _client = createClient({
+      url: process.env.TURSO_DATABASE_URL || 'file:.data/sqlite.db',
+      authToken: process.env.TURSO_AUTH_TOKEN
+    })
+  }
+  return _client
+}
 
 export function useDrizzle() {
   if (!_db) {
-    _db = drizzle(createClient({
-      url: process.env.TURSO_DATABASE_URL || 'file:.data/sqlite.db',
-      authToken: process.env.TURSO_AUTH_TOKEN
-    }), { schema })
+    _db = drizzle(useLibSQLClient(), { schema })
   }
   return _db
 }
