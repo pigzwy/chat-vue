@@ -1,0 +1,18 @@
+services:
+  chat-vue:
+    image: ${IMAGE:-ghcr.io/owner/chat-vue:latest}
+    container_name: chat-vue
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3009}:3009"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3009
+    volumes:
+      - chat-vue-data:/app/.data
+
+volumes:
+  chat-vue-data:
