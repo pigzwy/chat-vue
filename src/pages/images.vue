@@ -54,6 +54,7 @@ const imageGroup = {
 } as const
 const imageStorageKey = 'sub2api-image-tasks'
 const imageStorageLimit = 12
+const imageRequestTimeoutMs = 180000
 const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
 const resolutionItems: ImageResolution[] = ['1K', '2K', '4K']
 
@@ -255,13 +256,32 @@ function toImageUrl(image: NonNullable<ImageGenerationResponse['data']>[number])
     : `data:image/png;base64,${image.b64_json}`
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), imageRequestTimeoutMs)
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('图片请求超时，请稍后重试')
+    }
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
 async function requestImageGeneration(apiKey: string, task: {
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
   size: string
 }) {
-  const response = await fetch('/api/images/generations', {
+  const response = await fetchWithTimeout('/api/images/generations', {
     method: 'POST',
     headers: {
       [headerName]: csrf(),
@@ -314,7 +334,7 @@ async function requestImageEdit(apiKey: string, task: {
   formData.set('size', task.size)
   formData.set('image', await imageUrlToFile(source.imageUrl, `source-${source.id}.png`))
 
-  const response = await fetch('/api/images/edits', {
+  const response = await fetchWithTimeout('/api/images/edits', {
     method: 'POST',
     headers: {
       [headerName]: csrf()

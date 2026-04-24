@@ -56,6 +56,10 @@ function parseJson<T>(text: string) {
 }
 
 function toErrorMessage(text: string, status: number, statusText: string) {
+  if (status === 524) {
+    return 'Sub2API 图片生成超时，建议降低分辨率或稍后重试'
+  }
+
   const parsed = parseJson<ImageGenerationResponse & { message?: string }>(text)
   if (parsed) {
     return parsed.error?.message || parsed.message || `Sub2API upstream returned ${status} ${statusText || 'error'}`
