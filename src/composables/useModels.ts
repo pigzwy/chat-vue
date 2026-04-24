@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { createSharedComposable, useStorage } from '@vueuse/core'
 import { MODELS } from '../../shared/utils/models'
+import { useCsrf } from './useCsrf'
 
 interface ApiResponse<T> {
   data: T
@@ -89,10 +90,12 @@ export const useModels = createSharedComposable(() => {
   const group = useStorage<number | null>('sub2api-group', null)
   const model = useStorage<string>('model', 'anthropic/claude-haiku-4.5')
   const apiKey = useStorage('sub2api-api-key', '')
+  const apiKeysByGroup = useStorage<Record<string, string>>('sub2api-api-keys', {})
   const groupItems = ref<Array<{ label: string, value: number, icon: string }>>([])
   const modelItems = ref(MODELS)
   const loading = ref(false)
   const error = ref('')
+  const { csrf, headerName } = useCsrf()
 
   const hasSub2apiToken = computed(() => Boolean(token.value))
 
@@ -142,14 +145,7 @@ export const useModels = createSharedComposable(() => {
   async function loadModels(groupId: number) {
     if (!token.value) return
 
-    const params = new URLSearchParams({
-      page: '1',
-      page_size: '100',
-      group_id: String(groupId)
-    })
-    const keysResponse = await sub2apiFetch<unknown>(`/api/v1/keys?${params}`, token.value)
-    const activeKey = getItems<ApiKeyItem>(keysResponse).find(key => key.status === 'active')
-    apiKey.value = activeKey?.key || await createApiKey(groupId)
+    apiKey.value = await getApiKeyForGroup(groupId)
 
     const modelsResponse = await sub2apiFetch<unknown>('/v1/models', apiKey.value)
     modelItems.value = getItems<ModelItem>(modelsResponse).map(item => ({
@@ -167,11 +163,46 @@ export const useModels = createSharedComposable(() => {
     }
   }
 
+  async function getApiKeyForGroup(groupId: number) {
+    if (!token.value) {
+      throw new Error('缺少 Sub2API token')
+    }
+
+    const cacheKey = String(groupId)
+    if (apiKeysByGroup.value[cacheKey]) {
+      return apiKeysByGroup.value[cacheKey]
+    }
+
+    const params = new URLSearchParams({
+      page: '1',
+      page_size: '100',
+      group_id: String(groupId)
+    })
+    const keysResponse = await sub2apiFetch<unknown>(`/api/v1/keys?${params}`, token.value)
+    const activeKey = getItems<ApiKeyItem>(keysResponse).find(key => key.status === 'active')
+    const key = activeKey?.key || await createApiKey(groupId)
+    apiKeysByGroup.value = {
+      ...apiKeysByGroup.value,
+      [cacheKey]: key
+    }
+    return key
+  }
+
+  function clearApiKeyForGroup(groupId: number) {
+    const cacheKey = String(groupId)
+    if (!apiKeysByGroup.value[cacheKey]) return
+
+    const next = { ...apiKeysByGroup.value }
+    delete next[cacheKey]
+    apiKeysByGroup.value = next
+  }
+
   async function createApiKey(groupId: number) {
     const response = await fetch('/sub2api/api/v1/keys', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token.value}`,
+        [headerName]: csrf(),
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ name: `chat-vue-${groupId}`, group_id: groupId })
@@ -202,8 +233,10 @@ export const useModels = createSharedComposable(() => {
   return {
     apiKey,
     error,
+    clearApiKeyForGroup,
     group,
     groups: groupItems,
+    getApiKeyForGroup,
     hasSub2apiToken,
     loading,
     model,

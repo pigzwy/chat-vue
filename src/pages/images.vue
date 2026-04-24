@@ -1,5 +1,41 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useModels } from '../composables/useModels'
+import { useCsrf } from '../composables/useCsrf'
+
+type ImageRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'Auto'
+type ImageResolution = '1K' | '2K' | '4K'
+type TaskStatus = 'generating' | 'completed' | 'error'
+
+interface ImageGenerationResponse {
+  data?: Array<{
+    b64_json?: string
+    url?: string
+    revised_prompt?: string
+  }>
+  error?: {
+    message?: string
+  }
+}
+
+interface RequestError extends Error {
+  status?: number
+}
+
+interface ImageTask {
+  id: string
+  prompt: string
+  ratio: ImageRatio
+  resolution: ImageResolution
+  size: string
+  model: string
+  groupId: number
+  status: TaskStatus
+  imageUrl?: string
+  revisedPrompt?: string
+  error?: string
+  createdAt: Date
+}
 
 const imageGroup = {
   id: 25,
@@ -8,20 +44,43 @@ const imageGroup = {
   label: 'GPT Image 2'
 } as const
 
+const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> = {
+  '1K': {
+    '1:1': '1024x1024',
+    '16:9': '1024x576',
+    '9:16': '576x1024',
+    '4:3': '1024x768',
+    '3:4': '768x1024',
+    Auto: 'auto'
+  },
+  '2K': {
+    '1:1': '2048x2048',
+    '16:9': '1792x1024',
+    '9:16': '1024x1792',
+    '4:3': '2048x1536',
+    '3:4': '1536x2048',
+    Auto: 'auto'
+  },
+  '4K': {
+    '1:1': '4096x4096',
+    '16:9': '4096x2304',
+    '9:16': '2304x4096',
+    '4:3': '4096x3072',
+    '3:4': '3072x4096',
+    Auto: 'auto'
+  }
+}
+
+const toast = useToast()
+const { clearApiKeyForGroup, getApiKeyForGroup } = useModels()
+const { csrf, headerName } = useCsrf()
 const prompt = ref('')
-const ratio = ref<'1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'Auto'>('16:9')
-const resolution = ref<'1K' | '2K' | '4K'>('2K')
+const ratio = ref<ImageRatio>('16:9')
+const resolution = ref<ImageResolution>('2K')
 const files = ref<File[]>([])
-const queue = ref<Array<{
-  id: string
-  prompt: string
-  ratio: string
-  resolution: string
-  model: string
-  groupId: number
-  createdAt: Date
-}>>([])
+const queue = ref<ImageTask[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
+const previewTask = ref<ImageTask | null>(null)
 
 const promptLimit = 5000
 const canSubmit = computed(() => prompt.value.trim().length > 0)
@@ -32,9 +91,12 @@ const estimatedCost = computed(() => {
     '4K': 0.3
   }[resolution.value]
 })
+const imageSize = computed(() => {
+  return imageSizeMap[resolution.value][ratio.value]
+})
 
-const ratioItems = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto'] as const
-const resolutionItems = ['1K', '2K', '4K'] as const
+const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
+const resolutionItems: ImageResolution[] = ['1K', '2K', '4K']
 
 function pickFiles() {
   fileInput.value?.click()
@@ -47,19 +109,160 @@ function onFilesChange(event: Event) {
   input.value = ''
 }
 
-function submitImageTask() {
+function toErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : ''
+  if (!message) return '图片生成失败'
+
+  try {
+    const parsed = JSON.parse(message)
+    return parsed.error?.message || parsed.message || message
+  } catch {
+    return message
+  }
+}
+
+function parseJson<T>(text: string) {
+  if (!text) return null
+
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    return null
+  }
+}
+
+function updateTask(id: string, patch: Partial<ImageTask>) {
+  const index = queue.value.findIndex(item => item.id === id)
+  if (index === -1) return
+
+  const current = queue.value[index]
+  if (!current) return
+
+  queue.value.splice(index, 1, {
+    ...current,
+    ...patch
+  })
+}
+
+function toImageUrl(image: NonNullable<ImageGenerationResponse['data']>[number]) {
+  if (image.url) return image.url
+  if (!image.b64_json) return ''
+
+  return image.b64_json.startsWith('data:')
+    ? image.b64_json
+    : `data:image/png;base64,${image.b64_json}`
+}
+
+async function requestImageGeneration(apiKey: string, task: {
+  prompt: string
+  ratio: ImageRatio
+  resolution: ImageResolution
+  size: string
+}) {
+  const response = await fetch('/api/images/generations', {
+    method: 'POST',
+    headers: {
+      [headerName]: csrf(),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      apiKey,
+      prompt: task.prompt,
+      ratio: task.ratio,
+      resolution: task.resolution,
+      size: task.size
+    })
+  })
+
+  let resultText = await response.text()
+  const result = parseJson<ImageGenerationResponse>(resultText) || {}
+  if (!result.error?.message && resultText.trim().startsWith('<')) {
+    resultText = ''
+  }
+  if (!response.ok) {
+    const error = new Error(result.error?.message || resultText || `图片生成失败: ${response.status}`) as RequestError
+    error.status = response.status
+    throw error
+  }
+
+  return result
+}
+
+function previewImage(task: ImageTask) {
+  if (!task.imageUrl) return
+  previewTask.value = task
+}
+
+function closePreview() {
+  previewTask.value = null
+}
+
+function downloadImage(task: ImageTask) {
+  if (!task.imageUrl) return
+
+  const link = document.createElement('a')
+  link.href = task.imageUrl
+  link.download = `gpt-image-2-${task.id}.png`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
+async function submitImageTask() {
   if (!canSubmit.value) return
 
-  queue.value.unshift({
+  const task = {
     id: crypto.randomUUID(),
     prompt: prompt.value.trim(),
     ratio: ratio.value,
     resolution: resolution.value,
+    size: imageSize.value,
     model: imageGroup.model,
     groupId: imageGroup.id,
+    status: 'generating' as const,
     createdAt: new Date()
-  })
+  }
+  queue.value.unshift(task)
   prompt.value = ''
+
+  try {
+    let apiKey = await getApiKeyForGroup(imageGroup.id)
+    let result: ImageGenerationResponse
+    try {
+      result = await requestImageGeneration(apiKey, task)
+    } catch (error) {
+      const status = (error as RequestError).status
+      if (status !== 401 && status !== 403) {
+        throw error
+      }
+
+      clearApiKeyForGroup(imageGroup.id)
+      apiKey = await getApiKeyForGroup(imageGroup.id)
+      result = await requestImageGeneration(apiKey, task)
+    }
+
+    const image = result.data?.[0]
+    if (!image?.b64_json && !image?.url) {
+      throw new Error('图片接口未返回图片数据')
+    }
+
+    updateTask(task.id, {
+      status: 'completed' as const,
+      imageUrl: toImageUrl(image),
+      revisedPrompt: image.revised_prompt
+    })
+  } catch (error) {
+    const message = toErrorMessage(error)
+    updateTask(task.id, {
+      status: 'error' as const,
+      error: message
+    })
+    toast.add({
+      description: message,
+      icon: 'i-lucide-alert-circle',
+      color: 'error'
+    })
+  }
 }
 </script>
 
@@ -112,20 +315,68 @@ function submitImageTask() {
             :key="item.id"
             class="rounded-2xl border border-default bg-elevated/40 p-4"
           >
-            <div class="flex aspect-square items-center justify-center rounded-xl bg-muted text-muted">
+            <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted text-muted">
+              <img
+                v-if="item.imageUrl"
+                :src="item.imageUrl"
+                :alt="item.revisedPrompt || item.prompt"
+                class="size-full object-cover"
+              >
+              <div
+                v-if="item.imageUrl"
+                class="absolute inset-0 flex items-center justify-center gap-3 bg-black/0 opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100"
+              >
+                <UButton
+                  type="button"
+                  icon="i-lucide-eye"
+                  color="neutral"
+                  variant="solid"
+                  size="lg"
+                  class="rounded-full"
+                  aria-label="Preview image"
+                  @click="previewImage(item)"
+                />
+                <UButton
+                  type="button"
+                  icon="i-lucide-download"
+                  color="neutral"
+                  variant="solid"
+                  size="lg"
+                  class="rounded-full"
+                  aria-label="Download image"
+                  @click="downloadImage(item)"
+                />
+              </div>
               <UIcon
+                v-else-if="item.status === 'generating'"
+                name="i-lucide-loader-circle"
+                class="size-8 animate-spin"
+              />
+              <UIcon
+                v-else-if="item.status === 'error'"
+                name="i-lucide-circle-alert"
+                class="size-8 text-error"
+              />
+              <UIcon
+                v-else
                 name="i-lucide-image-plus"
                 class="size-8"
               />
             </div>
             <div class="mt-4 flex items-center justify-between gap-2">
               <UBadge
-                label="等待接口"
-                color="neutral"
+                :label="item.status === 'completed' ? '已完成' : item.status === 'error' ? '失败' : '生成中'"
+                :color="item.status === 'completed' ? 'success' : item.status === 'error' ? 'error' : 'neutral'"
                 variant="subtle"
               />
-              <span class="text-xs text-muted">{{ item.resolution }} · {{ item.ratio }}</span>
+              <span class="text-xs text-muted">{{ item.resolution }} · {{ item.ratio }} · {{ item.size }}</span>
             </div>
+            <p
+              v-if="item.error"
+              class="mt-3 line-clamp-2 text-sm text-error"
+            >
+              {{ item.error }}
+            </p>
             <p class="mt-3 line-clamp-3 text-sm text-muted">
               {{ item.prompt }}
             </p>
@@ -135,7 +386,7 @@ function submitImageTask() {
 
       <section class="flex min-h-[640px] flex-col rounded-3xl border border-default bg-default shadow-sm">
         <div class="border-b border-default p-5">
-          <div class="flex items-center justify-between gap-3">
+          <div>
             <div>
               <h2 class="text-lg font-bold text-highlighted">
                 画图
@@ -144,11 +395,6 @@ function submitImageTask() {
                 像聊天一样描述图片需求。
               </p>
             </div>
-            <UBadge
-              :label="`Group #${imageGroup.id}`"
-              color="neutral"
-              variant="outline"
-            />
           </div>
         </div>
 
@@ -188,6 +434,7 @@ function submitImageTask() {
               <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <UPopover>
                   <UButton
+                    type="button"
                     icon="i-lucide-sliders-horizontal"
                     color="neutral"
                     variant="outline"
@@ -248,6 +495,7 @@ function submitImageTask() {
                 <div class="h-6 w-px bg-default" />
 
                 <UButton
+                  type="button"
                   icon="i-lucide-zap"
                   color="neutral"
                   variant="soft"
@@ -265,6 +513,7 @@ function submitImageTask() {
                   @change="onFilesChange"
                 >
                 <UButton
+                  type="button"
                   icon="i-lucide-plus"
                   color="neutral"
                   variant="ghost"
@@ -289,6 +538,29 @@ function submitImageTask() {
           </div>
         </form>
       </section>
+    </div>
+
+    <div
+      v-if="previewTask?.imageUrl"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+      @click.self="closePreview"
+    >
+      <div class="relative max-h-full max-w-6xl">
+        <UButton
+          type="button"
+          icon="i-lucide-x"
+          color="neutral"
+          variant="solid"
+          class="absolute right-3 top-3 z-10 rounded-full"
+          aria-label="Close preview"
+          @click="closePreview"
+        />
+        <img
+          :src="previewTask.imageUrl"
+          :alt="previewTask.revisedPrompt || previewTask.prompt"
+          class="max-h-[90vh] max-w-full rounded-2xl object-contain shadow-2xl"
+        >
+      </div>
     </div>
   </div>
 </template>
