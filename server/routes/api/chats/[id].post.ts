@@ -15,6 +15,7 @@ import { getValidatedRouterParams, readValidatedBody } from 'nitro/h3'
 import { weatherTool } from '../../../utils/tools/weather'
 import { chartTool } from '../../../utils/tools/chart'
 import { MODELS } from '../../../../shared/utils/models'
+import { createSub2apiChatModel } from '../../../utils/sub2api'
 
 export default defineHandler(async (event) => {
   const session = await useUserSession(event)
@@ -23,12 +24,16 @@ export default defineHandler(async (event) => {
     id: z.string()
   }).parse)
 
-  const { model, messages } = await readValidatedBody(event, z.object({
-    model: z.string().refine(value => MODELS.some(m => m.value === value), {
-      message: 'Invalid model'
-    }),
+  const { apiKey, model, messages } = await readValidatedBody(event, z.object({
+    apiKey: z.string().optional(),
+    model: z.string().min(1),
     messages: z.array(z.custom<UIMessage>())
   }).parse)
+
+  const usesSub2api = Boolean(apiKey)
+  if (!usesSub2api && !MODELS.some(m => m.value === model)) {
+    throw new HTTPError({ statusCode: 400, statusMessage: 'Invalid model' })
+  }
 
   const db = useDrizzle()
 
@@ -44,7 +49,7 @@ export default defineHandler(async (event) => {
 
   if (!chat.title) {
     const { text: title } = await generateText({
-      model: gateway('openai/gpt-4.1-nano'),
+      model: apiKey ? createSub2apiChatModel(apiKey, model) : gateway('openai/gpt-4.1-nano'),
       system: `You are a title generator for a chat:
           - Generate a short title based on the first user's message
           - The title should be less than 30 characters long
@@ -74,7 +79,7 @@ export default defineHandler(async (event) => {
     execute: async ({ writer }) => {
       const result = streamText({
         abortSignal: abortController.signal,
-        model: gateway(model),
+        model: apiKey ? createSub2apiChatModel(apiKey, model) : gateway(model),
         system: `You are a knowledgeable and helpful AI assistant. ${session.data.user?.username ? `The user's name is ${session.data.user.username}.` : ''} Your goal is to provide clear, accurate, and well-structured responses.
 
 **FORMATTING RULES (CRITICAL):**
@@ -101,29 +106,31 @@ export default defineHandler(async (event) => {
         tools: {
           chart: chartTool,
           weather: weatherTool,
-          ...(model.startsWith('anthropic/') && { web_search: anthropic.tools.webSearch_20250305() }),
-          ...(model.startsWith('openai/') && { web_search: openai.tools.webSearch() })
+          ...(!usesSub2api && model.startsWith('anthropic/') && { web_search: anthropic.tools.webSearch_20250305() }),
+          ...(!usesSub2api && model.startsWith('openai/') && { web_search: openai.tools.webSearch() })
           // TODO: enable once AI SDK supports combining provider-defined tools with custom tools
           // ...(model.startsWith('google/') && { google_search: google.tools.googleSearch({}) })
         },
-        providerOptions: {
-          anthropic: {
-            thinking: {
-              type: 'enabled',
-              budgetTokens: 2048
-            }
-          } satisfies AnthropicLanguageModelOptions,
-          google: {
-            thinkingConfig: {
-              includeThoughts: true,
-              thinkingLevel: 'low'
-            }
-          } satisfies GoogleLanguageModelOptions,
-          openai: {
-            reasoningEffort: 'low',
-            reasoningSummary: 'detailed'
-          } satisfies OpenAILanguageModelResponsesOptions
-        },
+        ...(!usesSub2api && {
+          providerOptions: {
+            anthropic: {
+              thinking: {
+                type: 'enabled',
+                budgetTokens: 2048
+              }
+            } satisfies AnthropicLanguageModelOptions,
+            google: {
+              thinkingConfig: {
+                includeThoughts: true,
+                thinkingLevel: 'low'
+              }
+            } satisfies GoogleLanguageModelOptions,
+            openai: {
+              reasoningEffort: 'low',
+              reasoningSummary: 'detailed'
+            } satisfies OpenAILanguageModelResponsesOptions
+          }
+        }),
         stopWhen: stepCountIs(5),
         experimental_transform: smoothStream()
       })

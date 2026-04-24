@@ -17,7 +17,7 @@ import type { Vote } from '../../../server/utils/drizzle'
 
 const route = useRoute<'/chat/[id]'>()
 const toast = useToast()
-const { model } = useModels()
+const { apiKey, model } = useModels()
 const { fetchChats } = useChats()
 const { csrf, headerName } = useCsrf()
 
@@ -41,8 +41,18 @@ const chat = new Chat({
   transport: new DefaultChatTransport({
     api: `/api/chats/${data?.id}`,
     headers: { [headerName]: csrf() },
-    body: {
-      model: model.value
+    prepareSendMessagesRequest({ body, id, messageId, messages, trigger }) {
+      return {
+        body: {
+          ...body,
+          id,
+          messageId,
+          messages,
+          trigger,
+          apiKey: apiKey.value,
+          model: model.value
+        }
+      }
     }
   }),
   onData: (dataPart) => {
