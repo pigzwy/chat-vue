@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useModels } from '../composables/useModels'
 import { useCsrf } from '../composables/useCsrf'
+import ModalConfirm from '../components/ModalConfirm.vue'
 
 type ImageRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'Auto'
 type ImageResolution = '1K' | '2K' | '4K'
@@ -46,6 +47,15 @@ interface StoredImageTask extends Omit<ImageTask, 'createdAt'> {
   createdAt: string
 }
 
+interface UploadedImage {
+  id: string
+  file: File
+  previewUrl: string
+  name: string
+  size: number
+  type: string
+}
+
 const imageGroup = {
   id: 25,
   name: '画图 | GPT-Image-2 ',
@@ -54,6 +64,7 @@ const imageGroup = {
 } as const
 const imageStorageKey = 'sub2api-image-tasks'
 const imageStorageLimit = 12
+const uploadedImageLimit = 8
 const imageRequestTimeoutMs = 180000
 const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
 const resolutionItems: ImageResolution[] = ['1K', '2K', '4K']
@@ -86,21 +97,30 @@ const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> = {
 }
 
 const toast = useToast()
+const overlay = useOverlay()
 const { clearApiKeyForGroup, getApiKeyForGroup } = useModels()
 const { csrf, headerName } = useCsrf()
 const prompt = ref('')
 const ratio = ref<ImageRatio>('16:9')
 const resolution = ref<ImageResolution>('2K')
-const files = ref<File[]>([])
+const files = ref<UploadedImage[]>([])
 const queue = ref<ImageTask[]>(loadStoredTasks())
 const fileInput = ref<HTMLInputElement | null>(null)
 const previewTask = ref<ImageTask | null>(null)
+const previewUploadedImage = ref<UploadedImage | null>(null)
 const selectedTaskId = ref('')
 const timerNow = ref(Date.now())
 let durationTimer: ReturnType<typeof setInterval> | null = null
 
 const promptLimit = 5000
+const deleteImageModal = overlay.create(ModalConfirm, {
+  props: {
+    title: '删除图片',
+    description: '确定要删除这张图片记录吗？此操作只会从当前浏览器历史中移除。'
+  }
+})
 const canSubmit = computed(() => prompt.value.trim().length > 0)
+const hasUploadedImages = computed(() => files.value.length > 0)
 const estimatedCost = computed(() => {
   return {
     '1K': 0.15,
@@ -114,9 +134,23 @@ const imageSize = computed(() => {
 const selectedTask = computed(() => {
   return queue.value.find(item => item.id === selectedTaskId.value && item.imageUrl) || null
 })
-const submitLabel = computed(() => selectedTask.value ? '编辑所选图片' : '生成图片')
-const panelDescription = computed(() => selectedTask.value ? '基于左侧选中的图片继续修改。' : '像聊天一样描述图片需求。')
-const promptPlaceholder = computed(() => selectedTask.value ? '描述你想怎么编辑这张图片...' : '描述你想生成的图片...')
+const submitLabel = computed(() => {
+  if (hasUploadedImages.value) return '编辑上传图片'
+  return selectedTask.value ? '编辑所选图片' : '生成图片'
+})
+const panelDescription = computed(() => {
+  if (hasUploadedImages.value) return '基于本地上传的图片继续修改。'
+  return selectedTask.value ? '基于左侧选中的图片继续修改。' : '像聊天一样描述图片需求。'
+})
+const promptPlaceholder = computed(() => {
+  if (hasUploadedImages.value) return '描述你想怎么编辑上传的图片...'
+  return selectedTask.value ? '描述你想怎么编辑这张图片...' : '描述你想生成的图片...'
+})
+const previewImageUrl = computed(() => previewTask.value?.imageUrl || previewUploadedImage.value?.previewUrl || '')
+const previewImageAlt = computed(() => {
+  if (previewTask.value) return previewTask.value.revisedPrompt || previewTask.value.prompt
+  return previewUploadedImage.value?.name || 'Uploaded image'
+})
 const selectedHistory = computed(() => {
   if (!selectedTask.value) return []
 
@@ -199,16 +233,68 @@ onBeforeUnmount(() => {
   if (durationTimer) {
     clearInterval(durationTimer)
   }
+  clearUploadedImages()
 })
 
 function pickFiles() {
   fileInput.value?.click()
 }
 
+function createUploadedImage(file: File): UploadedImage {
+  return {
+    id: crypto.randomUUID(),
+    file,
+    previewUrl: URL.createObjectURL(file),
+    name: file.name,
+    size: file.size,
+    type: file.type
+  }
+}
+
+function revokeUploadedImage(image: UploadedImage) {
+  URL.revokeObjectURL(image.previewUrl)
+}
+
+function removeUploadedImage(id: string) {
+  const target = files.value.find(item => item.id === id)
+  if (!target) return
+
+  revokeUploadedImage(target)
+  files.value = files.value.filter(item => item.id !== id)
+  if (previewUploadedImage.value?.id === id) {
+    previewUploadedImage.value = null
+  }
+}
+
+function clearUploadedImages() {
+  files.value.forEach(revokeUploadedImage)
+  files.value = []
+  previewUploadedImage.value = null
+}
+
 function onFilesChange(event: Event) {
   const input = event.target as HTMLInputElement
   const selected = Array.from(input.files || [])
-  files.value = [...files.value, ...selected].slice(0, 8)
+  const remaining = uploadedImageLimit - files.value.length
+  if (remaining <= 0) {
+    toast.add({
+      description: `最多上传 ${uploadedImageLimit} 张图片`,
+      icon: 'i-lucide-circle-alert',
+      color: 'warning'
+    })
+    input.value = ''
+    return
+  }
+
+  const accepted = selected.slice(0, remaining)
+  files.value = [...files.value, ...accepted.map(createUploadedImage)]
+  if (selected.length > remaining) {
+    toast.add({
+      description: `最多上传 ${uploadedImageLimit} 张图片，已自动保留前 ${remaining} 张`,
+      icon: 'i-lucide-circle-alert',
+      color: 'warning'
+    })
+  }
   input.value = ''
 }
 
@@ -321,8 +407,8 @@ async function requestImageEdit(apiKey: string, task: {
   ratio: ImageRatio
   resolution: ImageResolution
   size: string
-}, source: ImageTask) {
-  if (!source.imageUrl) {
+}, sources: File[]) {
+  if (!sources.length) {
     throw new Error('缺少要编辑的图片')
   }
 
@@ -332,7 +418,9 @@ async function requestImageEdit(apiKey: string, task: {
   formData.set('ratio', task.ratio)
   formData.set('resolution', task.resolution)
   formData.set('size', task.size)
-  formData.set('image', await imageUrlToFile(source.imageUrl, `source-${source.id}.png`))
+  sources.forEach((source) => {
+    formData.append('image', source)
+  })
 
   const response = await fetchWithTimeout('/api/images/edits', {
     method: 'POST',
@@ -358,11 +446,18 @@ async function requestImageEdit(apiKey: string, task: {
 
 function previewImage(task: ImageTask) {
   if (!task.imageUrl) return
+  previewUploadedImage.value = null
   previewTask.value = task
+}
+
+function previewUploadedSource(image: UploadedImage) {
+  previewTask.value = null
+  previewUploadedImage.value = image
 }
 
 function closePreview() {
   previewTask.value = null
+  previewUploadedImage.value = null
 }
 
 function downloadImage(task: ImageTask) {
@@ -374,6 +469,27 @@ function downloadImage(task: ImageTask) {
   document.body.appendChild(link)
   link.click()
   link.remove()
+}
+
+async function deleteImageTask(task: ImageTask) {
+  const instance = deleteImageModal.open()
+  const result = await instance.result
+  if (!result) return
+
+  queue.value = queue.value.filter(item => item.id !== task.id)
+
+  if (selectedTaskId.value === task.id) {
+    selectedTaskId.value = ''
+  }
+  if (previewTask.value?.id === task.id) {
+    previewTask.value = null
+  }
+
+  toast.add({
+    title: '图片已删除',
+    description: '已从本地图片历史中移除',
+    icon: 'i-lucide-trash'
+  })
 }
 
 function selectImageTask(task: ImageTask) {
@@ -421,11 +537,12 @@ function getTaskDurationSeconds(task: ImageTask) {
 
 async function submitImageTask() {
   if (!canSubmit.value) return
-  const sourceTask = selectedTask.value
+  const uploadedSources = files.value.map(item => item.file)
+  const sourceTask = uploadedSources.length ? null : selectedTask.value
 
   const task: ImageTask = {
     id: crypto.randomUUID(),
-    type: sourceTask ? 'edit' : 'generation',
+    type: sourceTask || uploadedSources.length ? 'edit' : 'generation',
     parentId: sourceTask?.id,
     sourceImageIds: sourceTask ? [sourceTask.id] : undefined,
     prompt: prompt.value.trim(),
@@ -442,10 +559,15 @@ async function submitImageTask() {
 
   try {
     let apiKey = await getApiKeyForGroup(imageGroup.id)
+    const editSources = [...uploadedSources]
+    if (!editSources.length && sourceTask?.imageUrl) {
+      editSources.push(await imageUrlToFile(sourceTask.imageUrl, `source-${sourceTask.id}.png`))
+    }
+
     let result: ImageGenerationResponse
     try {
-      result = sourceTask
-        ? await requestImageEdit(apiKey, task, sourceTask)
+      result = editSources.length
+        ? await requestImageEdit(apiKey, task, editSources)
         : await requestImageGeneration(apiKey, task)
     } catch (error) {
       const status = (error as RequestError).status
@@ -455,8 +577,8 @@ async function submitImageTask() {
 
       clearApiKeyForGroup(imageGroup.id)
       apiKey = await getApiKeyForGroup(imageGroup.id)
-      result = sourceTask
-        ? await requestImageEdit(apiKey, task, sourceTask)
+      result = editSources.length
+        ? await requestImageEdit(apiKey, task, editSources)
         : await requestImageGeneration(apiKey, task)
     }
 
@@ -473,6 +595,9 @@ async function submitImageTask() {
     })
     if (sourceTask) {
       selectedTaskId.value = task.id
+    }
+    if (uploadedSources.length) {
+      clearUploadedImages()
     }
   } catch (error) {
     const message = toErrorMessage(error)
@@ -578,6 +703,16 @@ async function submitImageTask() {
                   class="rounded-full"
                   aria-label="Download image"
                   @click.stop="downloadImage(item)"
+                />
+                <UButton
+                  type="button"
+                  icon="i-lucide-trash"
+                  color="error"
+                  variant="solid"
+                  size="lg"
+                  class="rounded-full"
+                  aria-label="Delete image"
+                  @click.stop="deleteImageTask(item)"
                 />
               </div>
               <UIcon
@@ -792,6 +927,40 @@ async function submitImageTask() {
           @submit.prevent="submitImageTask"
         >
           <div class="rounded-3xl border border-default bg-elevated/30 p-3 shadow-xs">
+            <div
+              v-if="files.length"
+              class="mb-3 flex gap-2 overflow-x-auto pb-1"
+            >
+              <div
+                v-for="file in files"
+                :key="file.id"
+                class="group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-default bg-muted"
+                :title="file.name"
+              >
+                <button
+                  type="button"
+                  class="block size-full"
+                  @click="previewUploadedSource(file)"
+                >
+                  <img
+                    :src="file.previewUrl"
+                    :alt="file.name"
+                    class="size-full object-cover"
+                  >
+                </button>
+                <UButton
+                  type="button"
+                  icon="i-lucide-x"
+                  color="neutral"
+                  variant="solid"
+                  size="xs"
+                  class="absolute right-1 top-1 rounded-full opacity-0 transition group-hover:opacity-100"
+                  aria-label="Remove uploaded image"
+                  @click="removeUploadedImage(file.id)"
+                />
+              </div>
+            </div>
+
             <UTextarea
               v-model="prompt"
               :maxlength="promptLimit"
@@ -888,9 +1057,9 @@ async function submitImageTask() {
                   icon="i-lucide-paperclip"
                   color="neutral"
                   variant="ghost"
-                  :label="files.length ? `${files.length}/8` : undefined"
+                  :label="files.length ? `${files.length}/${uploadedImageLimit}` : undefined"
                   class="shrink-0 rounded-full"
-                  :disabled="files.length >= 8"
+                  :disabled="files.length >= uploadedImageLimit"
                   @click="pickFiles"
                 />
               </div>
@@ -913,7 +1082,7 @@ async function submitImageTask() {
     </div>
 
     <div
-      v-if="previewTask?.imageUrl"
+      v-if="previewImageUrl"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
       @click.self="closePreview"
     >
@@ -928,8 +1097,8 @@ async function submitImageTask() {
           @click="closePreview"
         />
         <img
-          :src="previewTask.imageUrl"
-          :alt="previewTask.revisedPrompt || previewTask.prompt"
+          :src="previewImageUrl"
+          :alt="previewImageAlt"
           class="max-h-[90vh] max-w-full rounded-2xl object-contain shadow-2xl"
         >
       </div>

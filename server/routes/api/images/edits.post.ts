@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { sub2apiBaseURL } from '../../../utils/sub2api'
 
 const imageModel = 'gpt-image-2'
+const imageInputLimit = 8
 const imageSizeMap = {
   '1K': {
     '1:1': '1024x1024',
@@ -86,9 +87,12 @@ export default defineHandler(async (event) => {
     ratio: form.get('ratio'),
     resolution: form.get('resolution')
   })
-  const image = form.get('image')
-  if (!(image instanceof File)) {
+  const images = form.getAll('image').filter((image): image is File => image instanceof File)
+  if (!images.length) {
     throw new HTTPError({ statusCode: 400, statusMessage: 'Image file is required' })
+  }
+  if (images.length > imageInputLimit) {
+    throw new HTTPError({ statusCode: 400, statusMessage: `Too many images. Maximum is ${imageInputLimit}` })
   }
 
   const upstreamForm = new FormData()
@@ -97,7 +101,9 @@ export default defineHandler(async (event) => {
   upstreamForm.set('size', imageSizeMap[payload.resolution][payload.ratio])
   upstreamForm.set('response_format', 'b64_json')
   upstreamForm.set('n', '1')
-  upstreamForm.set('image', image)
+  images.forEach((image) => {
+    upstreamForm.append('image', image)
+  })
 
   const response = await fetch(`${sub2apiBaseURL()}/images/edits`, {
     method: 'POST',
