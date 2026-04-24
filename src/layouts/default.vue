@@ -107,16 +107,17 @@ defineShortcuts({
       <template #header="{ collapsed }">
         <ULink
           to="/"
-          class="flex items-center gap-0.5"
+          class="flex items-center gap-2"
         >
-          <UIcon
-            name="i-logos-vue"
-            class="h-5 w-auto shrink-0"
-          />
+          <img
+            src="/logo-mark.svg"
+            alt="pigcoder"
+            class="size-7 shrink-0 rounded-md object-contain"
+          >
           <span
             v-if="!collapsed"
             class="text-xl font-bold text-highlighted"
-          >Chat</span>
+          >pigcoder</span>
         </ULink>
 
         <div

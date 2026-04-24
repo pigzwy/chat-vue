@@ -1,8 +1,79 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <style>
-    .st0 { fill: #42B883; }
-    .st1 { fill: #35495E; }
-  </style>
-  <path class="st0" d="M78.8,10L64,35.4L49.2,10H0l64,110l64-110C128,10,78.8,10,78.8,10z" />
-  <path class="st1" d="M78.8,10L64,35.4L49.2,10H25.6L64,76l38.4-66H78.8z" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">pigcoder logo</title>
+  <desc id="desc">A yellow cat-inspired coding logo with a green code badge and pigcoder wordmark.</desc>
+  <defs>
+    <linearGradient id="gold" x1="110" x2="360" y1="122" y2="395" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffd91f" />
+      <stop offset="1" stop-color="#f2bb12" />
+    </linearGradient>
+    <linearGradient id="badge" x1="320" x2="444" y1="193" y2="316" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9fd681" />
+      <stop offset="1" stop-color="#68b85b" />
+    </linearGradient>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0a2f68" flood-opacity=".16" />
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="64" fill="#ffffff" />
+  <g filter="url(#soft-shadow)">
+    <path
+      fill="#f6c515"
+      stroke="#082f6b"
+      stroke-linejoin="round"
+      stroke-width="16"
+      d="M115 199 96 99l96 13 54 40c38-18 82-21 121-6l63-61 13 107c25 32 39 72 39 116 0 105-85 190-190 190S102 413 102 308c0-39 12-76 33-106Z"
+    />
+    <path
+      fill="#ffdd29"
+      stroke="#082f6b"
+      stroke-linejoin="round"
+      stroke-width="13"
+      d="M109 100c32 2 64 11 92 28l-67 68c-13-29-21-61-25-96Z"
+    />
+    <path
+      fill="#ffdd29"
+      stroke="#082f6b"
+      stroke-linejoin="round"
+      stroke-width="13"
+      d="m418 89 10 83-73-28c19-21 40-39 63-55Z"
+    />
+    <path
+      fill="url(#gold)"
+      d="M136 223c-14 24-22 53-22 84 0 97 79 176 176 176 90 0 164-67 175-154-36 25-87 30-122 4-36-26-41-76-12-110 24-28 66-40 106-30-31-43-82-70-139-70-35 0-68 11-95 30 12 12 12 22 0 31l-45 42c-8 8-16 7-22-3Z"
+    />
+    <path
+      fill="none"
+      stroke="#ffffff"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="18"
+      d="M177 158c-34 35-54 83-54 135"
+      opacity=".94"
+    />
+    <g>
+      <ellipse cx="383" cy="260" fill="#082f6b" rx="104" ry="82" />
+      <ellipse cx="383" cy="260" fill="url(#badge)" rx="84" ry="62" />
+      <path
+        fill="none"
+        stroke="#082f6b"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="18"
+        d="m350 238-28 25 28 25m67-50 28 25-28 25m-25-58-18 66"
+      />
+      <path fill="#3f8f46" d="M310 299c16 19 42 30 73 30 45 0 81-24 84-54-20 22-50 35-84 35-28 0-53-4-73-11Z" opacity=".35" />
+    </g>
+  </g>
+  <text
+    x="256"
+    y="482"
+    fill="#082f6b"
+    font-family="Public Sans, Arial, sans-serif"
+    font-size="52"
+    font-weight="700"
+    letter-spacing="0"
+    text-anchor="middle"
+    transform="rotate(-4 256 482)"
+  >pigcoder</text>
 </svg>

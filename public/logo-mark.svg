@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">pigcoder mark</title>
+  <desc id="desc">A yellow cat-inspired coding mark with a green code badge.</desc>
+  <defs>
+    <linearGradient id="gold" x1="110" x2="360" y1="122" y2="395" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffd91f" />
+      <stop offset="1" stop-color="#f2bb12" />
+    </linearGradient>
+    <linearGradient id="badge" x1="320" x2="444" y1="193" y2="316" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9fd681" />
+      <stop offset="1" stop-color="#68b85b" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="#ffffff" />
+  <path
+    fill="#f6c515"
+    stroke="#082f6b"
+    stroke-linejoin="round"
+    stroke-width="18"
+    d="M101 199 81 74l118 18 53 38c39-15 83-17 122-2l72-70 17 132c25 34 39 75 39 119 0 112-91 203-203 203S96 421 96 309c0-39 11-76 31-107Z"
+  />
+  <path
+    fill="#ffdd29"
+    stroke="#082f6b"
+    stroke-linejoin="round"
+    stroke-width="15"
+    d="M95 77c38 3 75 14 108 33l-79 80c-15-35-25-72-29-113Z"
+  />
+  <path
+    fill="#ffdd29"
+    stroke="#082f6b"
+    stroke-linejoin="round"
+    stroke-width="15"
+    d="m431 66 13 99-86-34c22-25 46-47 73-65Z"
+  />
+  <path
+    fill="url(#gold)"
+    d="M131 218c-16 27-25 58-25 91 0 105 85 190 190 190 98 0 178-73 189-167-38 26-91 31-129 3-39-28-44-82-12-119 26-31 72-44 115-32-34-47-90-77-153-77-38 0-74 11-103 32 13 13 13 24 0 34l-49 46c-8 8-17 7-23-1Z"
+  />
+  <path
+    fill="none"
+    stroke="#ffffff"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="20"
+    d="M174 144c-39 40-62 94-62 153"
+    opacity=".94"
+  />
+  <ellipse cx="390" cy="258" fill="#082f6b" rx="109" ry="86" />
+  <ellipse cx="390" cy="258" fill="url(#badge)" rx="88" ry="65" />
+  <path
+    fill="none"
+    stroke="#082f6b"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="20"
+    d="m356 235-30 27 30 27m70-54 30 27-30 27m-27-61-19 70"
+  />
+  <path fill="#3f8f46" d="M314 299c17 20 44 32 76 32 48 0 86-25 89-57-21 23-53 36-89 36-30 0-56-4-76-11Z" opacity=".35" />
+</svg>
