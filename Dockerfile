@@ -23,6 +23,8 @@ RUN addgroup -S app && adduser -S app -G app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 COPY --from=build --chown=app:app /app/.output ./.output
+RUN mkdir -p .output/server/node_modules/@libsql \
+  && cp -Lr node_modules/@libsql/linux-x64-musl .output/server/node_modules/@libsql/linux-x64-musl
 RUN mkdir -p /app/.data && chown -R app:app /app/.data
 
 USER app
