@@ -12,12 +12,16 @@ import ChatMessageContent from '../../components/chat/message/MessageContent.vue
 import ChatMessageActions from '../../components/chat/message/MessageActions.vue'
 import ChatVisibility from '../../components/chat/ChatVisibility.vue'
 import ChatIndicator from '../../components/chat/Indicator.vue'
+import ChatAttachmentPreviewList from '../../components/chat/AttachmentPreviewList.vue'
 import Navbar from '../../components/Navbar.vue'
+import ReasoningEffortSelect from '../../components/ReasoningEffortSelect.vue'
+import { chatAttachmentAccept, chatAttachmentLimit } from '../../utils/chatAttachments'
+import { useChatAttachments } from '../../composables/useChatAttachments'
 import type { Vote } from '../../../server/utils/drizzle'
 
 const route = useRoute<'/chat/[id]'>()
 const toast = useToast()
-const { apiKey, model } = useModels()
+const { apiKey, model, reasoningEffort } = useModels()
 const { fetchChats } = useChats()
 const { csrf, headerName } = useCsrf()
 
@@ -34,6 +38,17 @@ if (isOwner.value) {
 }
 
 const input = ref('')
+const attachmentInput = ref<HTMLInputElement | null>(null)
+const attachmentPending = ref(false)
+const {
+  attachments,
+  hasAttachments,
+  addFiles,
+  removeAttachment,
+  clearAttachments,
+  validateAttachments,
+  toMessageParts
+} = useChatAttachments()
 
 const chat = new Chat({
   id: data?.id,
@@ -50,7 +65,8 @@ const chat = new Chat({
           messages,
           trigger,
           apiKey: apiKey.value,
-          model: model.value
+          model: model.value,
+          reasoningEffort: reasoningEffort.value
         }
       }
     }
@@ -71,13 +87,47 @@ const chat = new Chat({
   }
 })
 
-function handleSubmit(e: Event) {
-  e.preventDefault()
-  if (input.value.trim()) {
-    chat.sendMessage({
-      text: input.value
-    })
+function pickAttachmentFiles() {
+  if (chat.status !== 'ready') return
+  attachmentInput.value?.click()
+}
+
+function onAttachmentFilesChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  addFiles(Array.from(target.files || []), model.value)
+  target.value = ''
+}
+
+async function handleSubmit(e?: Event) {
+  e?.preventDefault()
+  const text = input.value.trim()
+  if (!text && !hasAttachments.value) return
+
+  attachmentPending.value = true
+  try {
+    if (hasAttachments.value && !validateAttachments(model.value)) return
+
+    const attachmentParts = hasAttachments.value ? await toMessageParts() : []
+    if (attachmentParts.length) {
+      void chat.sendMessage({
+        parts: [
+          ...(text ? [{ type: 'text' as const, text }] : []),
+          ...attachmentParts
+        ]
+      })
+    } else {
+      void chat.sendMessage({ text })
+    }
     input.value = ''
+    clearAttachments()
+  } catch (error) {
+    toast.add({
+      description: error instanceof Error ? error.message : 'Failed to read attachments',
+      icon: 'i-lucide-alert-circle',
+      color: 'error'
+    })
+  } finally {
+    attachmentPending.value = false
   }
 }
 
@@ -242,19 +292,64 @@ onMounted(() => {
           :error="chat.error"
           variant="subtle"
           class="sticky bottom-0 [view-transition-name:chat-prompt] rounded-b-none z-10"
-          :ui="{ base: 'px-1.5' }"
+          :ui="{ base: 'px-1.5', footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-default pt-2' }"
           @submit="handleSubmit"
         >
-          <template #footer>
-            <ModelSelect v-model="model" />
-
-            <UChatPromptSubmit
-              :status="chat.status"
-              color="neutral"
-              size="sm"
-              @stop="chat.stop()"
-              @reload="chat.regenerate()"
+          <template
+            v-if="attachments.length"
+            #header
+          >
+            <ChatAttachmentPreviewList
+              :attachments="attachments"
+              :disabled="chat.status !== 'ready' || attachmentPending"
+              @remove="removeAttachment"
             />
+          </template>
+
+          <template #footer>
+            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <ModelSelect />
+
+              <ReasoningEffortSelect />
+
+              <input
+                ref="attachmentInput"
+                type="file"
+                multiple
+                :accept="chatAttachmentAccept"
+                class="hidden"
+                @change="onAttachmentFilesChange"
+              >
+              <UTooltip text="Add attachments">
+                <UButton
+                  type="button"
+                  icon="i-lucide-paperclip"
+                  color="neutral"
+                  variant="ghost"
+                  size="sm"
+                  class="shrink-0 rounded-full"
+                  :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
+                  :disabled="chat.status !== 'ready' || attachmentPending || attachments.length >= chatAttachmentLimit"
+                  aria-label="Add attachments"
+                  @click="pickAttachmentFiles"
+                />
+              </UTooltip>
+            </div>
+
+            <div class="flex shrink-0 items-center">
+              <UChatPromptSubmit
+                :status="chat.status"
+                icon="i-lucide-arrow-up"
+                color="neutral"
+                size="sm"
+                class="shrink-0 rounded-full"
+                :type="hasAttachments ? 'button' : undefined"
+                :disabled="attachmentPending"
+                @click="chat.status === 'ready' && hasAttachments ? handleSubmit($event) : undefined"
+                @stop="chat.stop()"
+                @reload="chat.regenerate()"
+              />
+            </div>
           </template>
         </UChatPrompt>
       </UContainer>

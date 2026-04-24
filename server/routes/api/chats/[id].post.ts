@@ -1,4 +1,4 @@
-import type { UIMessage } from 'ai'
+import type { FileUIPart, UIMessage } from 'ai'
 import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, generateText, smoothStream, stepCountIs, streamText } from 'ai'
 import { gateway } from '@ai-sdk/gateway'
 import { z } from 'zod'
@@ -15,7 +15,67 @@ import { getValidatedRouterParams, readValidatedBody } from 'nitro/h3'
 import { weatherTool } from '../../../utils/tools/weather'
 import { chartTool } from '../../../utils/tools/chart'
 import { MODELS } from '../../../../shared/utils/models'
+import { reasoningEffortValues } from '../../../../shared/utils/reasoning'
+import type { ReasoningEffort } from '../../../../shared/utils/reasoning'
 import { createSub2apiChatModel } from '../../../utils/sub2api'
+
+function buildProviderOptions(model: string, usesSub2api: boolean, reasoningEffort: ReasoningEffort) {
+  if (reasoningEffort === 'auto') return undefined
+
+  if (usesSub2api || model.startsWith('openai/')) {
+    return {
+      providerOptions: {
+        openai: {
+          reasoningEffort,
+          reasoningSummary: 'detailed'
+        } satisfies OpenAILanguageModelResponsesOptions
+      }
+    }
+  }
+
+  if (model.startsWith('anthropic/')) {
+    return {
+      providerOptions: {
+        anthropic: {
+          effort: reasoningEffort
+        } satisfies AnthropicLanguageModelOptions
+      }
+    }
+  }
+
+  if (model.startsWith('google/')) {
+    return {
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: reasoningEffort
+          }
+        } satisfies GoogleLanguageModelOptions
+      }
+    }
+  }
+
+  return undefined
+}
+
+function getTitlePromptSource(message?: UIMessage) {
+  if (!message) return ''
+
+  return JSON.stringify({
+    ...message,
+    parts: message.parts.map((part) => {
+      if (part.type !== 'file') return part
+
+      const file = part as FileUIPart
+      return {
+        type: 'file',
+        mediaType: file.mediaType,
+        filename: file.filename
+      }
+    })
+  })
+}
 
 export default defineHandler(async (event) => {
   const session = await useChatSession(event)
@@ -24,10 +84,11 @@ export default defineHandler(async (event) => {
     id: z.string()
   }).parse)
 
-  const { apiKey, model, messages } = await readValidatedBody(event, z.object({
+  const { apiKey, model, messages, reasoningEffort } = await readValidatedBody(event, z.object({
     apiKey: z.string().optional(),
     model: z.string().min(1),
-    messages: z.array(z.custom<UIMessage>())
+    messages: z.array(z.custom<UIMessage>()),
+    reasoningEffort: z.enum(reasoningEffortValues).optional().default('auto')
   }).parse)
 
   const usesSub2api = Boolean(apiKey)
@@ -56,7 +117,7 @@ export default defineHandler(async (event) => {
           - The title should be a summary of the user's message
           - Do not use quotes (' or ") or colons (:) or any other punctuation
           - Do not use markdown, just plain text`,
-      prompt: JSON.stringify(messages[0])
+      prompt: getTitlePromptSource(messages[0])
     })
 
     await db.update(tables.chats).set({ title }).where(eq(tables.chats.id, id as string))
@@ -111,26 +172,7 @@ export default defineHandler(async (event) => {
           // TODO: enable once AI SDK supports combining provider-defined tools with custom tools
           // ...(model.startsWith('google/') && { google_search: google.tools.googleSearch({}) })
         },
-        ...(!usesSub2api && {
-          providerOptions: {
-            anthropic: {
-              thinking: {
-                type: 'enabled',
-                budgetTokens: 2048
-              }
-            } satisfies AnthropicLanguageModelOptions,
-            google: {
-              thinkingConfig: {
-                includeThoughts: true,
-                thinkingLevel: 'low'
-              }
-            } satisfies GoogleLanguageModelOptions,
-            openai: {
-              reasoningEffort: 'low',
-              reasoningSummary: 'detailed'
-            } satisfies OpenAILanguageModelResponsesOptions
-          }
-        }),
+        ...buildProviderOptions(model, usesSub2api, reasoningEffort),
         stopWhen: stepCountIs(5),
         experimental_transform: smoothStream()
       })

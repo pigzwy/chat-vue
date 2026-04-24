@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { createSharedComposable, useStorage } from '@vueuse/core'
 import { MODELS } from '../../shared/utils/models'
+import type { ReasoningEffort } from '../../shared/utils/reasoning'
 import { useCsrf } from './useCsrf'
 
 interface ApiResponse<T> {
@@ -18,10 +19,30 @@ interface ApiKeyItem {
   status: string
 }
 
+interface ApiKeyCacheItem {
+  token: string
+  key: string
+}
+
 interface ModelItem {
   id: string
   display_name?: string
 }
+
+type GroupSelectItem = { label: string, value: number, icon: string }
+type ModelSelectItem = { label: string, value: string, icon: string }
+
+interface GroupCache {
+  token: string
+  items: GroupSelectItem[]
+}
+
+interface ModelsCacheItem {
+  token: string
+  items: ModelSelectItem[]
+}
+
+type ApiKeyCacheValue = string | ApiKeyCacheItem
 
 const SUB2API_TOKEN_KEY = 'sub2api-token'
 const defaultErrorMessage = '加载 Sub2API 失败'
@@ -47,6 +68,28 @@ function iconForProvider(value?: string) {
   if (normalized.includes('google') || normalized.includes('gemini')) return 'i-simple-icons:google'
   if (normalized.includes('openai') || normalized.includes('gpt')) return 'i-simple-icons:openai'
   return 'i-lucide-box'
+}
+
+function capitalizeFirst(value: string) {
+  const text = value.trim()
+  if (!text) return text
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`
+}
+
+function toGroupSelectItem(item: GroupItem): GroupSelectItem {
+  return {
+    label: item.name,
+    value: item.id,
+    icon: iconForProvider(item.platform || item.name)
+  }
+}
+
+function toModelSelectItem(item: ModelItem): ModelSelectItem {
+  return {
+    label: capitalizeFirst(item.display_name || item.id),
+    value: item.id,
+    icon: iconForProvider(item.id)
+  }
 }
 
 async function sub2apiFetch<T>(path: string, token: string): Promise<T> {
@@ -79,19 +122,28 @@ function readTokenFromUrl() {
   const token = url.searchParams.get('token')
   if (!token) return ''
 
-  localStorage.setItem(SUB2API_TOKEN_KEY, token)
   url.searchParams.delete('token')
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
   return token
+}
+
+function getCachedApiKey(cache: Record<string, ApiKeyCacheValue>, groupId: number, token: string) {
+  const item = cache[String(groupId)]
+  if (!item) return ''
+  if (typeof item === 'string') return item
+  return item.token === token ? item.key : ''
 }
 
 export const useModels = createSharedComposable(() => {
   const token = useStorage(SUB2API_TOKEN_KEY, '')
   const group = useStorage<number | null>('sub2api-group', null)
   const model = useStorage<string>('model', 'anthropic/claude-haiku-4.5')
+  const reasoningEffort = useStorage<ReasoningEffort>('reasoning-effort', 'auto')
   const apiKey = useStorage('sub2api-api-key', '')
-  const apiKeysByGroup = useStorage<Record<string, string>>('sub2api-api-keys', {})
-  const groupItems = ref<Array<{ label: string, value: number, icon: string }>>([])
+  const apiKeysByGroup = useStorage<Record<string, ApiKeyCacheValue>>('sub2api-api-keys', {})
+  const cachedGroups = useStorage<GroupCache | null>('sub2api-groups-cache', null)
+  const cachedModelsByGroup = useStorage<Record<string, ModelsCacheItem>>('sub2api-models-cache', {})
+  const groupItems = ref<GroupSelectItem[]>([])
   const modelItems = ref(MODELS)
   const loading = ref(false)
   const error = ref('')
@@ -102,7 +154,15 @@ export const useModels = createSharedComposable(() => {
   async function init() {
     if (typeof window === 'undefined') return
     const urlToken = readTokenFromUrl()
-    if (urlToken) token.value = urlToken
+    if (urlToken) {
+      if (urlToken !== token.value) {
+        cachedGroups.value = null
+        cachedModelsByGroup.value = {}
+        apiKeysByGroup.value = {}
+        apiKey.value = ''
+      }
+      token.value = urlToken
+    }
     if (!token.value) return
 
     await loadGroups()
@@ -112,15 +172,33 @@ export const useModels = createSharedComposable(() => {
     loading.value = true
     error.value = ''
     try {
+      if (cachedGroups.value?.token === token.value && cachedGroups.value.items.length) {
+        groupItems.value = cachedGroups.value.items
+
+        if (!group.value || !groupItems.value.some(item => item.value === group.value)) {
+          group.value = groupItems.value[0]?.value || null
+        }
+
+        if (group.value) {
+          try {
+            await loadModels(group.value)
+          } catch (e) {
+            error.value = toErrorMessage(e)
+          }
+        }
+        return
+      }
+
       const response = await sub2apiFetch<unknown>('/api/v1/groups/available', token.value)
-      groupItems.value = getItems<GroupItem>(response).map(item => ({
-        label: item.name,
-        value: item.id,
-        icon: iconForProvider(item.platform || item.name)
-      }))
+      groupItems.value = getItems<GroupItem>(response).map(toGroupSelectItem)
 
       if (!groupItems.value.length) {
         throw new Error('没有可用分组')
+      }
+
+      cachedGroups.value = {
+        token: token.value,
+        items: groupItems.value
       }
 
       if (!group.value || !groupItems.value.some(item => item.value === group.value)) {
@@ -145,17 +223,31 @@ export const useModels = createSharedComposable(() => {
   async function loadModels(groupId: number) {
     if (!token.value) return
 
+    const cacheKey = String(groupId)
     apiKey.value = await getApiKeyForGroup(groupId)
 
+    const cachedModels = cachedModelsByGroup.value[cacheKey]
+    if (cachedModels?.token === token.value && cachedModels.items.length) {
+      modelItems.value = cachedModels.items
+      if (!modelItems.value.some(item => item.value === model.value)) {
+        model.value = modelItems.value[0]?.value || ''
+      }
+      return
+    }
+
     const modelsResponse = await sub2apiFetch<unknown>('/v1/models', apiKey.value)
-    modelItems.value = getItems<ModelItem>(modelsResponse).map(item => ({
-      label: item.display_name || item.id,
-      value: item.id,
-      icon: iconForProvider(item.id)
-    }))
+    modelItems.value = getItems<ModelItem>(modelsResponse).map(toModelSelectItem)
 
     if (!modelItems.value.length) {
       throw new Error('没有可用模型')
+    }
+
+    cachedModelsByGroup.value = {
+      ...cachedModelsByGroup.value,
+      [cacheKey]: {
+        token: token.value,
+        items: modelItems.value
+      }
     }
 
     if (!modelItems.value.some(item => item.value === model.value)) {
@@ -163,14 +255,24 @@ export const useModels = createSharedComposable(() => {
     }
   }
 
-  async function getApiKeyForGroup(groupId: number) {
+  async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
     if (!token.value) {
       throw new Error('缺少 Sub2API token')
     }
 
     const cacheKey = String(groupId)
-    if (apiKeysByGroup.value[cacheKey]) {
-      return apiKeysByGroup.value[cacheKey]
+    const cachedKey = getCachedApiKey(apiKeysByGroup.value, groupId, token.value)
+    if (cachedKey) {
+      if (typeof apiKeysByGroup.value[cacheKey] === 'string') {
+        apiKeysByGroup.value = {
+          ...apiKeysByGroup.value,
+          [cacheKey]: {
+            token: token.value,
+            key: cachedKey
+          }
+        }
+      }
+      return cachedKey
     }
 
     const params = new URLSearchParams({
@@ -180,10 +282,13 @@ export const useModels = createSharedComposable(() => {
     })
     const keysResponse = await sub2apiFetch<unknown>(`/api/v1/keys?${params}`, token.value)
     const activeKey = getItems<ApiKeyItem>(keysResponse).find(key => key.status === 'active')
-    const key = activeKey?.key || await createApiKey(groupId)
+    const key = activeKey?.key || await createApiKey(groupId, keyName)
     apiKeysByGroup.value = {
       ...apiKeysByGroup.value,
-      [cacheKey]: key
+      [cacheKey]: {
+        token: token.value,
+        key
+      }
     }
     return key
   }
@@ -197,7 +302,7 @@ export const useModels = createSharedComposable(() => {
     apiKeysByGroup.value = next
   }
 
-  async function createApiKey(groupId: number) {
+  async function createApiKey(groupId: number, keyName: string) {
     const response = await fetch('/sub2api/api/v1/keys', {
       method: 'POST',
       headers: {
@@ -205,7 +310,7 @@ export const useModels = createSharedComposable(() => {
         [headerName]: csrf(),
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ name: `chat-vue-${groupId}`, group_id: groupId })
+      body: JSON.stringify({ name: keyName, group_id: groupId })
     })
     if (!response.ok) {
       throw new Error(await response.text().catch(() => `创建 API Key 失败: ${response.status}`))
@@ -241,6 +346,7 @@ export const useModels = createSharedComposable(() => {
     loading,
     model,
     models: modelItems,
+    reasoningEffort,
     selectGroup
   }
 })

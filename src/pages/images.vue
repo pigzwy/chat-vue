@@ -62,6 +62,7 @@ const imageGroup = {
   model: 'gpt-image-2',
   label: 'GPT Image 2'
 } as const
+const imageApiKeyName = 'chat | draw'
 const imageStorageKey = 'sub2api-image-tasks'
 const imageStorageLimit = 12
 const uploadedImageLimit = 8
@@ -558,7 +559,7 @@ async function submitImageTask() {
   prompt.value = ''
 
   try {
-    let apiKey = await getApiKeyForGroup(imageGroup.id)
+    let apiKey = await getApiKeyForGroup(imageGroup.id, imageApiKeyName)
     const editSources = [...uploadedSources]
     if (!editSources.length && sourceTask?.imageUrl) {
       editSources.push(await imageUrlToFile(sourceTask.imageUrl, `source-${sourceTask.id}.png`))
@@ -576,7 +577,7 @@ async function submitImageTask() {
       }
 
       clearApiKeyForGroup(imageGroup.id)
-      apiKey = await getApiKeyForGroup(imageGroup.id)
+      apiKey = await getApiKeyForGroup(imageGroup.id, imageApiKeyName)
       result = editSources.length
         ? await requestImageEdit(apiKey, task, editSources)
         : await requestImageGeneration(apiKey, task)

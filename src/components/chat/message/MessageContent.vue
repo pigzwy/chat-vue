@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import { isReasoningUIPart, isTextUIPart, isToolUIPart, getToolName } from 'ai'
-import type { UIMessage } from 'ai'
+import { isFileUIPart, isReasoningUIPart, isTextUIPart, isToolUIPart, getToolName } from 'ai'
+import type { FileUIPart, UIMessage } from 'ai'
 import { isPartStreaming, isToolStreaming } from '@nuxt/ui/utils/ai'
 import ChatComark from '../Comark'
 import ChatToolChart from '../tool/Chart.vue'
 import ChatToolWeather from '../tool/Weather.vue'
 import ChatToolSources from '../tool/Sources.vue'
 import ChatMessageEdit from './MessageEdit.vue'
+import ChatMessageFiles from './MessageFiles.vue'
 import { getMergedParts } from '../../../utils/ai'
 import { getSearchQuery, getSources } from '../../../utils/tool'
 import type { WeatherUIToolInvocation } from '../../../../server/utils/tools/weather'
@@ -21,9 +22,18 @@ const emit = defineEmits<{
   save: [message: UIMessage, text: string]
   cancelEdit: []
 }>()
+
+function getFileParts(parts: UIMessage['parts']) {
+  return parts.filter(isFileUIPart) as FileUIPart[]
+}
 </script>
 
 <template>
+  <ChatMessageFiles
+    v-if="message.role === 'user'"
+    :files="getFileParts(message.parts)"
+  />
+
   <template
     v-for="(part, index) in getMergedParts(message.parts)"
     :key="`${message.id}-${part.type}-${index}`"

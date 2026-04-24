@@ -10,7 +10,7 @@ function onGroupChange(value?: number) {
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5">
+  <div class="flex min-w-0 flex-wrap items-center gap-2">
     <UIcon
       v-if="loading"
       name="i-lucide-loader-circle"
@@ -36,13 +36,21 @@ function onGroupChange(value?: number) {
       :items="groups"
       size="sm"
       :icon="groups.find(item => item.value === group)?.icon"
-      variant="ghost"
+      color="neutral"
+      variant="soft"
       value-key="value"
-      class="data-[state=open]:bg-elevated"
+      class="max-w-40 shrink-0 rounded-full data-[state=open]:bg-elevated"
       :ui="{
+        base: 'rounded-full',
+        label: 'truncate',
         trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
       }"
       @update:model-value="onGroupChange"
+    />
+
+    <div
+      v-if="groups.length"
+      class="hidden h-6 w-px shrink-0 bg-default sm:block"
     />
 
     <USelectMenu
@@ -50,10 +58,13 @@ function onGroupChange(value?: number) {
       :items="models"
       size="sm"
       :icon="models.find(m => m.value === model)?.icon"
-      variant="ghost"
+      color="neutral"
+      variant="soft"
       value-key="value"
-      class="data-[state=open]:bg-elevated"
+      class="max-w-44 shrink-0 rounded-full data-[state=open]:bg-elevated sm:max-w-48"
       :ui="{
+        base: 'rounded-full',
+        label: 'truncate',
         trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
       }"
     />
