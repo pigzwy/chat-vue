@@ -1,6 +1,6 @@
 services:
   chat-vue:
-    image: ${IMAGE:-ghcr.io/owner/chat-vue:latest}
+    image: ${IMAGE:-llpig/chat-vue:latest}
     container_name: chat-vue
     restart: unless-stopped
     ports:
