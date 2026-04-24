@@ -1,11 +1,11 @@
 import { defineHandler, HTTPError } from 'nitro'
 import { readValidatedBody } from 'nitro/h3'
 import { z } from 'zod'
-import { useUserSession } from '../../utils/session'
+import { useChatSession } from '../../utils/session'
 import { useDrizzle, tables } from '../../utils/drizzle'
 
 export default defineHandler(async (event) => {
-  const session = await useUserSession(event)
+  const session = await useChatSession(event)
 
   const { input } = await readValidatedBody(event, z.object({
     input: z.string()
@@ -14,7 +14,7 @@ export default defineHandler(async (event) => {
 
   const [chat] = await db.insert(tables.chats).values({
     title: '',
-    userId: session.data.user?.id || session.id!
+    userId: session.id!
   }).returning()
   if (!chat) {
     throw new HTTPError({ statusCode: 500, statusMessage: 'Failed to create chat' })

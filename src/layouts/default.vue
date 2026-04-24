@@ -1,22 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { useRouter, useRoute } from 'vue-router'
 import { $fetch } from 'ofetch'
 import ModalConfirm from '../components/ModalConfirm.vue'
 import { useChats } from '../composables/useChats'
-import { useUserSession } from '../composables/useUserSession'
 import { useCsrf } from '../composables/useCsrf'
 
 const router = useRouter()
 const route = useRoute<'/chat/[id]' | '/'>()
 const toast = useToast()
 const overlay = useOverlay()
-const { loggedIn, openInPopup, fetchSession } = useUserSession()
 const { csrf, headerName } = useCsrf()
 const { groups, fetchChats } = useChats()
 
-await fetchSession()
 await fetchChats()
 
 const open = ref(false)
@@ -28,11 +25,6 @@ const deleteModal = overlay.create(ModalConfirm, {
   }
 })
 
-
-watch(loggedIn, () => {
-  fetchChats()
-  open.value = false
-})
 
 const items = computed(() => groups.value?.flatMap((group) => {
   return [{
@@ -152,17 +144,7 @@ defineShortcuts({
 
       <template #footer="{ collapsed }">
         <UserMenu
-          v-if="loggedIn"
           :collapsed="collapsed"
-        />
-        <UButton
-          v-else
-          :label="collapsed ? '' : 'Login with GitHub'"
-          icon="i-simple-icons:github"
-          color="neutral"
-          variant="ghost"
-          class="w-full"
-          @click="openInPopup('/auth/github')"
         />
       </template>
     </UDashboardSidebar>

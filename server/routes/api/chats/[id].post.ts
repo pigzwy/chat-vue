@@ -8,7 +8,7 @@ import type { GoogleLanguageModelOptions } from '@ai-sdk/google'
 // import { google } from '@ai-sdk/google'
 import type { OpenAILanguageModelResponsesOptions } from '@ai-sdk/openai'
 import { openai } from '@ai-sdk/openai'
-import { useUserSession } from '../../../utils/session'
+import { useChatSession } from '../../../utils/session'
 import { useDrizzle, tables, eq, and } from '../../../utils/drizzle'
 import { defineHandler, HTTPError } from 'nitro'
 import { getValidatedRouterParams, readValidatedBody } from 'nitro/h3'
@@ -18,7 +18,7 @@ import { MODELS } from '../../../../shared/utils/models'
 import { createSub2apiChatModel } from '../../../utils/sub2api'
 
 export default defineHandler(async (event) => {
-  const session = await useUserSession(event)
+  const session = await useChatSession(event)
 
   const { id } = await getValidatedRouterParams(event, z.object({
     id: z.string()
@@ -38,7 +38,7 @@ export default defineHandler(async (event) => {
   const db = useDrizzle()
 
   const chat = await db.query.chats.findFirst({
-    where: (chat, { eq }) => and(eq(chat.id, id as string), eq(chat.userId, session.data.user?.id || session.id!)),
+    where: (chat, { eq }) => and(eq(chat.id, id as string), eq(chat.userId, session.id!)),
     with: {
       messages: true
     }
@@ -80,7 +80,7 @@ export default defineHandler(async (event) => {
       const result = streamText({
         abortSignal: abortController.signal,
         model: apiKey ? createSub2apiChatModel(apiKey, model) : gateway(model),
-        system: `You are a knowledgeable and helpful AI assistant. ${session.data.user?.username ? `The user's name is ${session.data.user.username}.` : ''} Your goal is to provide clear, accurate, and well-structured responses.
+        system: `You are a knowledgeable and helpful AI assistant. Your goal is to provide clear, accurate, and well-structured responses.
 
 **FORMATTING RULES (CRITICAL):**
 - ABSOLUTELY NO MARKDOWN HEADINGS: Never use #, ##, ###, ####, #####, or ######

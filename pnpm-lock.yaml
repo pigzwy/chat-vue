@@ -53,9 +53,6 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
-      defu:
-        specifier: ^6.1.7
-        version: 6.1.7
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@libsql/client@0.17.2)(@opentelemetry/api@1.9.0)(pg@8.20.0)
@@ -71,9 +68,6 @@ importers:
       tailwindcss:
         specifier: ^4.2.2
         version: 4.2.2
-      ufo:
-        specifier: ^1.6.3
-        version: 1.6.3
       vue:
         specifier: ^3.5.32
         version: 3.5.32(typescript@6.0.2)
@@ -87,9 +81,6 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@octokit/types':
-        specifier: ^16.0.0
-        version: 16.0.0
       '@types/node':
         specifier: ^24.12.2
         version: 24.12.2
@@ -1096,12 +1087,6 @@ packages:
 
   '@nuxtjs/color-mode@3.5.2':
     resolution: {integrity: sha512-cC6RfgZh3guHBMLLjrBB2Uti5eUoGM9KyauOaYS9ETmxNWBMTvpgjvSiSJp1OFljIXPIqVTJ3xtJpSNZiO3ZaA==}
-
-  '@octokit/openapi-types@27.0.0':
-    resolution: {integrity: sha512-whrdktVs1h6gtR+09+QsNk2+FO+49j6ga1c55YZudfEG+oKJVvJLQi3zkOm5JjiUXAagWK2tI2kTGKJ2Ys7MGA==}
-
-  '@octokit/types@16.0.0':
-    resolution: {integrity: sha512-sKq+9r1Mm4efXW1FCk7hFSeJo4QKreL/tTbR0rz/qx/r1Oa2VV83LTA/H/MuCOX7uCIJmQVRKBcbmWoySjAnSg==}
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -5583,12 +5568,6 @@ snapshots:
       semver: 7.7.4
     transitivePeerDependencies:
       - magicast
-
-  '@octokit/openapi-types@27.0.0': {}
-
-  '@octokit/types@16.0.0':
-    dependencies:
-      '@octokit/openapi-types': 27.0.0
 
   '@opentelemetry/api@1.9.0': {}
 

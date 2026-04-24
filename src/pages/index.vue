@@ -4,12 +4,10 @@ import { useRouter } from 'vue-router'
 import { $fetch } from 'ofetch'
 import { useChats } from '../composables/useChats'
 import { useCsrf } from '../composables/useCsrf'
-import { useUserSession } from '../composables/useUserSession'
 import Navbar from '../components/Navbar.vue'
 
 const { fetchChats } = useChats()
 const { csrf, headerName } = useCsrf()
-const { user } = useUserSession()
 const input = ref('')
 const loading = ref(false)
 const router = useRouter()
@@ -20,9 +18,7 @@ const greeting = computed(() => {
   if (hour < 12) timeGreeting = 'Good morning'
   else if (hour < 18) timeGreeting = 'Good afternoon'
 
-  const name = user.value?.name?.split(' ')[0] || user.value?.username
-
-  return name ? `${timeGreeting}, ${name}` : `${timeGreeting}`
+  return timeGreeting
 })
 
 async function createChat(prompt: string) {

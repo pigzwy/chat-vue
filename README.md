@@ -1,109 +1,47 @@
-# Vue AI Chatbot Template
+# Chat Vue Sub2API
 
-[![Nuxt UI](https://img.shields.io/badge/Made%20with-Nuxt%20UI-00DC82?logo=nuxt&labelColor=020420)](https://ui.nuxt.com)
-[![Nitro](https://img.shields.io/badge/Built%20with-Nitro-ff637e?logo=nitro&labelColor=18181B)](https://nitro.build)
+基于 `nuxt-ui-templates/chat-vue` 精简后的对话应用，保留聊天、历史记录、思考展示、复制、点赞、重试等核心能力，并接入 Sub2API 的分组和模型选择。
 
-Full-featured AI Chatbot Vue application with authentication, chat history, collapsible sidebar, keyboard shortcuts, light & dark mode, command palette and more. Built using [Nuxt UI](https://ui.nuxt.com) components and integrated with [AI SDK](https://ai-sdk.dev) for a complete chat experience.
+## 功能
 
-- [Live demo](https://chat-vue-template.nuxt.dev/)
-- [Documentation](https://ui.nuxt.com/docs/getting-started/installation/vue)
+- Sub2API 分组选择和分组下模型选择
+- OpenAI-compatible `/v1/chat/completions` 流式对话
+- SQLite/Turso 持久化聊天记录
+- AI SDK UI 消息流、reasoning 展示和消息操作
+- 匿名 session 隔离本机聊天记录
 
-<a href="https://chat-vue-template.nuxt.dev/" target="_blank">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://ui.nuxt.com/assets/templates/vue/chat-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="https://ui.nuxt.com/assets/templates/vue/chat-light.png">
-    <img alt="Vue AI Chatbot Template" src="https://ui.nuxt.com/assets/templates/vue/chat-light.png">
-  </picture>
-</a>
-
-> The chat template for Nuxt is on https://github.com/nuxt-ui-templates/chat.
-
-## Features
-
-- ⚡️ **Streaming AI messages** powered by the [AI SDK](https://ai-sdk.dev) with thinking/reasoning support
-- 🤖 **Multiple model support** — Claude Haiku 4.5, Gemini 3 Flash and GPT-5 Nano via [Vercel AI Gateway](https://vercel.com/docs/ai-gateway)
-- 🔍 **Web search** with built-in provider tools (Anthropic, OpenAI)
-- 📊 **Charts and weather** tool calling with rich UI rendering
-- 🔐 **Authentication** via GitHub OAuth using [Nitro](https://nitro.build) server routes and httpOnly cookies
-- 💾 **Chat history persistence** using SQLite database ([Turso](https://turso.tech) in production) and [Drizzle ORM](https://orm.drizzle.team)
-- ✨ **Markdown rendering** with streaming code highlighting via [Comark](https://comark.dev)
-
-## Quick Start
+## 环境变量
 
 ```bash
-npm create nuxt@latest -- --no-modules -t ui-vue/chat
+SESSION_SECRET=<minimum-32-characters>
+VITE_SUB2API_BASE_URL=https://your-sub2api-domain.com
+SUB2API_BASE_URL=https://your-sub2api-domain.com
+AI_GATEWAY_API_KEY=<optional-fallback-key>
+TURSO_DATABASE_URL=<production-only>
+TURSO_AUTH_TOKEN=<production-only>
 ```
 
-## Deploy your own
+`SESSION_SECRET` 仍然必需，用于匿名 session cookie。项目不再包含第三方登录。
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fnuxt-ui-templates%2Fchat-vue&repository-name=chat-vue&env=GITHUB_OAUTH_CLIENT_ID%2CGITHUB_OAUTH_CLIENT_SECRET%2CSESSION_SECRET&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22tursocloud%22%2C%22productSlug%22%3A%22database%22%2C%22protocol%22%3A%22storage%22%7D%5D&demo-title=Vue+Chat+Template&demo-description=An+AI+chatbot+template+with+GitHub+authentication+and+persistent+chat+history+powered+by+Vercel+AI+SDK.&demo-url=https%3A%2F%2Fchat-vue-template.nuxt.dev&demo-image=https%3A%2F%2Fui.nuxt.com%2Fassets%2Ftemplates%2Fvue%2Fchat-dark.png)
-
-## Setup
-
-Make sure to install the dependencies:
+## 开发
 
 ```bash
 pnpm install
-```
-
-Run database migrations:
-
-```bash
 pnpm db:migrate
-```
-
-> [!NOTE]
-> In production, configure your database connection. On Vercel, add the [Turso integration](https://vercel.com/integrations/turso) to automatically provision `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`.
-
-### AI Integration
-
-This template uses the [Vercel AI SDK](https://ai-sdk.dev/) for streaming AI responses with support for multiple providers through [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). When deployed on Vercel, the AI Gateway is configured automatically.
-
-For local development, set your API key in `.env`:
-
-```bash
-AI_GATEWAY_API_KEY=<your-vercel-ai-gateway-api-key>
-```
-
-> [!TIP]
-> With [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), you don't need individual API keys for OpenAI, Anthropic, etc. It provides a unified API to access hundreds of models through a single endpoint with automatic load balancing, fallbacks, and spend monitoring.
-
-### Authentication (Optional)
-
-This template uses [Nitro](https://nitro.build) server routes with httpOnly cookies for authentication with GitHub OAuth.
-
-To enable authentication, [create a GitHub OAuth application](https://github.com/settings/applications/new) and set:
-
-```bash
-GITHUB_OAUTH_CLIENT_ID=<your-github-oauth-app-client-id>
-GITHUB_OAUTH_CLIENT_SECRET=<your-github-oauth-app-client-secret>
-SESSION_SECRET=<your-secret-minimum-32-characters>
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
 pnpm dev
 ```
 
-## Production
+访问：
 
-Build the application for production:
+```text
+http://localhost:3000/?token=<sub2api-jwt>
+```
+
+页面会保存 token，加载可用分组，并根据分组加载模型。
+
+## 构建
 
 ```bash
 pnpm build
-```
-
-Locally preview production build:
-
-```bash
 pnpm preview
 ```
-
-Check out the [deployment documentation](https://nitro.build/deploy) for more information.
-
-## Renovate integration
-
-Install [Renovate GitHub app](https://github.com/apps/renovate/installations/select_target) on your repository and you are good to go.

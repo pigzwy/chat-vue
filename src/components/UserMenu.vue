@@ -1,30 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useColorMode } from '@vueuse/core'
-import { useRouter } from 'vue-router'
 import type { DropdownMenuItem } from '@nuxt/ui'
-import { useUserSession } from '../composables/useUserSession'
 
 defineProps<{
   collapsed?: boolean
 }>()
 
-const router = useRouter()
 const colorMode = useColorMode()
 const appConfig = useAppConfig()
-const { user, clearSession } = useUserSession()
 
 const colors = ['red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose']
 const neutrals = ['slate', 'gray', 'zinc', 'neutral', 'stone']
 
 const items = computed<DropdownMenuItem[][]>(() => ([[{
-  type: 'label',
-  label: user.value?.name,
-  avatar: {
-    src: user.value?.avatar,
-    alt: user.value?.name
-  }
-}], [{
   label: 'Theme',
   icon: 'i-lucide-palette',
   children: [{
@@ -96,38 +85,10 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
     }
   }]
 }], [{
-  label: 'Templates',
-  icon: 'i-lucide-layout-template',
-  children: [{
-    label: 'Starter',
-    to: 'https://starter-vue-template.nuxt.dev/'
-  }, {
-    label: 'Dashboard',
-    to: 'https://dashboard-vue-template.nuxt.dev/'
-  }, {
-    label: 'Chat',
-    to: 'https://chat-vue-template.nuxt.dev/',
-    color: 'primary',
-    checked: true,
-    type: 'checkbox'
-  }]
-}], [{
   label: 'Documentation',
   icon: 'i-lucide-book-open',
   to: 'https://ui.nuxt.com/docs/getting-started/installation/vue',
   target: '_blank'
-}, {
-  label: 'GitHub repository',
-  icon: 'i-simple-icons:github',
-  to: 'https://github.com/nuxt-ui-templates/chat-vue',
-  target: '_blank'
-}], [{
-  label: 'Log out',
-  icon: 'i-lucide-log-out',
-  onSelect() {
-    clearSession()
-    router.push('/')
-  }
 }]]))
 </script>
 
@@ -139,12 +100,9 @@ const items = computed<DropdownMenuItem[][]>(() => ([[{
   >
     <UButton
       v-bind="{
-        label: collapsed ? undefined : (user?.name || user?.username),
+        label: collapsed ? undefined : 'Settings',
+        icon: 'i-lucide-settings',
         trailingIcon: collapsed ? undefined : 'i-lucide-chevrons-up-down'
-      }"
-      :avatar="{
-        src: user?.avatar || undefined,
-        alt: user?.name || user?.username
       }"
       color="neutral"
       variant="ghost"

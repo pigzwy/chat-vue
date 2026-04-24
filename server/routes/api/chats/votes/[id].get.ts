@@ -1,11 +1,11 @@
 import { defineHandler, HTTPError } from 'nitro'
 import { getValidatedRouterParams } from 'nitro/h3'
 import { z } from 'zod'
-import { useUserSession } from '../../../../utils/session'
+import { useChatSession } from '../../../../utils/session'
 import { useDrizzle, tables, eq, and } from '../../../../utils/drizzle'
 
 export default defineHandler(async (event) => {
-  const session = await useUserSession(event)
+  const session = await useChatSession(event)
 
   const { id } = await getValidatedRouterParams(event, z.object({
     id: z.string()
@@ -14,7 +14,7 @@ export default defineHandler(async (event) => {
   const db = useDrizzle()
 
   const chat = await db.query.chats.findFirst({
-    where: (chat, { eq }) => and(eq(chat.id, id as string), eq(chat.userId, session.data.user?.id || session.id!))
+    where: (chat, { eq }) => and(eq(chat.id, id as string), eq(chat.userId, session.id!))
   })
 
   if (!chat) {

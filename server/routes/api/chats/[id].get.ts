@@ -1,12 +1,12 @@
 import { defineHandler, HTTPError } from 'nitro'
 import { getValidatedRouterParams } from 'nitro/h3'
-import { useUserSession } from '../../../utils/session'
+import { useChatSession } from '../../../utils/session'
 import { useDrizzle } from '../../../utils/drizzle'
 import { z } from 'zod'
 
 
 export default defineHandler(async (event) => {
-  const session = await useUserSession(event)
+  const session = await useChatSession(event)
 
   const { id } = await getValidatedRouterParams(event, z.object({
     id: z.string()
@@ -25,8 +25,7 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ statusCode: 404, statusMessage: 'Chat not found' })
   }
 
-  const userId = session.data.user?.id || session.id!
-  const isOwner = chat.userId === userId
+  const isOwner = chat.userId === session.id!
 
   if (chat.visibility === 'private' && !isOwner) {
     throw new HTTPError({ statusCode: 404, statusMessage: 'Chat not found' })
