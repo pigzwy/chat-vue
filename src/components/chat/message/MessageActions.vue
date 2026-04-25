@@ -55,6 +55,7 @@ function copy() {
         :color="copied ? 'primary' : 'neutral'"
         variant="ghost"
         :icon="copied ? 'i-lucide-copy-check' : 'i-lucide-copy'"
+        class="rounded-full"
         aria-label="Copy response"
         @click="copy"
       />
@@ -66,6 +67,7 @@ function copy() {
         :color="vote === true ? 'success' : 'neutral'"
         variant="ghost"
         icon="i-lucide-thumbs-up"
+        class="rounded-full"
         aria-label="Good response"
         @click="emit('vote', message, true)"
       />
@@ -77,6 +79,7 @@ function copy() {
         :color="vote === false ? 'error' : 'neutral'"
         variant="ghost"
         icon="i-lucide-thumbs-down"
+        class="rounded-full"
         aria-label="Bad response"
         @click="emit('vote', message, false)"
       />
@@ -88,6 +91,7 @@ function copy() {
         color="neutral"
         variant="ghost"
         icon="i-lucide-rotate-cw"
+        class="rounded-full"
         aria-label="Regenerate response"
         @click="emit('regenerate', message)"
       />
@@ -116,6 +120,7 @@ function copy() {
         color="neutral"
         variant="ghost"
         icon="i-lucide-pencil"
+        class="rounded-full"
         aria-label="Edit message"
         @click="emit('edit', message)"
       />

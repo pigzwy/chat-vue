@@ -17,7 +17,7 @@ const emit = defineEmits<{
     <div
       v-for="attachment in attachments"
       :key="attachment.id"
-      class="group relative flex h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-default bg-muted"
+      class="pig-card group relative flex h-20 w-20 shrink-0 overflow-hidden rounded-2xl"
       :title="attachment.name"
     >
       <img

@@ -39,7 +39,7 @@ function onGroupChange(value?: number) {
       color="neutral"
       variant="soft"
       value-key="value"
-      class="max-w-40 shrink-0 rounded-full data-[state=open]:bg-elevated"
+      class="max-w-40 shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur data-[state=open]:bg-white/80 dark:border-white/10 dark:bg-white/10 dark:data-[state=open]:bg-white/15"
       :ui="{
         base: 'rounded-full',
         label: 'truncate',
@@ -61,7 +61,7 @@ function onGroupChange(value?: number) {
       color="neutral"
       variant="soft"
       value-key="value"
-      class="max-w-44 shrink-0 rounded-full data-[state=open]:bg-elevated sm:max-w-48"
+      class="max-w-44 shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur data-[state=open]:bg-white/80 sm:max-w-48 dark:border-white/10 dark:bg-white/10 dark:data-[state=open]:bg-white/15"
       :ui="{
         base: 'rounded-full',
         label: 'truncate',

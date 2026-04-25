@@ -66,16 +66,31 @@ defineShortcuts({
 
 <template>
   <UDashboardGroup unit="rem">
+    <div class="pointer-events-none fixed left-4 top-3 z-50">
+      <ULink
+        to="/"
+        class="pig-brand-chip pointer-events-auto inline-flex items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2 sm:pr-3"
+      >
+        <img
+          src="/logo-mark.jpg"
+          alt="pigcoder"
+          class="size-7 shrink-0 rounded-full object-cover shadow-sm"
+        >
+        <span class="pig-title hidden text-lg font-bold sm:inline">pigcoder</span>
+      </ULink>
+    </div>
+
     <div class="pointer-events-none fixed top-3 left-1/2 z-50 -translate-x-1/2">
-      <div class="pointer-events-auto inline-flex items-center rounded-full bg-default/95 p-1 ring ring-default shadow-sm backdrop-blur">
+      <div class="pig-toolbar pointer-events-auto inline-flex items-center rounded-full p-0.5">
         <UButton
           to="/"
           label="对话"
           icon="i-lucide-message-circle"
           size="sm"
           color="neutral"
-          :variant="isImagesRoute ? 'ghost' : 'solid'"
-          class="rounded-full px-4"
+          variant="ghost"
+          class="h-8 rounded-full px-3.5 font-semibold"
+          :class="!isImagesRoute ? 'bg-[#1B3A6B] text-white shadow-sm' : 'text-[#1B3A6B] hover:bg-white/65 dark:text-white dark:hover:bg-white/10'"
         />
         <UButton
           to="/images"
@@ -83,8 +98,9 @@ defineShortcuts({
           icon="i-lucide-image"
           size="sm"
           color="neutral"
-          :variant="isImagesRoute ? 'solid' : 'ghost'"
-          class="rounded-full px-4"
+          variant="ghost"
+          class="h-8 rounded-full px-3.5 font-semibold"
+          :class="isImagesRoute ? 'bg-[#1B3A6B] text-white shadow-sm' : 'text-[#1B3A6B] hover:bg-white/65 dark:text-white dark:hover:bg-white/10'"
         />
       </div>
     </div>
@@ -93,7 +109,7 @@ defineShortcuts({
       <UColorModeButton
         color="neutral"
         variant="ghost"
-        class="pointer-events-auto rounded-full bg-default/95 ring ring-default shadow-sm backdrop-blur"
+        class="pig-toolbar pointer-events-auto rounded-full"
       />
     </div>
 
@@ -104,25 +120,8 @@ defineShortcuts({
       :min-size="12"
       collapsible
       resizable
-      class="border-r-0 pt-4 pb-4"
+      class="border-r-0 px-2 pb-4 pt-20"
     >
-      <template #header="{ collapsed }">
-        <ULink
-          to="/"
-          class="flex items-center gap-2"
-        >
-          <img
-            src="/logo-mark.svg"
-            alt="pigcoder"
-            class="size-7 shrink-0 rounded-md object-contain"
-          >
-          <span
-            v-if="!collapsed"
-            class="text-xl font-bold text-highlighted"
-          >pigcoder</span>
-        </ULink>
-      </template>
-
       <template #default="{ collapsed }">
         <div
           v-if="!collapsed"
@@ -135,9 +134,10 @@ defineShortcuts({
           <UButton
             icon="i-lucide-plus"
             label="New chat"
+            color="neutral"
             variant="soft"
             to="/"
-            class="shrink-0"
+            class="shrink-0 rounded-xl font-semibold"
             @click="open = false"
           />
         </div>
@@ -148,9 +148,11 @@ defineShortcuts({
         >
           <UButton
             icon="i-lucide-plus"
+            color="neutral"
             variant="soft"
             block
             to="/"
+            class="rounded-xl"
             aria-label="New chat"
             @click="open = false"
           />
@@ -162,7 +164,7 @@ defineShortcuts({
           :items="items"
           :collapsed="collapsed"
           orientation="vertical"
-          :ui="{ link: 'overflow-hidden' }"
+          :ui="{ link: 'overflow-hidden rounded-xl data-[active=true]:bg-[#1B3A6B] data-[active=true]:text-white data-[active=true]:shadow-sm' }"
         >
           <template #chat-trailing="{ item }">
             <div class="flex -mr-1.25 translate-x-full group-hover:translate-x-0 transition-transform">
@@ -201,7 +203,7 @@ defineShortcuts({
 
     <div
       class="flex-1 flex min-w-0 overflow-hidden"
-      :class="isImagesRoute ? 'mt-18' : 'mx-4 mb-4 mt-18 rounded-lg ring ring-default bg-default/75 shadow lg:ml-0'"
+      :class="isImagesRoute ? 'mt-18' : 'pig-app-panel mx-4 mb-4 mt-18 rounded-3xl lg:ml-0'"
     >
       <RouterView :key="route.path" />
     </div>

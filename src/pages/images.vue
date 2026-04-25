@@ -69,6 +69,33 @@ const uploadedImageLimit = 8
 const imageRequestTimeoutMs = 180000
 const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
 const resolutionItems: ImageResolution[] = ['1K', '2K', '4K']
+const imagePromptPresets = [
+  {
+    label: '赛博朋克城市',
+    icon: 'i-lucide-sparkles',
+    prompt: '一座充满霓虹灯和飞行器的赛博朋克风格科幻城市，夜晚，雨后街道，8k，高细节，虚幻引擎5渲染'
+  },
+  {
+    label: '动漫插画',
+    icon: 'i-lucide-image',
+    prompt: '一个可爱的二次元动漫少女，站在落日余晖的向日葵花海中，微风吹过，新海诚画风，壁纸级别'
+  },
+  {
+    label: '皮克斯 3D',
+    icon: 'i-lucide-gamepad-2',
+    prompt: '皮克斯 3D 动画风格，可爱的角色，柔和灯光，丰富表情，电影级构图，高质量渲染'
+  },
+  {
+    label: '水彩风景',
+    icon: 'i-lucide-palette',
+    prompt: '清新的水彩风景插画，远山、湖泊、晨雾和柔和阳光，纸张纹理，干净留白'
+  },
+  {
+    label: '写实摄影',
+    icon: 'i-lucide-camera',
+    prompt: '写实摄影风格，自然光，浅景深，细腻质感，专业商业摄影构图，高清细节'
+  }
+]
 
 const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> = {
   '1K': {
@@ -257,6 +284,11 @@ onBeforeUnmount(() => {
 
 function pickFiles() {
   fileInput.value?.click()
+}
+
+function useImagePromptPreset(presetPrompt: string) {
+  const current = prompt.value.trim()
+  prompt.value = current ? `${current}，${presetPrompt}` : presetPrompt
 }
 
 function createUploadedImage(file: File): UploadedImage {
@@ -743,9 +775,9 @@ async function retryImageTask(task: ImageTask) {
 </script>
 
 <template>
-  <div class="flex-1 min-h-0 overflow-hidden bg-muted/40">
+  <div class="pig-images flex-1 min-h-0 overflow-hidden">
     <div class="grid h-full min-h-0 gap-5 p-4 pt-0 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6 lg:pt-0">
-      <section class="flex min-h-0 flex-col overflow-hidden rounded-3xl border border-default bg-default p-5 shadow-sm sm:p-6">
+      <section class="pig-app-panel flex min-h-0 flex-col overflow-hidden rounded-3xl p-5 sm:p-6">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h1 class="text-xl font-bold text-highlighted">
@@ -768,7 +800,7 @@ async function retryImageTask(task: ImageTask) {
           v-if="!queue.length"
           class="flex min-h-0 flex-1 flex-col items-center justify-center text-center"
         >
-          <div class="flex size-24 items-center justify-center rounded-3xl bg-muted text-muted shadow-inner">
+          <div class="pig-icon-tile flex size-24 items-center justify-center rounded-3xl shadow-inner">
             <UIcon
               name="i-lucide-image"
               class="size-9"
@@ -790,11 +822,11 @@ async function retryImageTask(task: ImageTask) {
             <article
               v-for="item in queue"
               :key="item.id"
-              class="cursor-pointer rounded-2xl border bg-elevated/40 p-4 transition"
-              :class="selectedTaskId === item.id ? 'border-primary ring-2 ring-primary/20' : 'border-default hover:border-muted'"
+              class="pig-card cursor-pointer rounded-2xl p-4 transition"
+              :class="selectedTaskId === item.id ? 'border-[#E8A825] ring-2 ring-[#E8A825]/25' : ''"
               @click="selectImageTask(item)"
             >
-              <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted text-muted">
+              <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-slate-100/70 text-muted dark:bg-white/10">
                 <UBadge
                   v-if="selectedTaskId === item.id"
                   label="正在编辑"
@@ -954,8 +986,8 @@ async function retryImageTask(task: ImageTask) {
         </div>
       </section>
 
-      <section class="flex h-full min-h-0 flex-col rounded-3xl border border-default bg-default shadow-sm">
-        <div class="border-b border-default p-4 sm:p-5">
+      <section class="pig-app-panel flex h-full min-h-0 flex-col rounded-3xl">
+        <div class="border-b border-white/45 p-4 dark:border-white/10 sm:p-5">
           <div class="flex items-start justify-between gap-3">
             <div>
               <h2 class="text-lg font-bold text-highlighted">
@@ -980,7 +1012,7 @@ async function retryImageTask(task: ImageTask) {
 
         <div class="flex min-h-0 flex-1 items-center justify-center overflow-auto px-6 py-6 text-center">
           <div v-if="!selectedTask">
-            <div class="mx-auto flex size-16 items-center justify-center rounded-2xl bg-muted text-muted">
+            <div class="pig-icon-tile mx-auto flex size-16 items-center justify-center rounded-2xl">
               <UIcon
                 name="i-lucide-sparkles"
                 class="size-7"
@@ -997,7 +1029,7 @@ async function retryImageTask(task: ImageTask) {
             v-else
             class="w-full space-y-5 text-left"
           >
-            <div class="rounded-2xl border border-default bg-elevated/40 p-3">
+            <div class="pig-card rounded-2xl p-3">
               <div class="flex items-center gap-3">
                 <img
                   :src="selectedTask.imageUrl"
@@ -1040,8 +1072,8 @@ async function retryImageTask(task: ImageTask) {
               <div
                 v-for="historyItem in selectedHistory"
                 :key="historyItem.id"
-                class="rounded-2xl border border-default bg-default p-3 transition"
-                :class="selectedTaskId === historyItem.id ? 'ring-2 ring-primary/15' : ''"
+                class="pig-card rounded-2xl p-3 transition"
+                :class="selectedTaskId === historyItem.id ? 'ring-2 ring-[#E8A825]/20' : ''"
               >
                 <div class="flex items-start gap-3">
                   <img
@@ -1104,10 +1136,10 @@ async function retryImageTask(task: ImageTask) {
         </div>
 
         <form
-          class="border-t border-default p-4"
+          class="border-t border-white/45 p-4 dark:border-white/10"
           @submit.prevent="submitImageTask"
         >
-          <div class="rounded-3xl border border-default bg-elevated/30 p-3 shadow-xs">
+          <div class="pig-prompt rounded-3xl p-3">
             <div
               v-if="files.length"
               class="mb-3 flex gap-2 overflow-x-auto pb-1"
@@ -1115,7 +1147,7 @@ async function retryImageTask(task: ImageTask) {
               <div
                 v-for="file in files"
                 :key="file.id"
-                class="group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-default bg-muted"
+                class="pig-card group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl"
                 :title="file.name"
               >
                 <button
@@ -1132,7 +1164,7 @@ async function retryImageTask(task: ImageTask) {
                 <UButton
                   type="button"
                   icon="i-lucide-x"
-                  color="neutral"
+                  color="primary"
                   variant="solid"
                   size="xs"
                   class="absolute right-1 top-1 rounded-full opacity-0 transition group-hover:opacity-100"
@@ -1149,10 +1181,11 @@ async function retryImageTask(task: ImageTask) {
               :rows="3"
               :placeholder="promptPlaceholder"
               variant="none"
-              :ui="{ base: 'resize-none text-base' }"
+              class="w-full"
+              :ui="{ root: 'w-full', base: 'w-full max-h-48 resize-none overflow-y-auto text-base leading-7' }"
             />
 
-            <div class="mt-2 flex flex-nowrap items-center justify-between gap-3 border-t border-default pt-3">
+            <div class="mt-2 flex flex-nowrap items-center justify-between gap-3 border-t border-white/45 pt-3 dark:border-white/10">
               <div class="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
                 <UPopover>
                   <UButton
@@ -1161,7 +1194,7 @@ async function retryImageTask(task: ImageTask) {
                     color="neutral"
                     variant="outline"
                     :label="`${resolution} · ${ratio}`"
-                    class="shrink-0 rounded-full"
+                    class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10"
                   />
 
                   <template #content>
@@ -1185,7 +1218,7 @@ async function retryImageTask(task: ImageTask) {
                             :key="item"
                             type="button"
                             class="rounded-xl px-4 py-3 text-center text-sm font-medium transition"
-                            :class="ratio === item ? 'bg-neutral-950 text-white shadow-sm dark:bg-white dark:text-neutral-950' : 'text-highlighted hover:bg-muted'"
+                            :class="ratio === item ? 'bg-[#1B3A6B] text-white shadow-sm dark:bg-[#E8A825] dark:text-[#1B3A6B]' : 'text-highlighted hover:bg-muted'"
                             @click="ratio = item"
                           >
                             {{ item }}
@@ -1203,7 +1236,7 @@ async function retryImageTask(task: ImageTask) {
                             :key="item"
                             type="button"
                             class="rounded-xl px-4 py-3 text-center text-base font-bold transition"
-                            :class="resolution === item ? 'bg-neutral-950 text-white shadow-sm dark:bg-white dark:text-neutral-950' : 'text-highlighted hover:bg-muted'"
+                            :class="resolution === item ? 'bg-[#1B3A6B] text-white shadow-sm dark:bg-[#E8A825] dark:text-[#1B3A6B]' : 'text-highlighted hover:bg-muted'"
                             @click="resolution = item"
                           >
                             {{ item }}
@@ -1222,7 +1255,7 @@ async function retryImageTask(task: ImageTask) {
                   color="neutral"
                   variant="soft"
                   :label="imageGroup.label"
-                  class="shrink-0 rounded-full"
+                  class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10"
                 />
 
                 <input
@@ -1239,7 +1272,7 @@ async function retryImageTask(task: ImageTask) {
                   color="neutral"
                   variant="ghost"
                   :label="files.length ? `${files.length}/${uploadedImageLimit}` : undefined"
-                  class="shrink-0 rounded-full"
+                  class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10"
                   :disabled="files.length >= uploadedImageLimit"
                   @click="pickFiles"
                 />
@@ -1250,13 +1283,28 @@ async function retryImageTask(task: ImageTask) {
                 <UButton
                   type="submit"
                   icon="i-lucide-arrow-up"
-                  color="neutral"
+                  color="primary"
                   :disabled="!canSubmit"
                   :aria-label="submitLabel"
-                  class="shrink-0 rounded-full"
+                  class="pig-primary-action shrink-0 rounded-full"
                 />
               </div>
             </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap justify-center gap-2">
+            <UButton
+              v-for="preset in imagePromptPresets"
+              :key="preset.label"
+              type="button"
+              :icon="preset.icon"
+              :label="preset.label"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              class="rounded-full border-white/40 bg-white/35 px-4 text-[#294678] shadow-sm backdrop-blur hover:text-[#6D4BFF] dark:border-white/10 dark:bg-white/10 dark:text-white"
+              @click="useImagePromptPreset(preset.prompt)"
+            />
           </div>
         </form>
       </section>

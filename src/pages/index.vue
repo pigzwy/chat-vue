@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { UIMessage } from 'ai'
 import { useRouter } from 'vue-router'
 import { useChats } from '../composables/useChats'
@@ -30,12 +30,11 @@ const {
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
-  let timeGreeting = 'Good evening'
-  if (hour < 12) timeGreeting = 'Good morning'
-  else if (hour < 18) timeGreeting = 'Good afternoon'
-
-  return timeGreeting
+  if (hour < 12) return '早上好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
 })
+const canSubmitChat = computed(() => input.value.trim().length > 0 || hasAttachments.value)
 
 function buildInitialParts(text: string, attachmentParts: UIMessage['parts']): UIMessage['parts'] | undefined {
   if (!attachmentParts.length) return undefined
@@ -98,32 +97,54 @@ function onSubmit(event?: Event) {
 
 const quickChats = [
   {
-    label: 'Why use Nuxt UI?',
-    icon: 'i-logos-nuxt-icon'
+    label: '帮我总结这份资料',
+    icon: 'i-lucide-file-text',
+    tone: 'pig-quick-icon-blue'
   },
   {
-    label: 'Help me create a Vue composable',
-    icon: 'i-logos-vue'
+    label: '写一份产品方案',
+    icon: 'i-lucide-clipboard-list',
+    tone: 'pig-quick-icon-gold'
   },
   {
-    label: 'Tell me more about UnJS',
-    icon: 'i-logos-unjs'
+    label: '优化这段提示词',
+    icon: 'i-lucide-sparkles',
+    tone: 'pig-quick-icon-green'
   },
   {
-    label: 'Why should I consider VueUse?',
-    icon: 'i-logos-vueuse'
+    label: '生成一周学习计划',
+    icon: 'i-lucide-calendar-check',
+    tone: 'pig-quick-icon-purple'
   },
   {
-    label: 'Tailwind CSS best practices',
-    icon: 'i-logos-tailwindcss-icon'
+    label: '帮我分析图片内容',
+    icon: 'i-lucide-image',
+    tone: 'pig-quick-icon-green'
   },
   {
-    label: 'What is the weather in Bordeaux?',
-    icon: 'i-lucide-sun'
+    label: '写一封商务邮件',
+    icon: 'i-lucide-mail',
+    tone: 'pig-quick-icon-blue'
   },
   {
-    label: 'Show me a chart of sales data',
-    icon: 'i-lucide-line-chart'
+    label: '整理成表格对比',
+    icon: 'i-lucide-table',
+    tone: 'pig-quick-icon-gold'
+  },
+  {
+    label: '把内容翻译成英文',
+    icon: 'i-lucide-languages',
+    tone: 'pig-quick-icon-purple'
+  },
+  {
+    label: '生成会议纪要',
+    icon: 'i-lucide-notebook-pen',
+    tone: 'pig-quick-icon-blue'
+  },
+  {
+    label: '提炼行动清单',
+    icon: 'i-lucide-check-square',
+    tone: 'pig-quick-icon-green'
   }
 ]
 </script>
@@ -139,17 +160,21 @@ const quickChats = [
     </template>
 
     <template #body>
-      <UContainer class="flex-1 flex flex-col justify-center gap-4 sm:gap-6 py-8">
-        <h1 class="text-3xl sm:text-4xl text-highlighted font-bold">
-          {{ greeting }}
-        </h1>
+      <UContainer class="flex-1 flex flex-col justify-center gap-5 py-8 sm:py-10">
+        <div class="mx-auto inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/35 px-4 py-2 text-sm font-semibold text-[#1B3A6B] shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-white">
+          <UIcon
+            name="i-lucide-sparkles"
+            class="size-4 text-[#E8A825]"
+          />
+          <span>{{ greeting }}，开始你的 AI 工作流</span>
+        </div>
 
         <UChatPrompt
           v-model="input"
           :status="loading ? 'streaming' : 'ready'"
-          class="[view-transition-name:chat-prompt]"
+          class="pig-prompt mx-auto w-full max-w-3xl rounded-3xl [view-transition-name:chat-prompt]"
           variant="subtle"
-          :ui="{ base: 'px-1.5', footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-default pt-2' }"
+          :ui="{ base: 'px-2 py-1', footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-white/45 pt-3 dark:border-white/10' }"
           @submit="onSubmit"
         >
           <template
@@ -184,7 +209,7 @@ const quickChats = [
                   color="neutral"
                   variant="ghost"
                   size="sm"
-                  class="shrink-0 rounded-full"
+                  class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur hover:text-[#1B3A6B] dark:border-white/10 dark:bg-white/10 dark:hover:text-white"
                   :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
                   :disabled="loading || attachmentPending || attachments.length >= chatAttachmentLimit"
                   aria-label="Add attachments"
@@ -196,29 +221,39 @@ const quickChats = [
             <div class="flex shrink-0 items-center">
               <UChatPromptSubmit
                 icon="i-lucide-arrow-up"
-                color="neutral"
+                color="primary"
                 size="sm"
                 class="shrink-0 rounded-full"
+                :class="canSubmitChat ? 'pig-primary-action' : 'pig-submit-muted'"
                 :type="hasAttachments ? 'button' : undefined"
-                :disabled="attachmentPending"
+                :disabled="attachmentPending || !canSubmitChat"
                 @click="hasAttachments ? onSubmit($event) : undefined"
               />
             </div>
           </template>
         </UChatPrompt>
 
-        <div class="flex flex-wrap gap-2">
-          <UButton
+        <div class="mx-auto flex w-full max-w-3xl flex-wrap gap-2">
+          <button
             v-for="quickChat in quickChats"
             :key="quickChat.label"
-            :icon="quickChat.icon"
-            :label="quickChat.label"
-            size="sm"
-            color="neutral"
-            variant="outline"
-            class="rounded-full"
+            type="button"
+            class="pig-prompt-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
             @click="createChat(quickChat.label, false)"
-          />
+          >
+            <span
+              class="grid size-3.5 shrink-0 place-items-center"
+              :class="quickChat.tone"
+            >
+              <UIcon
+                :name="quickChat.icon"
+                class="size-3.5"
+              />
+            </span>
+            <span class="whitespace-nowrap">
+              {{ quickChat.label }}
+            </span>
+          </button>
         </div>
       </UContainer>
     </template>
