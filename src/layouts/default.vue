@@ -18,8 +18,8 @@ const isImagesRoute = computed(() => route.path.startsWith('/images'))
 
 const deleteModal = overlay.create(ModalConfirm, {
   props: {
-    title: 'Delete chat',
-    description: 'Are you sure you want to delete this chat? This cannot be undone.'
+    title: '删除对话',
+    description: '确定要删除这个对话吗？删除后无法恢复。'
   }
 })
 
@@ -45,8 +45,8 @@ async function deleteChat(id: string) {
   deleteLocalChat(id)
 
   toast.add({
-    title: 'Chat deleted',
-    description: 'Your chat has been deleted',
+    title: '对话已删除',
+    description: '已从本地对话列表中移除',
     icon: 'i-lucide-trash'
   })
 
@@ -174,7 +174,7 @@ defineShortcuts({
                 variant="ghost"
                 size="xs"
                 class="text-muted hover:text-primary hover:bg-accented/50 focus-visible:bg-accented/50 p-0.5"
-                aria-label="Delete chat"
+                aria-label="删除对话"
                 tabindex="-1"
                 @click.stop.prevent="deleteChat((item as any).id)"
               />

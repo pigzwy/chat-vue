@@ -282,99 +282,103 @@ onMounted(() => {
         </UChatMessages>
 
         <div
-          v-if="isOwner && !attachments.length && !input.trim()"
-          class="mx-auto -mb-1 flex w-full max-w-3xl flex-wrap gap-1.5 px-2"
-        >
-          <button
-            v-for="preset in chatPromptPresets"
-            :key="preset.label"
-            type="button"
-            class="pig-prompt-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
-            :disabled="chat.status !== 'ready'"
-            @click="useChatPromptPreset(preset.prompt)"
-          >
-            <span
-              class="grid size-3.5 shrink-0 place-items-center"
-              :class="preset.tone"
-            >
-              <UIcon
-                :name="preset.icon"
-                class="size-3.5"
-              />
-            </span>
-            <span class="whitespace-nowrap">
-              {{ preset.label }}
-            </span>
-          </button>
-        </div>
-
-        <UChatPrompt
           v-if="isOwner"
-          v-model="input"
-          :error="chat.error"
-          variant="subtle"
-          class="pig-prompt sticky bottom-4 z-10 rounded-3xl [view-transition-name:chat-prompt]"
-          :ui="{ base: 'px-2 py-1', footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-white/45 pt-3 dark:border-white/10' }"
-          @submit="handleSubmit"
+          class="sticky bottom-4 z-10 space-y-2"
         >
-          <template
-            v-if="attachments.length"
-            #header
+          <div
+            v-if="!attachments.length && !input.trim()"
+            class="mx-auto flex w-full max-w-3xl flex-wrap gap-1.5 px-2"
           >
-            <ChatAttachmentPreviewList
-              :attachments="attachments"
-              :disabled="chat.status !== 'ready' || attachmentPending"
-              @remove="removeAttachment"
-            />
-          </template>
-
-          <template #footer>
-            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <ModelSelect />
-
-              <ReasoningEffortSelect />
-
-              <input
-                ref="attachmentInput"
-                type="file"
-                multiple
-                :accept="chatAttachmentAccept"
-                class="hidden"
-                @change="onAttachmentFilesChange"
+            <button
+              v-for="preset in chatPromptPresets"
+              :key="preset.label"
+              type="button"
+              class="pig-prompt-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+              :disabled="chat.status !== 'ready'"
+              @click="useChatPromptPreset(preset.prompt)"
+            >
+              <span
+                class="grid size-3.5 shrink-0 place-items-center"
+                :class="preset.tone"
               >
-              <UTooltip text="Add attachments">
-                <UButton
-                  type="button"
-                  icon="i-lucide-paperclip"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur hover:text-[#1B3A6B] dark:border-white/10 dark:bg-white/10 dark:hover:text-white"
-                  :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
-                  :disabled="chat.status !== 'ready' || attachmentPending || attachments.length >= chatAttachmentLimit"
-                  aria-label="Add attachments"
-                  @click="pickAttachmentFiles"
+                <UIcon
+                  :name="preset.icon"
+                  class="size-3.5"
                 />
-              </UTooltip>
-            </div>
+              </span>
+              <span class="whitespace-nowrap">
+                {{ preset.label }}
+              </span>
+            </button>
+          </div>
 
-            <div class="flex shrink-0 items-center">
-              <UChatPromptSubmit
-                :status="chat.status"
-                icon="i-lucide-arrow-up"
-                color="primary"
-                size="sm"
-                class="shrink-0 rounded-full"
-                :class="chat.status !== 'ready' || canSendMessage ? 'pig-primary-action' : 'pig-submit-muted'"
-                :type="hasAttachments ? 'button' : undefined"
-                :disabled="chat.status === 'ready' && (attachmentPending || !canSendMessage)"
-                @click="chat.status === 'ready' && hasAttachments ? handleSubmit($event) : undefined"
-                @stop="chat.stop()"
-                @reload="chat.regenerate()"
+          <UChatPrompt
+            v-model="input"
+            :error="chat.error"
+            variant="subtle"
+            class="pig-prompt rounded-3xl [view-transition-name:chat-prompt]"
+            :ui="{ base: 'px-2 py-1', footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-white/45 pt-3 dark:border-white/10' }"
+            @submit="handleSubmit"
+          >
+            <template
+              v-if="attachments.length"
+              #header
+            >
+              <ChatAttachmentPreviewList
+                :attachments="attachments"
+                :disabled="chat.status !== 'ready' || attachmentPending"
+                @remove="removeAttachment"
               />
-            </div>
-          </template>
-        </UChatPrompt>
+            </template>
+
+            <template #footer>
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <ModelSelect />
+
+                <ReasoningEffortSelect />
+
+                <input
+                  ref="attachmentInput"
+                  type="file"
+                  multiple
+                  :accept="chatAttachmentAccept"
+                  class="hidden"
+                  @change="onAttachmentFilesChange"
+                >
+                <UTooltip text="Add attachments">
+                  <UButton
+                    type="button"
+                    icon="i-lucide-paperclip"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur hover:text-[#1B3A6B] dark:border-white/10 dark:bg-white/10 dark:hover:text-white"
+                    :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
+                    :disabled="chat.status !== 'ready' || attachmentPending || attachments.length >= chatAttachmentLimit"
+                    aria-label="Add attachments"
+                    @click="pickAttachmentFiles"
+                  />
+                </UTooltip>
+              </div>
+
+              <div class="flex shrink-0 items-center">
+                <UChatPromptSubmit
+                  :status="chat.status"
+                  icon="i-lucide-arrow-up"
+                  color="primary"
+                  size="sm"
+                  class="shrink-0 rounded-full"
+                  :class="chat.status !== 'ready' || canSendMessage ? 'pig-primary-action' : 'pig-submit-muted'"
+                  :type="hasAttachments ? 'button' : undefined"
+                  :disabled="chat.status === 'ready' && (attachmentPending || !canSendMessage)"
+                  @click="chat.status === 'ready' && hasAttachments ? handleSubmit($event) : undefined"
+                  @stop="chat.stop()"
+                  @reload="chat.regenerate()"
+                />
+              </div>
+            </template>
+          </UChatPrompt>
+        </div>
       </UContainer>
     </template>
   </UDashboardPanel>

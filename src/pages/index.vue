@@ -95,6 +95,11 @@ function onSubmit(event?: Event) {
   createChat(input.value, true)
 }
 
+function useQuickChatPrompt(prompt: string) {
+  if (loading.value) return
+  input.value = prompt
+}
+
 const quickChats = [
   {
     label: '帮我总结这份资料',
@@ -239,7 +244,7 @@ const quickChats = [
             :key="quickChat.label"
             type="button"
             class="pig-prompt-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
-            @click="createChat(quickChat.label, false)"
+            @click="useQuickChatPrompt(quickChat.label)"
           >
             <span
               class="grid size-3.5 shrink-0 place-items-center"
