@@ -775,9 +775,9 @@ async function retryImageTask(task: ImageTask) {
 </script>
 
 <template>
-  <div class="pig-images flex-1 min-h-0 overflow-hidden">
-    <div class="grid h-full min-h-0 gap-5 p-4 pt-0 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6 lg:pt-0">
-      <section class="pig-app-panel flex min-h-0 flex-col overflow-hidden rounded-3xl p-5 sm:p-6">
+  <div class="pig-images flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
+    <div class="grid min-h-full gap-5 p-4 pt-0 lg:h-full lg:min-h-0 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6 lg:pt-0">
+      <section class="pig-app-panel flex min-h-0 flex-col rounded-3xl p-4 sm:p-6 lg:overflow-hidden">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h1 class="text-xl font-bold text-highlighted">
@@ -816,7 +816,7 @@ async function retryImageTask(task: ImageTask) {
 
         <div
           v-else
-          class="mt-8 min-h-0 flex-1 overflow-y-auto pr-1"
+          class="mt-5 min-h-0 flex-1 pr-0 lg:mt-8 lg:overflow-y-auto lg:pr-1"
         >
           <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <article
@@ -867,7 +867,7 @@ async function retryImageTask(task: ImageTask) {
                 >
                 <div
                   v-if="item.imageUrl"
-                  class="absolute right-3 top-3 z-10 flex gap-2 opacity-0 transition group-hover:opacity-100"
+                  class="absolute right-3 top-3 z-10 flex gap-2"
                 >
                   <UButton
                     type="button"
@@ -986,7 +986,7 @@ async function retryImageTask(task: ImageTask) {
         </div>
       </section>
 
-      <section class="pig-app-panel flex h-full min-h-0 flex-col rounded-3xl">
+      <section class="pig-app-panel flex min-h-0 flex-col rounded-3xl lg:h-full">
         <div class="border-b border-white/45 p-4 dark:border-white/10 sm:p-5">
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -1010,7 +1010,10 @@ async function retryImageTask(task: ImageTask) {
           </div>
         </div>
 
-        <div class="flex min-h-0 flex-1 items-center justify-center overflow-auto px-6 py-6 text-center">
+        <div
+          class="min-h-0 flex-1 items-center justify-center overflow-auto px-4 py-4 text-center sm:px-6 sm:py-6"
+          :class="selectedTask ? 'flex' : 'hidden lg:flex'"
+        >
           <div v-if="!selectedTask">
             <div class="pig-icon-tile mx-auto flex size-16 items-center justify-center rounded-2xl">
               <UIcon
@@ -1136,7 +1139,7 @@ async function retryImageTask(task: ImageTask) {
         </div>
 
         <form
-          class="border-t border-white/45 p-4 dark:border-white/10"
+          class="border-t border-white/45 p-3 dark:border-white/10 sm:p-4"
           @submit.prevent="submitImageTask"
         >
           <div class="pig-prompt rounded-3xl p-3">
@@ -1185,8 +1188,8 @@ async function retryImageTask(task: ImageTask) {
               :ui="{ root: 'w-full', base: 'w-full max-h-48 resize-none overflow-y-auto text-base leading-7' }"
             />
 
-            <div class="mt-2 flex flex-nowrap items-center justify-between gap-3 border-t border-white/45 pt-3 dark:border-white/10">
-              <div class="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden">
+            <div class="mt-2 flex flex-col gap-3 border-t border-white/45 pt-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <UPopover>
                   <UButton
                     type="button"
@@ -1247,7 +1250,7 @@ async function retryImageTask(task: ImageTask) {
                   </template>
                 </UPopover>
 
-                <div class="h-6 w-px bg-default" />
+                <div class="hidden h-6 w-px bg-default sm:block" />
 
                 <UButton
                   type="button"
@@ -1278,7 +1281,7 @@ async function retryImageTask(task: ImageTask) {
                 />
               </div>
 
-              <div class="flex shrink-0 items-center gap-3">
+              <div class="flex shrink-0 items-center justify-end gap-3">
                 <span class="hidden whitespace-nowrap text-sm text-muted sm:inline">${{ estimatedCost.toFixed(2) }}</span>
                 <UButton
                   type="submit"
@@ -1301,8 +1304,8 @@ async function retryImageTask(task: ImageTask) {
               :label="preset.label"
               color="neutral"
               variant="outline"
-              size="sm"
-              class="rounded-full border-white/40 bg-white/35 px-4 text-[#294678] shadow-sm backdrop-blur hover:text-[#6D4BFF] dark:border-white/10 dark:bg-white/10 dark:text-white"
+              size="xs"
+              class="rounded-full border-white/40 bg-white/35 px-3 text-[#294678] shadow-sm backdrop-blur hover:text-[#6D4BFF] dark:border-white/10 dark:bg-white/10 dark:text-white sm:px-4"
               @click="useImagePromptPreset(preset.prompt)"
             />
           </div>
