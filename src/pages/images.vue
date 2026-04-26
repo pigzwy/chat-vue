@@ -165,9 +165,9 @@ const canSubmit = computed(() => prompt.value.trim().length > 0)
 const hasUploadedImages = computed(() => files.value.length > 0)
 const estimatedCost = computed(() => {
   return {
-    '1K': 0.15,
-    '2K': 0.2,
-    '4K': 0.3
+    '1K': 0.135,
+    '2K': 0.18,
+    '4K': 0.27
   }[resolution.value]
 })
 const imageSize = computed(() => {
@@ -1321,7 +1321,7 @@ async function retryImageTask(task: ImageTask) {
               </div>
 
               <div class="flex shrink-0 items-center justify-end gap-3">
-                <span class="hidden whitespace-nowrap text-sm text-muted sm:inline">${{ estimatedCost.toFixed(2) }}</span>
+                <span class="hidden items-center gap-1 text-xs text-muted sm:inline-flex"><UIcon name="i-lucide-coins" class="size-3" />{{ estimatedCost }}</span>
                 <UButton
                   type="submit"
                   icon="i-lucide-arrow-up"
