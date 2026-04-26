@@ -39,10 +39,9 @@ function onGroupChange(value?: number) {
       color="neutral"
       variant="soft"
       value-key="value"
-      class="max-w-40 shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur data-[state=open]:bg-white/80 dark:border-white/10 dark:bg-white/10 dark:data-[state=open]:bg-white/15"
+      class="shrink-0 rounded-full"
       :ui="{
-        base: 'rounded-full',
-        label: 'truncate',
+        base: 'rounded-full whitespace-nowrap',
         trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
       }"
       @update:model-value="onGroupChange"
@@ -61,10 +60,9 @@ function onGroupChange(value?: number) {
       color="neutral"
       variant="soft"
       value-key="value"
-      class="max-w-44 shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur data-[state=open]:bg-white/80 sm:max-w-48 dark:border-white/10 dark:bg-white/10 dark:data-[state=open]:bg-white/15"
+      class="shrink-0 rounded-full"
       :ui="{
-        base: 'rounded-full',
-        label: 'truncate',
+        base: 'rounded-full whitespace-nowrap',
         trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
       }"
     />

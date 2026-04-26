@@ -7,44 +7,50 @@
 
 @layer base {
   :root {
-    --pig-navy: #1b3a6b;
-    --pig-navy-deep: #0d1b2a;
-    --pig-navy-soft: #294678;
-    --pig-gold: #e8a825;
-    --pig-green: #5b9a5f;
-    --pig-surface: rgba(255, 255, 255, 0.68);
-    --pig-surface-strong: rgba(255, 255, 255, 0.84);
-    --pig-border: rgba(255, 255, 255, 0.52);
-    --pig-shadow: 0 24px 70px rgba(27, 58, 107, 0.14);
-    --pig-shadow-soft: 0 10px 32px rgba(27, 58, 107, 0.1);
+    --warm-bg: #faf8f5;
+    --warm-card: #ffffff;
+    --warm-border: rgba(0, 0, 0, 0.06);
+    --warm-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+    --warm-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.08);
+    --warm-accent: #6366f1;
+    --warm-accent-soft: rgba(99, 102, 241, 0.08);
+    --warm-accent-hover: rgba(99, 102, 241, 0.14);
+    --warm-text: #1e1e2e;
+    --warm-text-secondary: #6b7280;
+    --warm-surface-hover: rgba(0, 0, 0, 0.03);
   }
 
   html.dark {
-    --pig-surface: rgba(255, 255, 255, 0.08);
-    --pig-surface-strong: rgba(255, 255, 255, 0.12);
-    --pig-border: rgba(255, 255, 255, 0.12);
-    --pig-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
-    --pig-shadow-soft: 0 10px 32px rgba(0, 0, 0, 0.26);
+    --warm-bg: #111118;
+    --warm-card: #1a1a24;
+    --warm-border: rgba(255, 255, 255, 0.06);
+    --warm-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+    --warm-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --warm-accent: #818cf8;
+    --warm-accent-soft: rgba(129, 140, 248, 0.1);
+    --warm-accent-hover: rgba(129, 140, 248, 0.18);
+    --warm-text: #e4e4e7;
+    --warm-text-secondary: #71717a;
+    --warm-surface-hover: rgba(255, 255, 255, 0.04);
   }
 
   body {
-    @apply min-h-screen text-neutral-900 antialiased dark:text-white;
-    background:
-      radial-gradient(circle at 18% 12%, rgba(232, 168, 37, 0.22), transparent 32rem),
-      radial-gradient(circle at 88% 18%, rgba(91, 154, 95, 0.2), transparent 34rem),
-      linear-gradient(135deg, #eef2f7 0%, #e0e8f5 50%, #d5dff0 100%);
+    @apply min-h-screen text-zinc-900 antialiased dark:text-zinc-100;
+    background: var(--warm-bg);
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.06), transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.05), transparent 60%);
   }
 
   html.dark body {
-    background:
-      radial-gradient(circle at 18% 12%, rgba(232, 168, 37, 0.14), transparent 32rem),
-      radial-gradient(circle at 88% 18%, rgba(91, 154, 95, 0.12), transparent 34rem),
-      linear-gradient(135deg, #0d1b2a 0%, #0a1628 50%, #0d1b2a 100%);
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.08), transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.06), transparent 60%);
   }
 
   ::selection {
-    background: var(--pig-gold);
-    color: var(--pig-navy);
+    background: var(--warm-accent-soft);
+    color: var(--warm-accent);
   }
 }
 
@@ -53,277 +59,96 @@
 }
 
 @layer components {
-  .pig-glass {
-    border: 1px solid var(--pig-border);
-    background: var(--pig-surface);
-    box-shadow: var(--pig-shadow-soft);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+  .warm-card {
+    background: var(--warm-card);
+    border: 1px solid var(--warm-border);
+    box-shadow: var(--warm-shadow);
+    border-radius: 1rem;
   }
 
-  .pig-glass-strong {
-    border: 1px solid var(--pig-border);
-    background: var(--pig-surface-strong);
-    box-shadow: var(--pig-shadow);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+  .warm-card-hover {
+    background: var(--warm-card);
+    border: 1px solid var(--warm-border);
+    box-shadow: var(--warm-shadow);
+    border-radius: 1rem;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
   }
 
-  .pig-app-panel {
-    border: 1px solid var(--pig-border);
-    background: linear-gradient(180deg, var(--pig-surface-strong), var(--pig-surface));
-    box-shadow: var(--pig-shadow);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+  .warm-card-hover:hover {
+    box-shadow: var(--warm-shadow-lg);
+    border-color: rgba(99, 102, 241, 0.18);
+    transform: translateY(-1px);
   }
 
-  .pig-title {
-    color: var(--pig-navy);
-    font-family: 'Space Grotesk', Inter, ui-sans-serif, system-ui, sans-serif;
-    letter-spacing: 0;
+  html.dark .warm-card-hover:hover {
+    border-color: rgba(129, 140, 248, 0.22);
   }
 
-  html.dark .pig-title {
-    color: #fff;
-  }
-
-  .pig-gradient-text {
-    background: linear-gradient(90deg, var(--pig-gold), #f7c85f);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-
-  .pig-accent-line {
-    height: 0.375rem;
-    width: 5rem;
+  .warm-pill {
+    background: var(--warm-surface-hover);
+    color: var(--warm-text-secondary);
+    border: 1px solid transparent;
     border-radius: 9999px;
-    background: var(--pig-gold);
+    transition: all 0.15s ease;
   }
 
-  .pig-toolbar {
-    border: 1px solid var(--pig-border);
-    background: rgba(255, 255, 255, 0.58);
-    box-shadow: 0 12px 30px rgba(27, 58, 107, 0.1);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+  .warm-pill:hover {
+    background: var(--warm-accent-soft);
+    color: var(--warm-accent);
+    border-color: rgba(99, 102, 241, 0.12);
   }
 
-  html.dark .pig-toolbar {
-    background: rgba(13, 27, 42, 0.72);
+  html.dark .warm-pill:hover {
+    border-color: rgba(129, 140, 248, 0.15);
   }
 
-  .pig-brand-chip {
-    border: 1px solid var(--pig-border);
-    background: rgba(255, 255, 255, 0.84);
-    box-shadow: 0 12px 34px rgba(27, 58, 107, 0.12);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+  .warm-input {
+    background: var(--warm-card);
+    border: 1px solid var(--warm-border);
+    box-shadow: var(--warm-shadow-lg);
+    border-radius: 1.25rem;
   }
 
-  html.dark .pig-brand-chip {
-    background: rgba(13, 27, 42, 0.78);
+  .warm-input:focus-within {
+    border-color: rgba(99, 102, 241, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 3px rgba(99, 102, 241, 0.08);
   }
 
-  .pig-prompt {
-    border: 1px solid var(--pig-border);
-    background: rgba(255, 255, 255, 0.78);
-    box-shadow: 0 24px 70px rgba(27, 58, 107, 0.16);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
+  html.dark .warm-input {
+    box-shadow: var(--warm-shadow-lg);
   }
 
-  html.dark .pig-prompt {
-    background: rgba(13, 27, 42, 0.82);
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+  html.dark .warm-input:focus-within {
+    border-color: rgba(129, 140, 248, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(129, 140, 248, 0.1);
   }
 
-  .pig-card {
-    border: 1px solid var(--pig-border);
-    background: rgba(255, 255, 255, 0.58);
-    box-shadow: 0 8px 26px rgba(27, 58, 107, 0.08);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-  }
-
-  .pig-card:hover {
-    border-color: rgba(232, 168, 37, 0.42);
-    box-shadow: 0 18px 42px rgba(27, 58, 107, 0.12);
-    transform: translateY(-1px);
-  }
-
-  html.dark .pig-card {
-    background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 26px rgba(0, 0, 0, 0.24);
-  }
-
-  .pig-icon-tile {
-    color: var(--pig-navy);
-    background: linear-gradient(135deg, rgba(232, 168, 37, 0.18), rgba(91, 154, 95, 0.14));
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-  }
-
-  html.dark .pig-icon-tile {
+  .warm-btn {
+    background: var(--warm-accent);
     color: #fff;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+    border-radius: 9999px;
+    transition: all 0.15s ease;
   }
 
-  .pig-primary-action {
-    background: var(--pig-gold);
-    color: var(--pig-navy);
-    box-shadow: 0 12px 30px rgba(232, 168, 37, 0.24);
+  .warm-btn:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
   }
 
-  .pig-primary-action:hover {
-    filter: brightness(1.05);
+  html.dark .warm-btn {
+    box-shadow: 0 4px 14px rgba(129, 140, 248, 0.2);
   }
 
-  .pig-submit-muted {
-    background: rgba(59, 130, 246, 0.82);
-    color: #fff;
-    box-shadow: 0 10px 26px rgba(59, 130, 246, 0.18);
+  .warm-chip {
+    background: var(--warm-card);
+    border: 1px solid var(--warm-border);
+    box-shadow: var(--warm-shadow);
+    border-radius: 9999px;
   }
 
-  html.dark .pig-submit-muted {
-    background: rgba(96, 165, 250, 0.64);
-    color: rgba(255, 255, 255, 0.9);
-  }
-
-  .pig-prompt-pill {
-    border: 1px solid rgba(27, 58, 107, 0.16);
-    background: rgba(255, 255, 255, 0.36);
-    color: #374151;
-    line-height: 1.25;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
-  }
-
-  .pig-prompt-pill:hover {
-    border-color: rgba(27, 58, 107, 0.32);
-    background: rgba(255, 255, 255, 0.58);
-    color: #1f2937;
-    transform: translateY(-1px);
-  }
-
-  .pig-prompt-pill .pig-quick-icon-blue,
-  .pig-prompt-pill .pig-quick-icon-gold,
-  .pig-prompt-pill .pig-quick-icon-green,
-  .pig-prompt-pill .pig-quick-icon-purple {
-    background: transparent;
-    box-shadow: none;
-  }
-
-  html.dark .pig-prompt-pill {
-    border-color: rgba(255, 255, 255, 0.18);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.86);
-    box-shadow: none;
-  }
-
-  html.dark .pig-prompt-pill:hover {
-    border-color: rgba(255, 255, 255, 0.34);
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
-  }
-
-  html.dark .pig-prompt-pill .pig-quick-icon-blue {
-    color: #5eead4;
-  }
-
-  html.dark .pig-prompt-pill .pig-quick-icon-gold {
-    color: #facc15;
-  }
-
-  html.dark .pig-prompt-pill .pig-quick-icon-green {
-    color: #86efac;
-  }
-
-  html.dark .pig-prompt-pill .pig-quick-icon-purple {
-    color: #c4b5fd;
-  }
-
-  html.dark .pig-prompt-pill .pig-quick-icon-blue,
-  html.dark .pig-prompt-pill .pig-quick-icon-gold,
-  html.dark .pig-prompt-pill .pig-quick-icon-green,
-  html.dark .pig-prompt-pill .pig-quick-icon-purple {
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .pig-quick-chip {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.58);
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.58));
-    box-shadow: 0 12px 30px rgba(27, 58, 107, 0.08);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  }
-
-  .pig-quick-chip::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(90deg, rgba(232, 168, 37, 0.1), transparent 34%);
-    opacity: 0;
-    transition: opacity 0.18s ease;
-  }
-
-  .pig-quick-chip:hover {
-    border-color: rgba(232, 168, 37, 0.42);
-    box-shadow: 0 18px 42px rgba(27, 58, 107, 0.12);
-    transform: translateY(-1px);
-  }
-
-  .pig-quick-chip:hover::after {
-    opacity: 1;
-  }
-
-  html.dark .pig-quick-chip {
-    border-color: rgba(255, 255, 255, 0.12);
-    background:
-      linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
-  }
-
-  .pig-quick-icon {
-    position: relative;
-    z-index: 1;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.54);
-  }
-
-  .pig-quick-icon-blue {
-    color: #1b3a6b;
-    background: linear-gradient(135deg, rgba(27, 58, 107, 0.16), rgba(59, 130, 246, 0.16));
-  }
-
-  .pig-quick-icon-gold {
-    color: #9a6507;
-    background: linear-gradient(135deg, rgba(232, 168, 37, 0.26), rgba(247, 200, 95, 0.2));
-  }
-
-  .pig-quick-icon-green {
-    color: #2f6f37;
-    background: linear-gradient(135deg, rgba(91, 154, 95, 0.24), rgba(125, 190, 106, 0.18));
-  }
-
-  .pig-quick-icon-purple {
-    color: #5b4bb7;
-    background: linear-gradient(135deg, rgba(109, 75, 255, 0.18), rgba(139, 92, 246, 0.16));
-  }
-
-  html.dark .pig-quick-icon-blue,
-  html.dark .pig-quick-icon-gold,
-  html.dark .pig-quick-icon-green,
-  html.dark .pig-quick-icon-purple {
-    color: #fff;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  .warm-divider {
+    border-color: var(--warm-border);
   }
 }
 

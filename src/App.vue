@@ -6,7 +6,7 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const colorMode = useColorMode()
-const themeColor = computed(() => colorMode.value === 'dark' ? '#0D1B2A' : '#EEF2F7')
+const themeColor = computed(() => colorMode.value === 'dark' ? '#111118' : '#faf8f5')
 const title = computed(() => route.path.startsWith('/images') ? '画图 - PIG Coder' : '对话 - PIG Coder')
 
 useHead({

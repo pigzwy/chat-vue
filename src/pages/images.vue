@@ -81,26 +81,31 @@ const imagePromptPresets = [
   {
     label: '赛博朋克城市',
     icon: 'i-lucide-sparkles',
+    color: 'text-violet-500',
     prompt: '一座充满霓虹灯和飞行器的赛博朋克风格科幻城市，夜晚，雨后街道，8k，高细节，虚幻引擎5渲染'
   },
   {
     label: '动漫插画',
     icon: 'i-lucide-image',
+    color: 'text-pink-500',
     prompt: '一个可爱的二次元动漫少女，站在落日余晖的向日葵花海中，微风吹过，新海诚画风，壁纸级别'
   },
   {
     label: '皮克斯 3D',
     icon: 'i-lucide-gamepad-2',
+    color: 'text-blue-500',
     prompt: '皮克斯 3D 动画风格，可爱的角色，柔和灯光，丰富表情，电影级构图，高质量渲染'
   },
   {
     label: '水彩风景',
     icon: 'i-lucide-palette',
+    color: 'text-emerald-500',
     prompt: '清新的水彩风景插画，远山、湖泊、晨雾和柔和阳光，纸张纹理，干净留白'
   },
   {
     label: '写实摄影',
     icon: 'i-lucide-camera',
+    color: 'text-amber-500',
     prompt: '写实摄影风格，自然光，浅景深，细腻质感，专业商业摄影构图，高清细节'
   }
 ]
@@ -793,9 +798,9 @@ async function retryImageTask(task: ImageTask) {
 </script>
 
 <template>
-  <div class="pig-images flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
+  <div class="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
     <div class="grid min-h-full gap-5 p-4 pt-0 lg:h-full lg:min-h-0 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6 lg:pt-0">
-      <section class="pig-app-panel flex min-h-0 flex-col rounded-3xl p-4 sm:p-6 lg:overflow-hidden">
+      <section class="warm-card flex min-h-0 flex-col p-4 sm:p-6 lg:overflow-hidden">
         <div class="flex items-start justify-between gap-4">
           <div>
             <h1 class="text-xl font-bold text-highlighted">
@@ -818,7 +823,7 @@ async function retryImageTask(task: ImageTask) {
           v-if="!queue.length"
           class="flex min-h-0 flex-1 flex-col items-center justify-center text-center"
         >
-          <div class="pig-icon-tile flex size-24 items-center justify-center rounded-3xl shadow-inner">
+          <div class="flex size-24 items-center justify-center rounded-3xl text-violet-500" style="background: var(--warm-accent-soft)">
             <UIcon
               name="i-lucide-image"
               class="size-9"
@@ -840,8 +845,8 @@ async function retryImageTask(task: ImageTask) {
             <article
               v-for="item in queue"
               :key="item.id"
-              class="pig-card cursor-pointer rounded-2xl p-4 transition"
-              :class="selectedTaskId === item.id ? 'border-[#E8A825] ring-2 ring-[#E8A825]/25' : ''"
+              class="warm-card-hover cursor-pointer p-4"
+              :class="selectedTaskId === item.id ? '!border-[var(--warm-accent)] ring-2 ring-[var(--warm-accent)]/20' : ''"
               @click="selectImageTask(item)"
             >
               <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-slate-100/70 text-muted dark:bg-white/10">
@@ -988,7 +993,7 @@ async function retryImageTask(task: ImageTask) {
                 <div class="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted">
                   <UIcon
                     name="i-lucide-sparkles"
-                    class="size-3.5"
+                    class="size-3.5 text-amber-500"
                   />
                   <span>模型描述</span>
                 </div>
@@ -1004,8 +1009,8 @@ async function retryImageTask(task: ImageTask) {
         </div>
       </section>
 
-      <section class="pig-app-panel flex min-h-0 flex-col rounded-3xl lg:h-full">
-        <div class="border-b border-white/45 p-4 dark:border-white/10 sm:p-5">
+      <section class="warm-card flex min-h-0 flex-col lg:h-full">
+        <div class="warm-divider border-b p-4 sm:p-5">
           <div class="flex items-start justify-between gap-3">
             <div>
               <h2 class="text-lg font-bold text-highlighted">
@@ -1033,7 +1038,7 @@ async function retryImageTask(task: ImageTask) {
           :class="selectedTask ? 'flex' : 'hidden lg:flex'"
         >
           <div v-if="!selectedTask">
-            <div class="pig-icon-tile mx-auto flex size-16 items-center justify-center rounded-2xl">
+            <div class="mx-auto flex size-16 items-center justify-center rounded-2xl text-violet-500" style="background: var(--warm-accent-soft)">
               <UIcon
                 name="i-lucide-sparkles"
                 class="size-7"
@@ -1050,7 +1055,7 @@ async function retryImageTask(task: ImageTask) {
             v-else
             class="w-full space-y-5 text-left"
           >
-            <div class="pig-card rounded-2xl p-3">
+            <div class="warm-card rounded-2xl p-3">
               <div class="flex items-center gap-3">
                 <img
                   :src="selectedTask.imageUrl"
@@ -1093,8 +1098,8 @@ async function retryImageTask(task: ImageTask) {
               <div
                 v-for="historyItem in selectedHistory"
                 :key="historyItem.id"
-                class="pig-card rounded-2xl p-3 transition"
-                :class="selectedTaskId === historyItem.id ? 'ring-2 ring-[#E8A825]/20' : ''"
+                class="warm-card-hover rounded-2xl p-3"
+                :class="selectedTaskId === historyItem.id ? 'ring-2 ring-[var(--warm-accent)]/20' : ''"
               >
                 <div class="flex items-start gap-3">
                   <img
@@ -1157,10 +1162,10 @@ async function retryImageTask(task: ImageTask) {
         </div>
 
         <form
-          class="border-t border-white/45 p-3 dark:border-white/10 sm:p-4"
+          class="warm-divider border-t p-3 sm:p-4"
           @submit.prevent="submitImageTask"
         >
-          <div class="pig-prompt rounded-3xl p-3">
+          <div class="warm-input p-3">
             <div
               v-if="files.length"
               class="mb-3 flex gap-2 overflow-x-auto pb-1"
@@ -1168,7 +1173,7 @@ async function retryImageTask(task: ImageTask) {
               <div
                 v-for="file in files"
                 :key="file.id"
-                class="pig-card group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl"
+                class="warm-card-hover group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl"
                 :title="file.name"
               >
                 <button
@@ -1206,7 +1211,7 @@ async function retryImageTask(task: ImageTask) {
               :ui="{ root: 'w-full', base: 'w-full max-h-48 resize-none overflow-y-auto text-base leading-7' }"
             />
 
-            <div class="mt-2 flex flex-col gap-3 border-t border-white/45 pt-3 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
+            <div class="mt-2 flex flex-col gap-3 warm-divider border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
               <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <UPopover>
                   <UButton
@@ -1215,7 +1220,7 @@ async function retryImageTask(task: ImageTask) {
                     color="neutral"
                     variant="outline"
                     :label="`${resolution} · ${ratio}`"
-                    class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10"
+                    class="shrink-0 rounded-full"
                   />
 
                   <template #content>
@@ -1239,7 +1244,7 @@ async function retryImageTask(task: ImageTask) {
                             :key="item.value"
                             type="button"
                             class="flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl px-2.5 py-2.5 text-center text-sm font-medium transition"
-                            :class="ratio === item.value ? 'bg-[#1B3A6B] text-white shadow-sm dark:bg-[#E8A825] dark:text-[#1B3A6B]' : 'text-highlighted hover:bg-muted'"
+                            :class="ratio === item.value ? 'warm-btn' : 'text-highlighted hover:bg-[var(--warm-surface-hover)]'"
                             @click="ratio = item.value"
                           >
                             <span
@@ -1248,7 +1253,7 @@ async function retryImageTask(task: ImageTask) {
                             >
                               <span
                                 class="flex max-h-8 max-w-12 items-center justify-center rounded-sm border-2"
-                                :class="ratio === item.value ? 'border-current bg-white/15 dark:bg-[#1B3A6B]/10' : 'border-[#1B3A6B]/35 bg-white/50 dark:border-white/35 dark:bg-white/10'"
+                                :class="ratio === item.value ? 'border-current bg-[var(--warm-accent-soft)]' : 'border-zinc-300 bg-[var(--warm-surface-hover)]'"
                                 :style="{ aspectRatio: item.aspect, width: item.aspect.includes(' / 16') || item.aspect.includes(' / 4') ? '1.5rem' : '3rem' }"
                               >
                                 <UIcon
@@ -1273,7 +1278,7 @@ async function retryImageTask(task: ImageTask) {
                             :key="item"
                             type="button"
                             class="rounded-xl px-3 py-2.5 text-center text-base font-bold transition"
-                            :class="resolution === item ? 'bg-[#1B3A6B] text-white shadow-sm dark:bg-[#E8A825] dark:text-[#1B3A6B]' : 'text-highlighted hover:bg-muted'"
+                            :class="resolution === item ? 'warm-btn' : 'text-highlighted hover:bg-[var(--warm-surface-hover)]'"
                             @click="resolution = item"
                           >
                             {{ item }}
@@ -1292,7 +1297,7 @@ async function retryImageTask(task: ImageTask) {
                   color="neutral"
                   variant="soft"
                   :label="imageGroup.label"
-                  class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10"
+                  class="shrink-0 rounded-full"
                 />
 
                 <input
@@ -1309,7 +1314,7 @@ async function retryImageTask(task: ImageTask) {
                   color="neutral"
                   variant="ghost"
                   :label="files.length ? `${files.length}/${uploadedImageLimit}` : undefined"
-                  class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10"
+                  class="shrink-0 rounded-full"
                   :disabled="files.length >= uploadedImageLimit"
                   @click="pickFiles"
                 />
@@ -1323,25 +1328,27 @@ async function retryImageTask(task: ImageTask) {
                   color="primary"
                   :disabled="!canSubmit"
                   :aria-label="submitLabel"
-                  class="pig-primary-action shrink-0 rounded-full"
+                  class="warm-btn shrink-0"
                 />
               </div>
             </div>
           </div>
 
           <div class="mt-3 flex flex-wrap justify-center gap-2">
-            <UButton
+            <button
               v-for="preset in imagePromptPresets"
               :key="preset.label"
               type="button"
-              :icon="preset.icon"
-              :label="preset.label"
-              color="neutral"
-              variant="outline"
-              size="xs"
-              class="rounded-full border-white/40 bg-white/35 px-3 text-[#294678] shadow-sm backdrop-blur hover:text-[#6D4BFF] dark:border-white/10 dark:bg-white/10 dark:text-white sm:px-4"
+              class="warm-pill inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium"
               @click="useImagePromptPreset(preset.prompt)"
-            />
+            >
+              <UIcon
+                :name="preset.icon"
+                class="size-3.5"
+                :class="preset.color"
+              />
+              {{ preset.label }}
+            </button>
           </div>
         </form>
       </section>
@@ -1375,7 +1382,7 @@ async function retryImageTask(task: ImageTask) {
             <div class="flex items-center gap-2 text-sm font-semibold text-highlighted">
               <UIcon
                 name="i-lucide-sparkles"
-                class="size-4"
+                class="size-4 text-amber-500"
               />
               <span>模型描述</span>
             </div>

@@ -101,56 +101,16 @@ function useQuickChatPrompt(prompt: string) {
 }
 
 const quickChats = [
-  {
-    label: '帮我总结这份资料',
-    icon: 'i-lucide-file-text',
-    tone: 'pig-quick-icon-blue'
-  },
-  {
-    label: '写一份产品方案',
-    icon: 'i-lucide-clipboard-list',
-    tone: 'pig-quick-icon-gold'
-  },
-  {
-    label: '优化这段提示词',
-    icon: 'i-lucide-sparkles',
-    tone: 'pig-quick-icon-green'
-  },
-  {
-    label: '生成一周学习计划',
-    icon: 'i-lucide-calendar-check',
-    tone: 'pig-quick-icon-purple'
-  },
-  {
-    label: '帮我分析图片内容',
-    icon: 'i-lucide-image',
-    tone: 'pig-quick-icon-green'
-  },
-  {
-    label: '写一封商务邮件',
-    icon: 'i-lucide-mail',
-    tone: 'pig-quick-icon-blue'
-  },
-  {
-    label: '整理成表格对比',
-    icon: 'i-lucide-table',
-    tone: 'pig-quick-icon-gold'
-  },
-  {
-    label: '把内容翻译成英文',
-    icon: 'i-lucide-languages',
-    tone: 'pig-quick-icon-purple'
-  },
-  {
-    label: '生成会议纪要',
-    icon: 'i-lucide-notebook-pen',
-    tone: 'pig-quick-icon-blue'
-  },
-  {
-    label: '提炼行动清单',
-    icon: 'i-lucide-check-square',
-    tone: 'pig-quick-icon-green'
-  }
+  { label: '帮我总结这份资料', icon: 'i-lucide-file-text', color: 'text-blue-500' },
+  { label: '写一份产品方案', icon: 'i-lucide-clipboard-list', color: 'text-amber-500' },
+  { label: '优化这段提示词', icon: 'i-lucide-sparkles', color: 'text-violet-500' },
+  { label: '生成一周学习计划', icon: 'i-lucide-calendar-check', color: 'text-emerald-500' },
+  { label: '帮我分析图片内容', icon: 'i-lucide-image', color: 'text-pink-500' },
+  { label: '写一封商务邮件', icon: 'i-lucide-mail', color: 'text-blue-500' },
+  { label: '整理成表格对比', icon: 'i-lucide-table', color: 'text-amber-500' },
+  { label: '把内容翻译成英文', icon: 'i-lucide-languages', color: 'text-violet-500' },
+  { label: '生成会议纪要', icon: 'i-lucide-notebook-pen', color: 'text-emerald-500' },
+  { label: '提炼行动清单', icon: 'i-lucide-check-square', color: 'text-pink-500' }
 ]
 </script>
 
@@ -165,21 +125,22 @@ const quickChats = [
     </template>
 
     <template #body>
-      <UContainer class="flex-1 flex flex-col justify-center gap-5 py-8 sm:py-10">
-        <div class="mx-auto inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/35 px-4 py-2 text-sm font-semibold text-[#1B3A6B] shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10 dark:text-white">
-          <UIcon
-            name="i-lucide-sparkles"
-            class="size-4 text-[#E8A825]"
-          />
-          <span>{{ greeting }}，开始你的 AI 工作流</span>
+      <UContainer class="flex-1 flex flex-col justify-center gap-6 py-8 sm:py-12">
+        <div class="text-center">
+          <h1 class="text-2xl font-bold text-highlighted sm:text-3xl">
+            {{ greeting }}
+          </h1>
+          <p class="mt-2 text-sm text-muted">
+            有什么可以帮你的？
+          </p>
         </div>
 
         <UChatPrompt
           v-model="input"
           :status="loading ? 'streaming' : 'ready'"
-          class="pig-prompt mx-auto w-full max-w-3xl rounded-3xl [view-transition-name:chat-prompt]"
+          class="warm-input mx-auto w-full max-w-3xl [view-transition-name:chat-prompt]"
           variant="subtle"
-          :ui="{ base: 'px-2 py-1', footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-white/45 pt-3 dark:border-white/10' }"
+          :ui="{ base: 'px-3 py-2', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
           @submit="onSubmit"
         >
           <template
@@ -214,7 +175,7 @@ const quickChats = [
                   color="neutral"
                   variant="ghost"
                   size="sm"
-                  class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur hover:text-[#1B3A6B] dark:border-white/10 dark:bg-white/10 dark:hover:text-white"
+                  class="shrink-0 rounded-full"
                   :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
                   :disabled="loading || attachmentPending || attachments.length >= chatAttachmentLimit"
                   aria-label="Add attachments"
@@ -228,8 +189,7 @@ const quickChats = [
                 icon="i-lucide-arrow-up"
                 color="primary"
                 size="sm"
-                class="shrink-0 rounded-full"
-                :class="canSubmitChat ? 'pig-primary-action' : 'pig-submit-muted'"
+                class="warm-btn shrink-0"
                 :type="hasAttachments ? 'button' : undefined"
                 :disabled="attachmentPending || !canSubmitChat"
                 @click="hasAttachments ? onSubmit($event) : undefined"
@@ -238,23 +198,19 @@ const quickChats = [
           </template>
         </UChatPrompt>
 
-        <div class="mx-auto flex w-full max-w-3xl flex-wrap gap-2">
+        <div class="mx-auto flex w-full max-w-3xl flex-wrap justify-center gap-2">
           <button
             v-for="quickChat in quickChats"
             :key="quickChat.label"
             type="button"
-            class="pig-prompt-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+            class="warm-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
             @click="useQuickChatPrompt(quickChat.label)"
           >
-            <span
-              class="grid size-3.5 shrink-0 place-items-center"
-              :class="quickChat.tone"
-            >
-              <UIcon
-                :name="quickChat.icon"
-                class="size-3.5"
-              />
-            </span>
+            <UIcon
+              :name="quickChat.icon"
+              class="size-3.5"
+              :class="quickChat.color"
+            />
             <span class="whitespace-nowrap">
               {{ quickChat.label }}
             </span>

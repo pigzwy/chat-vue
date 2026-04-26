@@ -42,30 +42,10 @@ const {
 } = useChatAttachments()
 
 const chatPromptPresets = [
-  {
-    label: '总结重点',
-    icon: 'i-lucide-list-check',
-    tone: 'pig-quick-icon-blue',
-    prompt: '请帮我总结上面的重点，并按条目列出可执行建议。'
-  },
-  {
-    label: '润色表达',
-    icon: 'i-lucide-pen-line',
-    tone: 'pig-quick-icon-gold',
-    prompt: '请帮我把这段内容润色得更专业、更清晰。'
-  },
-  {
-    label: '深入分析',
-    icon: 'i-lucide-brain',
-    tone: 'pig-quick-icon-green',
-    prompt: '请从背景、问题、原因、风险和下一步建议几个角度深入分析。'
-  },
-  {
-    label: '生成表格',
-    icon: 'i-lucide-table',
-    tone: 'pig-quick-icon-purple',
-    prompt: '请把这些信息整理成对比表格，并补充简短结论。'
-  }
+  { label: '总结重点', icon: 'i-lucide-list-check', color: 'text-blue-500', prompt: '请帮我总结上面的重点，并按条目列出可执行建议。' },
+  { label: '润色表达', icon: 'i-lucide-pen-line', color: 'text-amber-500', prompt: '请帮我把这段内容润色得更专业、更清晰。' },
+  { label: '深入分析', icon: 'i-lucide-brain', color: 'text-violet-500', prompt: '请从背景、问题、原因、风险和下一步建议几个角度深入分析。' },
+  { label: '生成表格', icon: 'i-lucide-table', color: 'text-emerald-500', prompt: '请把这些信息整理成对比表格，并补充简短结论。' }
 ]
 
 const chat = new Chat({
@@ -113,7 +93,6 @@ const canSendMessage = computed(() => input.value.trim().length > 0 || hasAttach
 function persistMessages(messages = chat.messages) {
   if (!data.value?.id) return
 
-  // 聊天消息已停用 SQL 入库，流式结束后直接写入浏览器 localStorage。
   updateChatMessages(data.value.id, messages)
   data.value = getChat(data.value.id)
   void fetchChats()
@@ -293,19 +272,15 @@ onMounted(() => {
               v-for="preset in chatPromptPresets"
               :key="preset.label"
               type="button"
-              class="pig-prompt-pill inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-60"
+              class="warm-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="chat.status !== 'ready'"
               @click="useChatPromptPreset(preset.prompt)"
             >
-              <span
-                class="grid size-3.5 shrink-0 place-items-center"
-                :class="preset.tone"
-              >
-                <UIcon
-                  :name="preset.icon"
-                  class="size-3.5"
-                />
-              </span>
+              <UIcon
+                :name="preset.icon"
+                class="size-3.5"
+                :class="preset.color"
+              />
               <span class="whitespace-nowrap">
                 {{ preset.label }}
               </span>
@@ -316,8 +291,8 @@ onMounted(() => {
             v-model="input"
             :error="chat.error"
             variant="subtle"
-            class="pig-prompt rounded-3xl [view-transition-name:chat-prompt]"
-            :ui="{ base: 'px-2 py-1', footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-white/45 pt-3 dark:border-white/10' }"
+            class="warm-input [view-transition-name:chat-prompt]"
+            :ui="{ base: 'px-3 py-2', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
             @submit="handleSubmit"
           >
             <template
@@ -352,7 +327,7 @@ onMounted(() => {
                     color="neutral"
                     variant="ghost"
                     size="sm"
-                    class="shrink-0 rounded-full border border-[#1B3A6B]/15 bg-white/60 shadow-sm backdrop-blur hover:text-[#1B3A6B] dark:border-white/10 dark:bg-white/10 dark:hover:text-white"
+                    class="shrink-0 rounded-full"
                     :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
                     :disabled="chat.status !== 'ready' || attachmentPending || attachments.length >= chatAttachmentLimit"
                     aria-label="Add attachments"
@@ -367,8 +342,7 @@ onMounted(() => {
                   icon="i-lucide-arrow-up"
                   color="primary"
                   size="sm"
-                  class="shrink-0 rounded-full"
-                  :class="chat.status !== 'ready' || canSendMessage ? 'pig-primary-action' : 'pig-submit-muted'"
+                  class="warm-btn shrink-0"
                   :type="hasAttachments ? 'button' : undefined"
                   :disabled="chat.status === 'ready' && (attachmentPending || !canSendMessage)"
                   @click="chat.status === 'ready' && hasAttachments ? handleSubmit($event) : undefined"

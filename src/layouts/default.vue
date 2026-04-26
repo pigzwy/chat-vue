@@ -69,19 +69,19 @@ defineShortcuts({
     <div class="pointer-events-none fixed left-4 top-3 z-50">
       <ULink
         to="/"
-        class="pig-brand-chip pointer-events-auto inline-flex items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2 sm:pr-3"
+        class="warm-chip pointer-events-auto inline-flex items-center gap-1.5 py-1.5 pl-1.5 pr-2 sm:pr-3"
       >
         <img
           src="/logo-mark.jpg"
           alt="pigcoder"
-          class="size-7 shrink-0 rounded-full object-cover shadow-sm"
+          class="size-7 shrink-0 rounded-full object-cover"
         >
-        <span class="pig-title hidden text-lg font-bold sm:inline">pigcoder</span>
+        <span class="hidden text-sm font-semibold text-highlighted sm:inline">pigcoder</span>
       </ULink>
     </div>
 
     <div class="pointer-events-none fixed top-3 left-1/2 z-50 -translate-x-1/2">
-      <div class="pig-toolbar pointer-events-auto inline-flex items-center rounded-full p-0.5">
+      <div class="warm-chip pointer-events-auto inline-flex items-center p-0.5">
         <UButton
           to="/"
           label="对话"
@@ -89,8 +89,9 @@ defineShortcuts({
           size="sm"
           color="neutral"
           variant="ghost"
-          class="h-8 rounded-full px-3.5 font-semibold"
-          :class="!isImagesRoute ? 'bg-[#1B3A6B] text-white shadow-sm' : 'text-[#1B3A6B] hover:bg-white/65 dark:text-white dark:hover:bg-white/10'"
+          class="h-8 rounded-full px-3.5 font-medium"
+          :class="!isImagesRoute ? 'warm-btn' : ''"
+          :style="!isImagesRoute ? 'border:none;box-shadow:none' : ''"
         />
         <UButton
           to="/images"
@@ -99,8 +100,9 @@ defineShortcuts({
           size="sm"
           color="neutral"
           variant="ghost"
-          class="h-8 rounded-full px-3.5 font-semibold"
-          :class="isImagesRoute ? 'bg-[#1B3A6B] text-white shadow-sm' : 'text-[#1B3A6B] hover:bg-white/65 dark:text-white dark:hover:bg-white/10'"
+          class="h-8 rounded-full px-3.5 font-medium"
+          :class="isImagesRoute ? 'warm-btn' : ''"
+          :style="isImagesRoute ? 'border:none;box-shadow:none' : ''"
         />
       </div>
     </div>
@@ -109,7 +111,7 @@ defineShortcuts({
       <UColorModeButton
         color="neutral"
         variant="ghost"
-        class="pig-toolbar pointer-events-auto rounded-full"
+        class="warm-chip pointer-events-auto"
       />
     </div>
 
@@ -164,7 +166,7 @@ defineShortcuts({
           :items="items"
           :collapsed="collapsed"
           orientation="vertical"
-          :ui="{ link: 'overflow-hidden rounded-xl data-[active=true]:bg-[#1B3A6B] data-[active=true]:text-white data-[active=true]:shadow-sm' }"
+          :ui="{ link: 'overflow-hidden rounded-xl data-[active=true]:bg-[var(--warm-accent)] data-[active=true]:text-white' }"
         >
           <template #chat-trailing="{ item }">
             <div class="flex -mr-1.25 translate-x-full group-hover:translate-x-0 transition-transform">
@@ -203,7 +205,7 @@ defineShortcuts({
 
     <div
       class="flex-1 flex min-w-0 overflow-hidden"
-      :class="isImagesRoute ? 'mt-18' : 'pig-app-panel mx-4 mb-4 mt-18 rounded-3xl lg:ml-0'"
+      :class="isImagesRoute ? 'mt-18' : 'warm-card mx-4 mb-4 mt-18 lg:ml-0'"
     >
       <RouterView :key="route.path" />
     </div>
