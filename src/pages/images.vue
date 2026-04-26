@@ -139,6 +139,7 @@ const previewUploadedImage = ref<UploadedImage | null>(null)
 const selectedTaskId = ref('')
 const timerNow = ref(Date.now())
 let durationTimer: ReturnType<typeof setInterval> | null = null
+const sourceFilesByTaskId = new Map<string, File[]>()
 
 const promptLimit = 5000
 const deleteImageModal = overlay.create(ModalConfirm, {
@@ -279,6 +280,7 @@ onBeforeUnmount(() => {
   if (durationTimer) {
     clearInterval(durationTimer)
   }
+  sourceFilesByTaskId.clear()
   clearUploadedImages()
 })
 
@@ -721,6 +723,9 @@ async function submitImageTask() {
     resolution: resolution.value,
     size: imageSize.value
   })
+  if (uploadedSources.length) {
+    sourceFilesByTaskId.set(task.id, uploadedSources)
+  }
   prompt.value = ''
 
   await executeImageTask(
@@ -744,6 +749,7 @@ async function retryImageTask(task: ImageTask) {
     ? task.sourceImageIds
     : task.parentId ? [task.parentId] : undefined
   let usedUploadedSources = false
+  const cachedSources = sourceFilesByTaskId.get(task.id) || []
 
   const retryTask = createImageTask({
     type: task.type,
@@ -754,12 +760,16 @@ async function retryImageTask(task: ImageTask) {
     resolution: task.resolution,
     size: task.size
   })
+  if (cachedSources.length) {
+    sourceFilesByTaskId.set(retryTask.id, cachedSources)
+  }
 
   await executeImageTask(
     retryTask,
     async () => {
       if (task.type !== 'edit') return []
       if (sourceImageIds?.length) return getSourcesFromTaskIds(sourceImageIds)
+      if (cachedSources.length) return cachedSources
       if (files.value.length) {
         usedUploadedSources = true
         return files.value.map(item => item.file)
