@@ -68,6 +68,14 @@ const imageStorageLimit = 12
 const uploadedImageLimit = 8
 const imageRequestTimeoutMs = 300000
 const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
+const ratioOptions: Array<{ value: ImageRatio, aspect: string, auto?: boolean }> = [
+  { value: '1:1', aspect: '1 / 1' },
+  { value: '16:9', aspect: '16 / 9' },
+  { value: '9:16', aspect: '9 / 16' },
+  { value: '4:3', aspect: '4 / 3' },
+  { value: '3:4', aspect: '3 / 4' },
+  { value: 'Auto', aspect: '1 / 1', auto: true }
+]
 const resolutionItems: ImageResolution[] = ['1K', '2K', '4K']
 const imagePromptPresets = [
   {
@@ -1211,7 +1219,7 @@ async function retryImageTask(task: ImageTask) {
                   />
 
                   <template #content>
-                    <div class="w-[420px] max-w-[calc(100vw-2rem)] space-y-8 p-5">
+                    <div class="w-[360px] max-w-[calc(100vw-2rem)] space-y-5 p-4">
                       <div>
                         <h3 class="text-base font-bold text-highlighted">
                           生图参数
@@ -1221,34 +1229,50 @@ async function retryImageTask(task: ImageTask) {
                         </p>
                       </div>
 
-                      <div class="space-y-3">
+                      <div class="space-y-2.5">
                         <div class="text-sm font-semibold text-muted">
                           画面比例
                         </div>
-                        <div class="grid grid-cols-3 gap-3">
+                        <div class="grid grid-cols-3 gap-2.5">
                           <button
-                            v-for="item in ratioItems"
-                            :key="item"
+                            v-for="item in ratioOptions"
+                            :key="item.value"
                             type="button"
-                            class="rounded-xl px-4 py-3 text-center text-sm font-medium transition"
-                            :class="ratio === item ? 'bg-[#1B3A6B] text-white shadow-sm dark:bg-[#E8A825] dark:text-[#1B3A6B]' : 'text-highlighted hover:bg-muted'"
-                            @click="ratio = item"
+                            class="flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl px-2.5 py-2.5 text-center text-sm font-medium transition"
+                            :class="ratio === item.value ? 'bg-[#1B3A6B] text-white shadow-sm dark:bg-[#E8A825] dark:text-[#1B3A6B]' : 'text-highlighted hover:bg-muted'"
+                            @click="ratio = item.value"
                           >
-                            {{ item }}
+                            <span
+                              class="flex h-8 w-12 items-center justify-center"
+                              aria-hidden="true"
+                            >
+                              <span
+                                class="flex max-h-8 max-w-12 items-center justify-center rounded-sm border-2"
+                                :class="ratio === item.value ? 'border-current bg-white/15 dark:bg-[#1B3A6B]/10' : 'border-[#1B3A6B]/35 bg-white/50 dark:border-white/35 dark:bg-white/10'"
+                                :style="{ aspectRatio: item.aspect, width: item.aspect.includes(' / 16') || item.aspect.includes(' / 4') ? '1.5rem' : '3rem' }"
+                              >
+                                <UIcon
+                                  v-if="item.auto"
+                                  name="i-lucide-sparkles"
+                                  class="size-4"
+                                />
+                              </span>
+                            </span>
+                            <span>{{ item.value }}</span>
                           </button>
                         </div>
                       </div>
 
-                      <div class="space-y-3">
+                      <div class="space-y-2.5">
                         <div class="text-sm font-semibold text-muted">
                           分辨率
                         </div>
-                        <div class="grid grid-cols-3 gap-3">
+                        <div class="grid grid-cols-3 gap-2.5">
                           <button
                             v-for="item in resolutionItems"
                             :key="item"
                             type="button"
-                            class="rounded-xl px-4 py-3 text-center text-base font-bold transition"
+                            class="rounded-xl px-3 py-2.5 text-center text-base font-bold transition"
                             :class="resolution === item ? 'bg-[#1B3A6B] text-white shadow-sm dark:bg-[#E8A825] dark:text-[#1B3A6B]' : 'text-highlighted hover:bg-muted'"
                             @click="resolution = item"
                           >
