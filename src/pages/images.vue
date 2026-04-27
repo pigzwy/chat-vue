@@ -869,15 +869,13 @@ function getTaskDurationSeconds(task: ImageTask) {
 }
 
 function formatTaskCreatedAt(task: ImageTask) {
-  return task.createdAt.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false
-  })
+  }).format(task.createdAt)
 }
 
 function createImageTask(input: {
@@ -1225,6 +1223,9 @@ async function retryImageTask(task: ImageTask) {
                     :color="item.status === 'completed' ? 'success' : item.status === 'error' ? 'error' : 'neutral'"
                     variant="subtle"
                   />
+                  <span class="shrink-0 text-xs text-muted">
+                    {{ formatTaskCreatedAt(item) }}
+                  </span>
                   <span
                     v-if="getTaskDurationSeconds(item)"
                     class="shrink-0 text-xs text-muted"
@@ -1239,13 +1240,6 @@ async function retryImageTask(task: ImageTask) {
                   variant="outline"
                 />
                 <span class="text-xs text-muted">{{ item.resolution }} · {{ item.ratio }} · {{ item.size }}</span>
-              </div>
-              <div class="mt-2 flex items-center gap-1.5 text-xs text-muted">
-                <UIcon
-                  name="i-lucide-clock-3"
-                  class="size-3.5"
-                />
-                <span>创建于 {{ formatTaskCreatedAt(item) }}</span>
               </div>
               <p
                 v-if="item.error"
