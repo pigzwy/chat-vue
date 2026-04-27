@@ -79,6 +79,8 @@ const imageGroup = {
 } as const
 const imageApiKeyName = 'chat | draw'
 const imageStorageKey = 'sub2api-image-tasks'
+const imageDatabaseName = 'sub2api-image-assets'
+const imageDatabaseStoreName = 'images'
 const imageStorageLimit = 12
 const uploadedImageLimit = 8
 const imageRequestTimeoutMs = 300000
@@ -167,6 +169,7 @@ const previewUploadedImage = ref<UploadedImage | null>(null)
 const selectedTaskId = ref('')
 const timerNow = ref(Date.now())
 let durationTimer: ReturnType<typeof setInterval> | null = null
+let imageDatabasePromise: Promise<IDBDatabase> | null = null
 const sourceFilesByTaskId = new Map<string, File[]>()
 
 const promptLimit = 5000
@@ -231,10 +234,13 @@ function isImageResolution(value: unknown): value is ImageResolution {
 }
 
 function toStoredTask(task: ImageTask): StoredImageTask {
-  return {
+  const stored = {
     ...task,
+    imageUrl: task.imageUrl?.startsWith('data:') ? undefined : task.imageUrl,
     createdAt: task.createdAt.toISOString()
   }
+
+  return stored
 }
 
 function createImageTaskId() {
@@ -280,25 +286,125 @@ function loadStoredTasks() {
     .filter((task): task is ImageTask => Boolean(task))
 }
 
+function openImageDatabase() {
+  if (typeof window === 'undefined' || !window.indexedDB) {
+    return Promise.reject(new Error('IndexedDB is not available'))
+  }
+
+  imageDatabasePromise ||= new Promise<IDBDatabase>((resolve, reject) => {
+    const request = window.indexedDB.open(imageDatabaseName, 1)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(imageDatabaseStoreName)) {
+        db.createObjectStore(imageDatabaseStoreName)
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+
+  return imageDatabasePromise
+}
+
+async function putImageAsset(id: string, imageUrl: string) {
+  if (!imageUrl.startsWith('data:')) return
+
+  const db = await openImageDatabase()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(imageDatabaseStoreName, 'readwrite')
+    tx.objectStore(imageDatabaseStoreName).put(imageUrl, id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function getImageAsset(id: string) {
+  const db = await openImageDatabase()
+  return await new Promise<string | undefined>((resolve, reject) => {
+    const tx = db.transaction(imageDatabaseStoreName, 'readonly')
+    const request = tx.objectStore(imageDatabaseStoreName).get(id)
+    request.onsuccess = () => resolve(typeof request.result === 'string' ? request.result : undefined)
+    request.onerror = () => reject(request.error)
+  })
+}
+
+async function deleteImageAsset(id: string) {
+  const db = await openImageDatabase()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(imageDatabaseStoreName, 'readwrite')
+    tx.objectStore(imageDatabaseStoreName).delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function deleteImageAssetsExcept(ids: Set<string>) {
+  const db = await openImageDatabase()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(imageDatabaseStoreName, 'readwrite')
+    const store = tx.objectStore(imageDatabaseStoreName)
+    const request = store.getAllKeys()
+    request.onsuccess = () => {
+      request.result.forEach((key) => {
+        if (typeof key === 'string' && !ids.has(key)) {
+          store.delete(key)
+        }
+      })
+    }
+    request.onerror = () => reject(request.error)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function persistImageAssets(tasks: ImageTask[]) {
+  try {
+    await Promise.all(tasks.map(task => task.imageUrl ? putImageAsset(task.id, task.imageUrl) : undefined))
+    await deleteImageAssetsExcept(new Set(tasks.map(task => task.id)))
+  } catch {
+    // Keep metadata persistence independent from large image asset persistence.
+  }
+}
+
+async function hydrateStoredImageAssets() {
+  const nextTasks = await Promise.all(queue.value.map(async (task) => {
+    if (task.imageUrl?.startsWith('data:')) {
+      await putImageAsset(task.id, task.imageUrl)
+      return task
+    }
+
+    const imageUrl = await getImageAsset(task.id)
+    return imageUrl ? { ...task, imageUrl } : task
+  }))
+
+  queue.value = nextTasks
+  persistTasks(queue.value)
+}
+
 function persistTasks(tasks: ImageTask[]) {
   if (typeof window === 'undefined') return
 
-  let next = tasks.slice(0, imageStorageLimit)
-  while (next.length) {
+  const next = tasks.slice(0, imageStorageLimit)
+  void persistImageAssets(next)
+
+  try {
+    window.localStorage.setItem(imageStorageKey, JSON.stringify(next.map(toStoredTask)))
+  } catch {
     try {
-      window.localStorage.setItem(imageStorageKey, JSON.stringify(next.map(toStoredTask)))
-      return
+      window.localStorage.setItem(imageStorageKey, JSON.stringify(next.map(task => ({
+        ...toStoredTask(task),
+        imageUrl: undefined
+      }))))
     } catch {
-      next = next.slice(0, -1)
+      // Keep the in-memory queue intact even if browser storage is exhausted.
     }
   }
-
-  window.localStorage.removeItem(imageStorageKey)
 }
 
 watch(queue, persistTasks, { deep: true })
 
 onMounted(() => {
+  void hydrateStoredImageAssets().catch(() => {})
   durationTimer = setInterval(() => {
     timerNow.value = Date.now()
   }, 1000)
@@ -379,15 +485,19 @@ function onFilesChange(event: Event) {
   input.value = ''
 }
 
+function normalizeApiErrorMessage(message: string) {
+  return message.replace(/sub2api/gi, 'API')
+}
+
 function toErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : ''
   if (!message) return '图片生成失败'
 
   try {
     const parsed = JSON.parse(message)
-    return parsed.error?.message || parsed.message || message
+    return normalizeApiErrorMessage(parsed.error?.message || parsed.message || message)
   } catch {
-    return message
+    return normalizeApiErrorMessage(message)
   }
 }
 
@@ -407,6 +517,10 @@ function updateTask(id: string, patch: Partial<ImageTask>) {
 
   const current = queue.value[index]
   if (!current) return
+
+  if (patch.imageUrl) {
+    void putImageAsset(current.id, patch.imageUrl).catch(() => {})
+  }
 
   queue.value.splice(index, 1, {
     ...current,
@@ -695,6 +809,7 @@ async function deleteImageTask(task: ImageTask) {
   if (index === -1) return
 
   queue.value.splice(index, 1)
+  void deleteImageAsset(task.id).catch(() => {})
 
   if (selectedTaskId.value === task.id) {
     selectedTaskId.value = ''
@@ -1136,7 +1251,7 @@ async function retryImageTask(task: ImageTask) {
                 v-if="item.error"
                 class="mt-3 line-clamp-2 text-sm text-error"
               >
-                {{ item.error }}
+                {{ normalizeApiErrorMessage(item.error) }}
               </p>
               <div
                 v-if="item.revisedPrompt"

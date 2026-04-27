@@ -58,17 +58,17 @@ function parseJson<T>(text: string) {
 
 function toErrorMessage(text: string, status: number, statusText: string) {
   if (status === 524) {
-    return 'Sub2API 图片编辑超时，建议降低分辨率或稍后重试'
+    return 'API 图片编辑超时，建议降低分辨率或稍后重试'
   }
 
   const parsed = parseJson<ImageResponse>(text)
   if (parsed) {
-    return parsed.error?.message || parsed.message || `Sub2API upstream returned ${status} ${statusText || 'error'}`
+    return parsed.error?.message || parsed.message || `API upstream returned ${status} ${statusText || 'error'}`
   }
 
   const trimmed = text.trim()
   if (!trimmed || trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
-    return `Sub2API upstream returned ${status} ${statusText || 'error'}`
+    return `API upstream returned ${status} ${statusText || 'error'}`
   }
 
   return trimmed.slice(0, 500)
