@@ -34,63 +34,76 @@ function getFileParts(parts: UIMessage['parts']) {
     :files="getFileParts(message.parts)"
   />
 
-  <template
-    v-for="(part, index) in getMergedParts(message.parts)"
-    :key="`${message.id}-${part.type}-${index}`"
+  <div
+    :class="message.role === 'assistant' ? 'flex items-start gap-3' : undefined"
   >
-    <UChatReasoning
-      v-if="isReasoningUIPart(part)"
-      :text="part.text"
-      :streaming="isPartStreaming(part)"
-      chevron="leading"
+    <img
+      v-if="message.role === 'assistant'"
+      src="/logo-mark.jpg"
+      alt="pigcoder"
+      class="size-8 shrink-0 rounded-full object-cover ring-1 ring-default"
     >
-      <ChatComark
-        :markdown="part.text"
-        :streaming="isPartStreaming(part)"
-      />
-    </UChatReasoning>
 
-    <template v-else-if="isToolUIPart(part)">
-      <ChatToolChart
-        v-if="getToolName(part) === 'chart'"
-        :invocation="{ ...(part as ChartUIToolInvocation) }"
-      />
-      <ChatToolWeather
-        v-else-if="getToolName(part) === 'weather'"
-        :invocation="{ ...(part as WeatherUIToolInvocation) }"
-      />
-      <UChatTool
-        v-else-if="getToolName(part) === 'web_search' || getToolName(part) === 'google_search'"
-        :text="isToolStreaming(part) ? 'Searching the web...' : 'Searched the web'"
-        :suffix="getSearchQuery(part)"
-        :streaming="isToolStreaming(part)"
-        chevron="leading"
+    <div :class="message.role === 'assistant' ? 'min-w-0 max-w-full rounded-2xl bg-muted/60 px-4 py-3' : undefined">
+      <template
+        v-for="(part, index) in getMergedParts(message.parts)"
+        :key="`${message.id}-${part.type}-${index}`"
       >
-        <ChatToolSources :sources="getSources(part)" />
-      </UChatTool>
-    </template>
-
-    <template v-else-if="isTextUIPart(part)">
-      <ChatComark
-        v-if="message.role === 'assistant'"
-        :markdown="part.text"
-        :streaming="isPartStreaming(part)"
-      />
-      <template v-else-if="message.role === 'user'">
-        <ChatMessageEdit
-          v-if="editing"
-          :message="message"
+        <UChatReasoning
+          v-if="isReasoningUIPart(part)"
           :text="part.text"
-          @save="(msg, text) => emit('save', msg, text)"
-          @cancel="emit('cancelEdit')"
-        />
-        <p
-          v-else
-          class="whitespace-pre-wrap"
+          :streaming="isPartStreaming(part)"
+          chevron="leading"
         >
-          {{ part.text }}
-        </p>
+          <ChatComark
+            :markdown="part.text"
+            :streaming="isPartStreaming(part)"
+          />
+        </UChatReasoning>
+
+        <template v-else-if="isToolUIPart(part)">
+          <ChatToolChart
+            v-if="getToolName(part) === 'chart'"
+            :invocation="{ ...(part as ChartUIToolInvocation) }"
+          />
+          <ChatToolWeather
+            v-else-if="getToolName(part) === 'weather'"
+            :invocation="{ ...(part as WeatherUIToolInvocation) }"
+          />
+          <UChatTool
+            v-else-if="getToolName(part) === 'web_search' || getToolName(part) === 'google_search'"
+            :text="isToolStreaming(part) ? 'Searching the web...' : 'Searched the web'"
+            :suffix="getSearchQuery(part)"
+            :streaming="isToolStreaming(part)"
+            chevron="leading"
+          >
+            <ChatToolSources :sources="getSources(part)" />
+          </UChatTool>
+        </template>
+
+        <template v-else-if="isTextUIPart(part)">
+          <ChatComark
+            v-if="message.role === 'assistant'"
+            :markdown="part.text"
+            :streaming="isPartStreaming(part)"
+          />
+          <template v-else-if="message.role === 'user'">
+            <ChatMessageEdit
+              v-if="editing"
+              :message="message"
+              :text="part.text"
+              @save="(msg, text) => emit('save', msg, text)"
+              @cancel="emit('cancelEdit')"
+            />
+            <p
+              v-else
+              class="whitespace-pre-wrap"
+            >
+              {{ part.text }}
+            </p>
+          </template>
+        </template>
       </template>
-    </template>
-  </template>
+    </div>
+  </div>
 </template>
