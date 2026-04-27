@@ -74,6 +74,10 @@ function toErrorMessage(text: string, status: number, statusText: string) {
   return trimmed.slice(0, 500)
 }
 
+function isPathFallbackStatus(status: number) {
+  return status === 404 || status === 405
+}
+
 export default defineHandler(async (event) => {
   const form = await event.req.formData()
   const payload = z.object({
@@ -105,13 +109,28 @@ export default defineHandler(async (event) => {
     upstreamForm.append('image', image)
   })
 
-  const response = await fetch(`${sub2apiBaseURL()}/images/edits`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${payload.apiKey}`
-    },
-    body: upstreamForm
-  })
+  const upstreamPaths = ['/images/edits', '/v1/images/edits']
+  let response: Response | null = null
+
+  for (const path of upstreamPaths) {
+    response = await fetch(`${sub2apiBaseURL()}${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${payload.apiKey}`
+      },
+      body: upstreamForm
+    })
+
+    if (response.ok || !isPathFallbackStatus(response.status)) break
+    await response.text().catch(() => '')
+  }
+
+  if (!response) {
+    throw new HTTPError({
+      statusCode: 502,
+      statusMessage: 'Image edit API did not return response'
+    })
+  }
 
   const text = await response.text()
   if (!response.ok) {

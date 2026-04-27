@@ -73,40 +73,83 @@ function toErrorMessage(text: string, status: number, statusText: string) {
   return trimmed.slice(0, 500)
 }
 
+function isPathFallbackStatus(status: number) {
+  return status === 404 || status === 405
+}
+
 export default defineHandler(async (event) => {
-  const { apiKey, prompt, ratio, resolution } = await readValidatedBody(event, z.object({
+  const { apiKey, prompt, ratio, resolution, stream } = await readValidatedBody(event, z.object({
     apiKey: z.string().min(1),
     prompt: z.string().trim().min(1),
     ratio: imageRatioSchema,
     resolution: imageResolutionSchema,
-    size: z.string().trim().min(1).optional()
+    size: z.string().trim().min(1).optional(),
+    stream: z.boolean().optional()
   }).parse)
   const size = imageSizeMap[resolution][ratio]
 
-  const upstreamUrl = `${sub2apiBaseURL()}/images/generations`
-  const response = await fetch(upstreamUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: imageModel,
-      prompt,
-      size,
-      response_format: 'b64_json',
-      n: 1
-    })
+  const requestBody = JSON.stringify({
+    model: imageModel,
+    prompt,
+    size,
+    response_format: 'b64_json',
+    n: 1,
+    stream: Boolean(stream),
+    ...(stream && { partial_images: 1 })
   })
+  const upstreamPaths = ['/images/generations', '/v1/images/generations']
+  let response: Response | null = null
 
-  const text = await response.text()
+  for (const path of upstreamPaths) {
+    response = await fetch(`${sub2apiBaseURL()}${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: stream ? 'text/event-stream' : 'application/json'
+      },
+      body: requestBody
+    })
+
+    if (response.ok || !isPathFallbackStatus(response.status)) break
+    await response.text().catch(() => '')
+  }
+
+  if (!response) {
+    throw new HTTPError({
+      statusCode: 502,
+      statusMessage: 'Image API did not return response'
+    })
+  }
+
   if (!response.ok) {
+    const text = await response.text()
     throw new HTTPError({
       statusCode: response.status,
       statusMessage: toErrorMessage(text, response.status, response.statusText)
     })
   }
 
+  if (stream) {
+    if (!response.body) {
+      throw new HTTPError({
+        statusCode: 502,
+        statusMessage: 'Image stream did not return response body'
+      })
+    }
+
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        'Content-Type': response.headers.get('Content-Type') || 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no'
+      }
+    })
+  }
+
+  const text = await response.text()
   const result = parseJson<ImageGenerationResponse>(text) || {}
   const image = result.data?.[0]
   if (!image?.b64_json && !image?.url) {

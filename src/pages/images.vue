@@ -20,8 +20,23 @@ interface ImageGenerationResponse {
   }
 }
 
+type GeneratedImage = NonNullable<ImageGenerationResponse['data']>[number]
+
+interface ImageGenerationStreamEvent extends GeneratedImage {
+  type?: string
+  message?: string
+  error?: {
+    message?: string
+  }
+  data?: GeneratedImage[]
+}
+
 interface RequestError extends Error {
   status?: number
+}
+
+interface ImageGenerationRequestOptions {
+  stream?: boolean
 }
 
 interface ImageTask {
@@ -399,13 +414,89 @@ function updateTask(id: string, patch: Partial<ImageTask>) {
   })
 }
 
-function toImageUrl(image: NonNullable<ImageGenerationResponse['data']>[number]) {
+function toImageUrl(image: GeneratedImage) {
   if (image.url) return image.url
   if (!image.b64_json) return ''
 
   return image.b64_json.startsWith('data:')
     ? image.b64_json
     : `data:image/png;base64,${image.b64_json}`
+}
+
+function extractStreamData(block: string) {
+  return block
+    .split(/\r?\n/)
+    .filter(line => line.startsWith('data:'))
+    .map(line => line.slice(5).trimStart())
+    .join('\n')
+    .trim()
+}
+
+function toStreamImage(event: ImageGenerationStreamEvent): GeneratedImage | null {
+  const image = event.data?.[0] || event
+  if (!image.b64_json && !image.url) return null
+
+  return {
+    b64_json: image.b64_json,
+    url: image.url,
+    revised_prompt: image.revised_prompt
+  }
+}
+
+function parseStreamEvent(data: string) {
+  if (!data || data === '[DONE]') return null
+
+  const event = parseJson<ImageGenerationStreamEvent>(data)
+  if (!event) return null
+  if (event.message || event.error?.message) {
+    throw new Error(event.error?.message || event.message)
+  }
+
+  return event
+}
+
+async function readImageGenerationStream(response: Response) {
+  if (!response.body) {
+    throw new Error('图片流没有返回响应体')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let completedImage: GeneratedImage | null = null
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (value) {
+      buffer += decoder.decode(value, { stream: true })
+      const blocks = buffer.split(/\r?\n\r?\n/)
+      buffer = blocks.pop() || ''
+
+      for (const block of blocks) {
+        const event = parseStreamEvent(extractStreamData(block))
+        if (!event) continue
+
+        const image = toStreamImage(event)
+        if (image) {
+          completedImage = image
+        }
+      }
+    }
+
+    if (done) break
+  }
+
+  const tail = parseStreamEvent(extractStreamData(buffer))
+  const tailImage = tail ? toStreamImage(tail) : null
+  completedImage = tailImage || completedImage
+
+  if (!completedImage) {
+    throw new Error('图片流未返回最终图片')
+  }
+
+  return {
+    data: [completedImage]
+  } satisfies ImageGenerationResponse
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
@@ -427,26 +518,46 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   }
 }
 
+function shouldFallbackToNonStreaming(error: unknown) {
+  const status = (error as RequestError).status
+  if (status && ![400, 404, 405, 406, 415, 422].includes(status)) {
+    return false
+  }
+
+  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  return message.includes('stream')
+    || message.includes('event-stream')
+    || message.includes('not supported')
+    || message.includes('unsupported')
+}
+
 async function requestImageGeneration(apiKey: string, task: {
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
   size: string
-}) {
+}, options: ImageGenerationRequestOptions = {}) {
+  const stream = options.stream !== false
   const response = await fetchWithTimeout('/api/images/generations', {
     method: 'POST',
     headers: {
       [headerName]: csrf(),
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      Accept: stream ? 'text/event-stream' : 'application/json'
     },
     body: JSON.stringify({
       apiKey,
       prompt: task.prompt,
       ratio: task.ratio,
       resolution: task.resolution,
-      size: task.size
+      size: task.size,
+      stream
     })
   })
+
+  if (stream && response.ok && response.headers.get('Content-Type')?.includes('text/event-stream')) {
+    return readImageGenerationStream(response)
+  }
 
   let resultText = await response.text()
   const result = parseJson<ImageGenerationResponse>(resultText) || {}
@@ -460,6 +571,28 @@ async function requestImageGeneration(apiKey: string, task: {
   }
 
   return result
+}
+
+async function requestImageGenerationWithFallback(apiKey: string, task: {
+  prompt: string
+  ratio: ImageRatio
+  resolution: ImageResolution
+  size: string
+}) {
+  try {
+    return await requestImageGeneration(apiKey, task, { stream: true })
+  } catch (error) {
+    if (!shouldFallbackToNonStreaming(error)) {
+      throw error
+    }
+
+    toast.add({
+      title: '已切换兼容模式',
+      description: '当前上游不支持图片流式，正在使用普通模式重试',
+      icon: 'i-lucide-refresh-cw'
+    })
+    return requestImageGeneration(apiKey, task, { stream: false })
+  }
 }
 
 async function imageUrlToFile(imageUrl: string, filename: string) {
@@ -620,6 +753,18 @@ function getTaskDurationSeconds(task: ImageTask) {
   return Math.max(1, Math.round((timerNow.value - task.createdAt.getTime()) / 1000))
 }
 
+function formatTaskCreatedAt(task: ImageTask) {
+  return task.createdAt.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+}
+
 function createImageTask(input: {
   prompt: string
   ratio: ImageRatio
@@ -663,7 +808,7 @@ async function executeImageTask(
     try {
       result = editSources.length
         ? await requestImageEdit(apiKey, task, editSources)
-        : await requestImageGeneration(apiKey, task)
+        : await requestImageGenerationWithFallback(apiKey, task)
     } catch (error) {
       const status = (error as RequestError).status
       if (status !== 401 && status !== 403) {
@@ -674,7 +819,7 @@ async function executeImageTask(
       apiKey = await getApiKeyForGroup(imageGroup.id, imageApiKeyName)
       result = editSources.length
         ? await requestImageEdit(apiKey, task, editSources)
-        : await requestImageGeneration(apiKey, task)
+        : await requestImageGenerationWithFallback(apiKey, task)
     }
 
     const image = result.data?.[0]
@@ -979,6 +1124,13 @@ async function retryImageTask(task: ImageTask) {
                   variant="outline"
                 />
                 <span class="text-xs text-muted">{{ item.resolution }} · {{ item.ratio }} · {{ item.size }}</span>
+              </div>
+              <div class="mt-2 flex items-center gap-1.5 text-xs text-muted">
+                <UIcon
+                  name="i-lucide-clock-3"
+                  class="size-3.5"
+                />
+                <span>创建于 {{ formatTaskCreatedAt(item) }}</span>
               </div>
               <p
                 v-if="item.error"
