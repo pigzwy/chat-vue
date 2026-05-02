@@ -22,21 +22,19 @@ interface ImageGenerationResponse {
 
 type GeneratedImage = NonNullable<ImageGenerationResponse['data']>[number]
 
-interface ImageGenerationStreamEvent extends GeneratedImage {
-  type?: string
-  message?: string
-  error?: {
-    message?: string
-  }
-  data?: GeneratedImage[]
-}
-
 interface RequestError extends Error {
   status?: number
+  streamStarted?: boolean
 }
 
-interface ImageGenerationRequestOptions {
-  stream?: boolean
+interface ImageJobResponse extends ImageGenerationResponse {
+  id: string
+  status: 'queued' | 'running' | 'completed' | 'error'
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  jobError?: string
+  jobErrorStatus?: number
 }
 
 interface ImageTask {
@@ -55,11 +53,14 @@ interface ImageTask {
   revisedPrompt?: string
   error?: string
   durationSeconds?: number
+  jobId?: string
+  completedAt?: Date
   createdAt: Date
 }
 
-interface StoredImageTask extends Omit<ImageTask, 'createdAt'> {
+interface StoredImageTask extends Omit<ImageTask, 'createdAt' | 'completedAt'> {
   createdAt: string
+  completedAt?: string
 }
 
 interface UploadedImage {
@@ -84,6 +85,7 @@ const imageDatabaseStoreName = 'images'
 const imageStorageLimit = 12
 const uploadedImageLimit = 8
 const imageRequestTimeoutMs = 300000
+const imageJobPollIntervalMs = 2500
 const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
 const ratioOptions: Array<{ value: ImageRatio, aspect: string, auto?: boolean }> = [
   { value: '1:1', aspect: '1 / 1' },
@@ -170,6 +172,7 @@ const selectedTaskId = ref('')
 const timerNow = ref(Date.now())
 let durationTimer: ReturnType<typeof setInterval> | null = null
 let imageDatabasePromise: Promise<IDBDatabase> | null = null
+let isUnmounted = false
 const sourceFilesByTaskId = new Map<string, File[]>()
 
 const promptLimit = 5000
@@ -237,7 +240,8 @@ function toStoredTask(task: ImageTask): StoredImageTask {
   const stored = {
     ...task,
     imageUrl: task.imageUrl?.startsWith('data:') ? undefined : task.imageUrl,
-    createdAt: task.createdAt.toISOString()
+    createdAt: task.createdAt.toISOString(),
+    completedAt: task.completedAt?.toISOString()
   }
 
   return stored
@@ -265,8 +269,9 @@ function fromStoredTask(task: StoredImageTask, usedIds: Set<string>): ImageTask 
     ...task,
     id: normalizeStoredTaskId(task.id, usedIds),
     type: task.type === 'edit' ? 'edit' : 'generation',
-    status: task.status === 'generating' ? 'error' : task.status,
-    error: task.status === 'generating' ? 'Task was interrupted by refresh' : task.error,
+    status: task.status === 'generating' && !task.jobId ? 'error' : task.status,
+    error: task.status === 'generating' && !task.jobId ? '刷新中断了图片任务，请重试' : task.error,
+    completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
     createdAt: new Date(task.createdAt)
   }
 }
@@ -405,12 +410,14 @@ watch(queue, persistTasks, { deep: true })
 
 onMounted(() => {
   void hydrateStoredImageAssets().catch(() => {})
+  resumePendingImageTasks()
   durationTimer = setInterval(() => {
     timerNow.value = Date.now()
   }, 1000)
 })
 
 onBeforeUnmount(() => {
+  isUnmounted = true
   if (durationTimer) {
     clearInterval(durationTimer)
   }
@@ -537,82 +544,6 @@ function toImageUrl(image: GeneratedImage) {
     : `data:image/png;base64,${image.b64_json}`
 }
 
-function extractStreamData(block: string) {
-  return block
-    .split(/\r?\n/)
-    .filter(line => line.startsWith('data:'))
-    .map(line => line.slice(5).trimStart())
-    .join('\n')
-    .trim()
-}
-
-function toStreamImage(event: ImageGenerationStreamEvent): GeneratedImage | null {
-  const image = event.data?.[0] || event
-  if (!image.b64_json && !image.url) return null
-
-  return {
-    b64_json: image.b64_json,
-    url: image.url,
-    revised_prompt: image.revised_prompt
-  }
-}
-
-function parseStreamEvent(data: string) {
-  if (!data || data === '[DONE]') return null
-
-  const event = parseJson<ImageGenerationStreamEvent>(data)
-  if (!event) return null
-  if (event.message || event.error?.message) {
-    throw new Error(event.error?.message || event.message)
-  }
-
-  return event
-}
-
-async function readImageGenerationStream(response: Response) {
-  if (!response.body) {
-    throw new Error('图片流没有返回响应体')
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let completedImage: GeneratedImage | null = null
-
-  while (true) {
-    const { value, done } = await reader.read()
-    if (value) {
-      buffer += decoder.decode(value, { stream: true })
-      const blocks = buffer.split(/\r?\n\r?\n/)
-      buffer = blocks.pop() || ''
-
-      for (const block of blocks) {
-        const event = parseStreamEvent(extractStreamData(block))
-        if (!event) continue
-
-        const image = toStreamImage(event)
-        if (image) {
-          completedImage = image
-        }
-      }
-    }
-
-    if (done) break
-  }
-
-  const tail = parseStreamEvent(extractStreamData(buffer))
-  const tailImage = tail ? toStreamImage(tail) : null
-  completedImage = tailImage || completedImage
-
-  if (!completedImage) {
-    throw new Error('图片流未返回最终图片')
-  }
-
-  return {
-    data: [completedImage]
-  } satisfies ImageGenerationResponse
-}
-
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), imageRequestTimeoutMs)
@@ -632,80 +563,96 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   }
 }
 
-function shouldFallbackToNonStreaming(error: unknown) {
-  const status = (error as RequestError).status
-  if (status && ![400, 404, 405, 406, 415, 422].includes(status)) {
-    return false
-  }
-
-  const message = error instanceof Error ? error.message.toLowerCase() : ''
-  return message.includes('stream')
-    || message.includes('event-stream')
-    || message.includes('not supported')
-    || message.includes('unsupported')
-}
-
-async function requestImageGeneration(apiKey: string, task: {
+async function createImageGenerationJob(apiKey: string, task: {
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
   size: string
-}, options: ImageGenerationRequestOptions = {}) {
-  const stream = options.stream !== false
-  const response = await fetchWithTimeout('/api/images/generations', {
+}) {
+  const response = await fetchWithTimeout('/api/images/jobs', {
     method: 'POST',
     headers: {
       [headerName]: csrf(),
-      'Content-Type': 'application/json',
-      Accept: stream ? 'text/event-stream' : 'application/json'
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify({
       apiKey,
       prompt: task.prompt,
       ratio: task.ratio,
       resolution: task.resolution,
-      size: task.size,
-      stream
+      size: task.size
     })
   })
 
-  if (stream && response.ok && response.headers.get('Content-Type')?.includes('text/event-stream')) {
-    return readImageGenerationStream(response)
-  }
-
   let resultText = await response.text()
-  const result = parseJson<ImageGenerationResponse>(resultText) || {}
-  if (!result.error?.message && resultText.trim().startsWith('<')) {
+  const result = parseJson<ImageJobResponse>(resultText) || ({} as ImageJobResponse)
+  if (!result?.error?.message && resultText.trim().startsWith('<')) {
     resultText = ''
   }
   if (!response.ok) {
-    const error = new Error(result.error?.message || resultText || `图片生成失败: ${response.status}`) as RequestError
+    const error = new Error(result?.error?.message || resultText || `图片任务创建失败: ${response.status}`) as RequestError
     error.status = response.status
     throw error
+  }
+  if (!result?.id) {
+    throw new Error('图片任务创建失败')
   }
 
   return result
 }
 
-async function requestImageGenerationWithFallback(apiKey: string, task: {
-  prompt: string
-  ratio: ImageRatio
-  resolution: ImageResolution
-  size: string
-}) {
-  try {
-    return await requestImageGeneration(apiKey, task, { stream: true })
-  } catch (error) {
-    if (!shouldFallbackToNonStreaming(error)) {
-      throw error
+async function getImageGenerationJob(jobId: string) {
+  const response = await fetchWithTimeout(`/api/images/jobs/${jobId}`, {
+    headers: {
+      Accept: 'application/json'
+    }
+  })
+
+  let resultText = await response.text()
+  const result = parseJson<ImageJobResponse>(resultText) || ({} as ImageJobResponse)
+  if (!result?.error?.message && resultText.trim().startsWith('<')) {
+    resultText = ''
+  }
+  if (!response.ok) {
+    const error = new Error(result?.error?.message || resultText || `图片任务查询失败: ${response.status}`) as RequestError
+    error.status = response.status
+    throw error
+  }
+  if (!result?.id) {
+    throw new Error('图片任务查询失败')
+  }
+
+  return result
+}
+
+function wait(ms: number) {
+  return new Promise(resolve => window.setTimeout(resolve, ms))
+}
+
+async function pollImageGenerationJob(jobId: string) {
+  while (true) {
+    if (isUnmounted) {
+      throw new Error('图片任务已暂停，请刷新后继续查看')
     }
 
-    toast.add({
-      title: '已切换兼容模式',
-      description: '当前上游不支持图片流式，正在使用普通模式重试',
-      icon: 'i-lucide-refresh-cw'
-    })
-    return requestImageGeneration(apiKey, task, { stream: false })
+    const job = await getImageGenerationJob(jobId)
+    if (job.status === 'completed') {
+      if (!job.data?.[0]?.b64_json && !job.data?.[0]?.url) {
+        throw new Error('图片接口未返回图片数据')
+      }
+
+      return job
+    }
+    if (job.status === 'error') {
+      if (job.jobErrorStatus) {
+        const error = new Error(job.jobError || 'Image generation failed') as RequestError
+        error.status = job.jobErrorStatus
+        throw error
+      }
+      throw new Error(job.jobError || '图片生成失败')
+    }
+
+    await wait(imageJobPollIntervalMs)
   }
 }
 
@@ -720,6 +667,7 @@ async function requestImageEdit(apiKey: string, task: {
   ratio: ImageRatio
   resolution: ImageResolution
   size: string
+  id?: string
 }, sources: File[]) {
   if (!sources.length) {
     throw new Error('缺少要编辑的图片')
@@ -735,7 +683,7 @@ async function requestImageEdit(apiKey: string, task: {
     formData.append('image', source)
   })
 
-  const response = await fetchWithTimeout('/api/images/edits', {
+  const response = await fetchWithTimeout('/api/images/jobs/edits', {
     method: 'POST',
     headers: {
       [headerName]: csrf()
@@ -744,8 +692,8 @@ async function requestImageEdit(apiKey: string, task: {
   })
 
   let resultText = await response.text()
-  const result = parseJson<ImageGenerationResponse>(resultText) || {}
-  if (!result.error?.message && resultText.trim().startsWith('<')) {
+  const result = parseJson<ImageJobResponse>(resultText) || ({} as ImageJobResponse)
+  if (!result?.error?.message && resultText.trim().startsWith('<')) {
     resultText = ''
   }
   if (!response.ok) {
@@ -754,7 +702,14 @@ async function requestImageEdit(apiKey: string, task: {
     throw error
   }
 
-  return result
+  if (!result?.id) {
+    throw new Error('Image edit job creation failed')
+  }
+
+  if (task.id) {
+    updateTask(task.id, { jobId: result.id })
+  }
+  return pollImageGenerationJob(result.id)
 }
 
 function previewImage(task: ImageTask) {
@@ -773,12 +728,21 @@ function closePreview() {
   previewUploadedImage.value = null
 }
 
+function getImageDownloadFilename(task: Pick<ImageTask, 'id' | 'createdAt'>) {
+  const createdAt = task.createdAt
+    .toISOString()
+    .replace(/[:.]/g, '-')
+    .slice(0, 19)
+
+  return `gpt-image-2-${createdAt}-${task.id}.png`
+}
+
 function downloadImage(task: ImageTask) {
   if (!task.imageUrl) return
 
   const link = document.createElement('a')
   link.href = task.imageUrl
-  link.download = `gpt-image-2-${task.id}.png`
+  link.download = getImageDownloadFilename(task)
   document.body.appendChild(link)
   link.click()
   link.remove()
@@ -903,6 +867,50 @@ function createImageTask(input: {
   } satisfies ImageTask
 }
 
+async function requestImageGenerationJob(apiKey: string, task: ImageTask) {
+  const job = await createImageGenerationJob(apiKey, task)
+  updateTask(task.id, { jobId: job.id })
+  return pollImageGenerationJob(job.id)
+}
+
+async function resumeImageGenerationTask(task: ImageTask) {
+  if (!task.jobId || task.status !== 'generating') return
+
+  try {
+    const result = await pollImageGenerationJob(task.jobId)
+    const image = result.data?.[0]
+    if (!image?.b64_json && !image?.url) {
+      throw new Error('图片接口未返回图片数据')
+    }
+
+    const imageUrl = toImageUrl(image)
+    updateTask(task.id, {
+      status: 'completed',
+      imageUrl,
+      revisedPrompt: image.revised_prompt,
+      durationSeconds: getDurationSeconds(task.createdAt),
+      completedAt: result.completedAt ? new Date(result.completedAt) : new Date()
+    })
+  } catch (error) {
+    if (isUnmounted) return
+
+    updateTask(task.id, {
+      status: 'error',
+      error: toErrorMessage(error),
+      durationSeconds: getDurationSeconds(task.createdAt),
+      completedAt: new Date()
+    })
+  }
+}
+
+function resumePendingImageTasks() {
+  queue.value
+    .filter(task => task.status === 'generating' && task.jobId)
+    .forEach((task) => {
+      void resumeImageGenerationTask(task)
+    })
+}
+
 async function executeImageTask(
   task: ImageTask,
   getEditSources: () => Promise<File[]>,
@@ -921,7 +929,7 @@ async function executeImageTask(
     try {
       result = editSources.length
         ? await requestImageEdit(apiKey, task, editSources)
-        : await requestImageGenerationWithFallback(apiKey, task)
+        : await requestImageGenerationJob(apiKey, task)
     } catch (error) {
       const status = (error as RequestError).status
       if (status !== 401 && status !== 403) {
@@ -932,7 +940,7 @@ async function executeImageTask(
       apiKey = await getApiKeyForGroup(imageGroup.id, imageApiKeyName)
       result = editSources.length
         ? await requestImageEdit(apiKey, task, editSources)
-        : await requestImageGenerationWithFallback(apiKey, task)
+        : await requestImageGenerationJob(apiKey, task)
     }
 
     const image = result.data?.[0]
@@ -940,11 +948,13 @@ async function executeImageTask(
       throw new Error('图片接口未返回图片数据')
     }
 
+    const imageUrl = toImageUrl(image)
     updateTask(task.id, {
       status: 'completed' as const,
-      imageUrl: toImageUrl(image),
+      imageUrl,
       revisedPrompt: image.revised_prompt,
-      durationSeconds: getDurationSeconds(task.createdAt)
+      durationSeconds: getDurationSeconds(task.createdAt),
+      completedAt: new Date()
     })
     if (options.selectOnSuccess) {
       selectedTaskId.value = task.id
@@ -953,6 +963,8 @@ async function executeImageTask(
       clearUploadedImages()
     }
   } catch (error) {
+    if (isUnmounted) return
+
     const message = toErrorMessage(error)
     updateTask(task.id, {
       status: 'error' as const,
