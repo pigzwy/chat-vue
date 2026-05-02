@@ -1574,6 +1574,16 @@ async function retryImageTask(task: ImageTask) {
 
                 <div class="hidden h-6 w-px bg-default sm:block" />
 
+                <UButton
+                  type="button"
+                  icon="i-lucide-zap"
+                  color="neutral"
+                  variant="soft"
+                  size="sm"
+                  :label="imageGroup.label"
+                  class="shrink-0 rounded-full font-medium"
+                />
+
                 <UPopover>
                   <UButton
                     type="button"
@@ -1582,7 +1592,7 @@ async function retryImageTask(task: ImageTask) {
                     variant="soft"
                     size="sm"
                     :label="`质量: ${getImageQualityLabel(quality)}`"
-                    class="shrink-0 rounded-full"
+                    class="shrink-0 rounded-full font-medium"
                   />
 
                   <template #content>
@@ -1596,21 +1606,12 @@ async function retryImageTask(task: ImageTask) {
                         color="neutral"
                         :variant="quality === item.value ? 'soft' : 'ghost'"
                         block
-                        class="justify-start rounded-lg"
+                        class="justify-start rounded-lg font-medium"
                         @click="quality = item.value"
                       />
                     </div>
                   </template>
                 </UPopover>
-
-                <UButton
-                  type="button"
-                  icon="i-lucide-zap"
-                  color="neutral"
-                  variant="soft"
-                  :label="imageGroup.label"
-                  class="shrink-0 rounded-full"
-                />
 
                 <input
                   ref="fileInput"
@@ -1624,9 +1625,10 @@ async function retryImageTask(task: ImageTask) {
                   type="button"
                   icon="i-lucide-paperclip"
                   color="neutral"
-                  variant="ghost"
+                  variant="soft"
+                  size="sm"
                   :label="files.length ? `${files.length}/${uploadedImageLimit}` : undefined"
-                  class="shrink-0 rounded-full"
+                  class="shrink-0 rounded-full font-medium"
                   :disabled="files.length >= uploadedImageLimit"
                   @click="pickFiles"
                 />
