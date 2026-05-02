@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { sub2apiBaseURL } from './sub2api'
+import { buildImagePrompt, type ImageQuality, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
 
-type ImageRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'Auto'
-type ImageResolution = '1K' | '2K' | '4K'
 type ImageJobStatus = 'queued' | 'running' | 'completed' | 'error'
 type ImageJobKind = 'generation' | 'edit'
 
@@ -34,6 +33,7 @@ export interface ImageJobInput {
   ratio: ImageRatio
   resolution: ImageResolution
   size: string
+  quality: ImageQuality
 }
 
 export interface ImageEditJobInput extends ImageJobInput {
@@ -187,8 +187,9 @@ async function readImageGenerationStream(response: Response) {
 async function callImageGeneration(job: ImageJob, stream: boolean) {
   const requestBody = JSON.stringify({
     model: imageModel,
-    prompt: job.prompt,
+    prompt: buildImagePrompt(job.prompt, job.size, job.quality),
     size: job.size,
+    quality: job.quality,
     response_format: 'b64_json',
     n: 1,
     stream,
@@ -263,8 +264,9 @@ async function callImageEdit(job: ImageJob) {
 
   const upstreamForm = new FormData()
   upstreamForm.set('model', imageModel)
-  upstreamForm.set('prompt', job.prompt)
+  upstreamForm.set('prompt', buildImagePrompt(job.prompt, job.size, job.quality))
   upstreamForm.set('size', job.size)
+  upstreamForm.set('quality', job.quality)
   upstreamForm.set('response_format', 'b64_json')
   upstreamForm.set('n', '1')
   job.images.forEach((image) => {

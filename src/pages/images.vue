@@ -3,9 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useModels } from '../composables/useModels'
 import { useCsrf } from '../composables/useCsrf'
 import ModalConfirm from '../components/ModalConfirm.vue'
-
-type ImageRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | 'Auto'
-type ImageResolution = '1K' | '2K' | '4K'
+import { imageSizeMap, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
 type ImageTaskType = 'generation' | 'edit'
 type TaskStatus = 'generating' | 'completed' | 'error'
 
@@ -86,10 +84,12 @@ const imageStorageLimit = 12
 const uploadedImageLimit = 8
 const imageRequestTimeoutMs = 300000
 const imageJobPollIntervalMs = 2500
-const ratioItems: ImageRatio[] = ['1:1', '16:9', '9:16', '4:3', '3:4', 'Auto']
+const ratioItems: ImageRatio[] = ['1:1', '3:2', '16:9', '21:9', '9:16', '4:3', '3:4', 'Auto']
 const ratioOptions: Array<{ value: ImageRatio, aspect: string, auto?: boolean }> = [
   { value: '1:1', aspect: '1 / 1' },
+  { value: '3:2', aspect: '3 / 2' },
   { value: '16:9', aspect: '16 / 9' },
+  { value: '21:9', aspect: '21 / 9' },
   { value: '9:16', aspect: '9 / 16' },
   { value: '4:3', aspect: '4 / 3' },
   { value: '3:4', aspect: '3 / 4' },
@@ -128,33 +128,6 @@ const imagePromptPresets = [
     prompt: '写实摄影风格，自然光，浅景深，细腻质感，专业商业摄影构图，高清细节'
   }
 ]
-
-const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> = {
-  '1K': {
-    '1:1': '1024x1024',
-    '16:9': '1024x576',
-    '9:16': '576x1024',
-    '4:3': '1024x768',
-    '3:4': '768x1024',
-    Auto: 'auto'
-  },
-  '2K': {
-    '1:1': '2048x2048',
-    '16:9': '1792x1024',
-    '9:16': '1024x1792',
-    '4:3': '2048x1536',
-    '3:4': '1536x2048',
-    Auto: 'auto'
-  },
-  '4K': {
-    '1:1': '4096x4096',
-    '16:9': '4096x2304',
-    '9:16': '2304x4096',
-    '4:3': '4096x3072',
-    '3:4': '3072x4096',
-    Auto: 'auto'
-  }
-}
 
 const toast = useToast()
 const overlay = useOverlay()
