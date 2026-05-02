@@ -1,13 +1,14 @@
 import { defineHandler, HTTPError } from 'nitro'
 import { z } from 'zod'
 import { sub2apiBaseURL } from '../../../utils/sub2api'
-import { buildImagePrompt, imageQuality, imageSizeMap } from '../../../../shared/utils/images'
+import { buildImagePrompt, defaultImageQuality, imageSizeMap } from '../../../../shared/utils/images'
 
 const imageModel = 'gpt-image-2'
 const imageInputLimit = 8
 
 const imageRatioSchema = z.enum(['1:1', '3:2', '16:9', '21:9', '9:16', '4:3', '3:4', 'Auto'])
 const imageResolutionSchema = z.enum(['1K', '2K', '4K'])
+const imageQualitySchema = z.enum(['low', 'medium', 'high'])
 
 interface ImageResponse {
   data?: Array<{
@@ -59,12 +60,14 @@ export default defineHandler(async (event) => {
     apiKey: z.string().min(1),
     prompt: z.string().trim().min(1),
     ratio: imageRatioSchema,
-    resolution: imageResolutionSchema
+    resolution: imageResolutionSchema,
+    quality: imageQualitySchema.optional()
   }).parse({
     apiKey: form.get('apiKey'),
     prompt: form.get('prompt'),
     ratio: form.get('ratio'),
-    resolution: form.get('resolution')
+    resolution: form.get('resolution'),
+    quality: form.get('quality')
   })
   const images = form.getAll('image').filter((image): image is File => image instanceof File)
   if (!images.length) {
@@ -76,6 +79,7 @@ export default defineHandler(async (event) => {
 
   const upstreamForm = new FormData()
   const size = imageSizeMap[payload.resolution][payload.ratio]
+  const imageQuality = payload.quality || defaultImageQuality
   upstreamForm.set('model', imageModel)
   upstreamForm.set('prompt', buildImagePrompt(payload.prompt, size, imageQuality))
   upstreamForm.set('size', size)

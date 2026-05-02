@@ -73,21 +73,58 @@ function parseJson<T>(text: string) {
 }
 
 function toErrorMessage(text: string, status: number, statusText: string) {
+  if (status === 524) return 'API 图片生成超时，建议降低分辨率或稍后重试'
+  return toNonTimeoutErrorMessage(text, status, statusText)
+}
+
+function toNonTimeoutErrorMessage(text: string, status: number, statusText: string) {
+  if (status === 524) return 'API 图片生成超时，建议降低分辨率或稍后重试'
+
   if (status === 524) {
     return 'API 图片生成超时，建议降低分辨率或稍后重试'
   }
 
   const parsed = parseJson<ImageGenerationResponse>(text)
   if (parsed) {
-    return parsed.error?.message || parsed.message || `API upstream returned ${status} ${statusText || 'error'}`
+    return normalizeErrorMessage(parsed.error?.message || parsed.message || `API 请求失败: ${status} ${statusText || 'error'}`)
   }
 
   const trimmed = text.trim()
   if (!trimmed || trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html')) {
-    return `API upstream returned ${status} ${statusText || 'error'}`
+    return status >= 500 ? 'API 服务暂时不可用，请稍后重试' : `API 请求失败: ${status} ${statusText || 'error'}`
   }
 
-  return trimmed.slice(0, 500)
+  return normalizeErrorMessage(trimmed.slice(0, 500))
+}
+
+function normalizeErrorMessage(message: string) {
+  const text = message.trim()
+  const lower = text.toLowerCase()
+
+  if (!text) return '图片生成失败，请稍后重试'
+  if (lower.includes('cloudflare') || lower.includes('bad gateway') || lower.includes('cf_chl')) {
+    return 'API 服务暂时不可用，请稍后重试'
+  }
+  if (lower.includes('internal_error') || lower.includes('received from peer') || lower.includes('stream error')) {
+    return '图片生成连接中断，请重试'
+  }
+  if (lower.includes('did not return image data') || lower.includes('no output data')) {
+    return 'API 未返回图片数据，请重试或调整提示词'
+  }
+  if (lower.includes('fetch failed') || lower.includes('econnreset') || lower.includes('etimedout')) {
+    return '图片请求网络异常，请稍后重试'
+  }
+
+  return text
+}
+
+function toRequestError(error: unknown) {
+  if (error instanceof Error) {
+    error.message = normalizeErrorMessage(error.message)
+    return error
+  }
+
+  return new Error('图片生成失败，请稍后重试')
 }
 
 function isPathFallbackStatus(status: number) {
@@ -382,10 +419,12 @@ export async function runImageJob(id: string) {
     job.data = result.data
     job.images = undefined
   } catch (error) {
+    const requestError = toRequestError(error) as RequestError
     job.status = 'error'
     job.completedAt = new Date().toISOString()
-    job.errorStatus = (error as RequestError).status
+    job.errorStatus = requestError.status
     job.images = undefined
+    job.error = requestError.message
     job.error = error instanceof Error ? error.message : '图片生成失败'
   }
 }

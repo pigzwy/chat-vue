@@ -2,7 +2,22 @@ export type ImageRatio = '1:1' | '3:2' | '16:9' | '21:9' | '9:16' | '4:3' | '3:4
 export type ImageResolution = '1K' | '2K' | '4K'
 export type ImageQuality = 'low' | 'medium' | 'high'
 
-export const imageQuality: ImageQuality = 'high'
+export const defaultImageQuality: ImageQuality = 'high'
+
+export const imageQualityItems: Array<{
+  label: string
+  value: ImageQuality
+  icon: string
+  description: string
+}> = [
+  { label: 'Low', value: 'low', icon: 'i-lucide-gauge', description: '速度更快，适合草稿测试' },
+  { label: 'Medium', value: 'medium', icon: 'i-lucide-sparkles', description: '质量和耗时更均衡' },
+  { label: 'High', value: 'high', icon: 'i-lucide-gem', description: '细节更好，耗时更长' }
+]
+
+export function getImageQualityLabel(value: ImageQuality) {
+  return imageQualityItems.find(item => item.value === value)?.label || 'High'
+}
 
 export const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> = {
   '1K': {
@@ -37,7 +52,7 @@ export const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> =
   }
 }
 
-export function buildImagePrompt(prompt: string, size: string, quality: ImageQuality = imageQuality) {
+export function buildImagePrompt(prompt: string, size: string, quality: ImageQuality = defaultImageQuality) {
   const hints: string[] = []
 
   if (/^\d+x\d+$/.test(size)) {

@@ -3,7 +3,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useModels } from '../composables/useModels'
 import { useCsrf } from '../composables/useCsrf'
 import ModalConfirm from '../components/ModalConfirm.vue'
-import { imageSizeMap, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
+import {
+  defaultImageQuality,
+  getImageQualityLabel,
+  imageQualityItems,
+  imageSizeMap,
+  type ImageQuality,
+  type ImageRatio,
+  type ImageResolution
+} from '../../shared/utils/images'
 type ImageTaskType = 'generation' | 'edit'
 type TaskStatus = 'generating' | 'completed' | 'error'
 
@@ -43,6 +51,7 @@ interface ImageTask {
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
+  quality: ImageQuality
   size: string
   model: string
   groupId: number
@@ -78,6 +87,7 @@ const imageGroup = {
 } as const
 const imageApiKeyName = 'chat | draw'
 const imageStorageKey = 'sub2api-image-tasks'
+const imageQualityStorageKey = 'sub2api-image-quality'
 const imageDatabaseName = 'sub2api-image-assets'
 const imageDatabaseStoreName = 'images'
 const imageStorageLimit = 12
@@ -136,6 +146,7 @@ const { csrf, headerName } = useCsrf()
 const prompt = ref('')
 const ratio = ref<ImageRatio>('16:9')
 const resolution = ref<ImageResolution>('2K')
+const quality = ref<ImageQuality>(loadStoredImageQuality())
 const files = ref<UploadedImage[]>([])
 const queue = ref<ImageTask[]>(loadStoredTasks())
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -200,6 +211,9 @@ const selectedHistory = computed(() => {
   }
   return history
 })
+const activeQualityIcon = computed(() => {
+  return imageQualityItems.find(item => item.value === quality.value)?.icon || 'i-lucide-gem'
+})
 
 function isImageRatio(value: unknown): value is ImageRatio {
   return typeof value === 'string' && ratioItems.includes(value as ImageRatio)
@@ -207,6 +221,17 @@ function isImageRatio(value: unknown): value is ImageRatio {
 
 function isImageResolution(value: unknown): value is ImageResolution {
   return typeof value === 'string' && resolutionItems.includes(value as ImageResolution)
+}
+
+function isImageQuality(value: unknown): value is ImageQuality {
+  return typeof value === 'string' && imageQualityItems.some(item => item.value === value)
+}
+
+function loadStoredImageQuality(): ImageQuality {
+  if (typeof window === 'undefined') return defaultImageQuality
+
+  const value = window.localStorage.getItem(imageQualityStorageKey)
+  return isImageQuality(value) ? value : defaultImageQuality
 }
 
 function toStoredTask(task: ImageTask): StoredImageTask {
@@ -244,6 +269,7 @@ function fromStoredTask(task: StoredImageTask, usedIds: Set<string>): ImageTask 
     type: task.type === 'edit' ? 'edit' : 'generation',
     status: task.status === 'generating' && !task.jobId ? 'error' : task.status,
     error: task.status === 'generating' && !task.jobId ? '刷新中断了图片任务，请重试' : task.error,
+    quality: isImageQuality(task.quality) ? task.quality : defaultImageQuality,
     completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
     createdAt: new Date(task.createdAt)
   }
@@ -380,6 +406,9 @@ function persistTasks(tasks: ImageTask[]) {
 }
 
 watch(queue, persistTasks, { deep: true })
+watch(quality, (value) => {
+  window.localStorage.setItem(imageQualityStorageKey, value)
+})
 
 onMounted(() => {
   void hydrateStoredImageAssets().catch(() => {})
@@ -540,6 +569,7 @@ async function createImageGenerationJob(apiKey: string, task: {
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
+  quality: ImageQuality
   size: string
 }) {
   const response = await fetchWithTimeout('/api/images/jobs', {
@@ -553,6 +583,7 @@ async function createImageGenerationJob(apiKey: string, task: {
       prompt: task.prompt,
       ratio: task.ratio,
       resolution: task.resolution,
+      quality: task.quality,
       size: task.size
     })
   })
@@ -639,6 +670,7 @@ async function requestImageEdit(apiKey: string, task: {
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
+  quality: ImageQuality
   size: string
   id?: string
 }, sources: File[]) {
@@ -651,6 +683,7 @@ async function requestImageEdit(apiKey: string, task: {
   formData.set('prompt', task.prompt)
   formData.set('ratio', task.ratio)
   formData.set('resolution', task.resolution)
+  formData.set('quality', task.quality)
   formData.set('size', task.size)
   sources.forEach((source) => {
     formData.append('image', source)
@@ -819,6 +852,7 @@ function createImageTask(input: {
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
+  quality: ImageQuality
   size: string
   type: ImageTaskType
   parentId?: string
@@ -832,6 +866,7 @@ function createImageTask(input: {
     prompt: input.prompt,
     ratio: input.ratio,
     resolution: input.resolution,
+    quality: input.quality,
     size: input.size,
     model: imageGroup.model,
     groupId: imageGroup.id,
@@ -977,6 +1012,7 @@ async function submitImageTask() {
     prompt: prompt.value.trim(),
     ratio: ratio.value,
     resolution: resolution.value,
+    quality: quality.value,
     size: imageSize.value
   })
   if (uploadedSources.length) {
@@ -1014,6 +1050,7 @@ async function retryImageTask(task: ImageTask) {
     prompt: task.prompt,
     ratio: task.ratio,
     resolution: task.resolution,
+    quality: task.quality,
     size: task.size
   })
   if (cachedSources.length) {
@@ -1536,6 +1573,35 @@ async function retryImageTask(task: ImageTask) {
                 </UPopover>
 
                 <div class="hidden h-6 w-px bg-default sm:block" />
+
+                <UPopover>
+                  <UButton
+                    type="button"
+                    :icon="activeQualityIcon"
+                    color="neutral"
+                    variant="soft"
+                    size="sm"
+                    :label="`质量: ${getImageQualityLabel(quality)}`"
+                    class="shrink-0 rounded-full"
+                  />
+
+                  <template #content>
+                    <div class="w-48 p-1">
+                      <UButton
+                        v-for="item in imageQualityItems"
+                        :key="item.value"
+                        type="button"
+                        :icon="item.icon"
+                        :label="item.label"
+                        color="neutral"
+                        :variant="quality === item.value ? 'soft' : 'ghost'"
+                        block
+                        class="justify-start rounded-lg"
+                        @click="quality = item.value"
+                      />
+                    </div>
+                  </template>
+                </UPopover>
 
                 <UButton
                   type="button"
