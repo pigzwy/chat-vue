@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { DropdownMenuItem } from '@nuxt/ui'
 import { useModels } from '../composables/useModels'
 import { useCsrf } from '../composables/useCsrf'
 import ModalConfirm from '../components/ModalConfirm.vue'
@@ -153,6 +154,9 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const previewTask = ref<ImageTask | null>(null)
 const previewUploadedImage = ref<UploadedImage | null>(null)
 const selectedTaskId = ref('')
+const batchMode = ref(false)
+const selectedBatchIds = ref<string[]>([])
+const isDraggingImages = ref(false)
 const timerNow = ref(Date.now())
 let durationTimer: ReturnType<typeof setInterval> | null = null
 let imageDatabasePromise: Promise<IDBDatabase> | null = null
@@ -180,6 +184,11 @@ const imageSize = computed(() => {
 })
 const selectedTask = computed(() => {
   return queue.value.find(item => item.id === selectedTaskId.value && item.imageUrl) || null
+})
+const downloadableTasks = computed(() => queue.value.filter(item => item.imageUrl))
+const selectedBatchTasks = computed(() => {
+  const selected = new Set(selectedBatchIds.value)
+  return queue.value.filter(item => selected.has(item.id) && item.imageUrl)
 })
 const submitLabel = computed(() => {
   if (hasUploadedImages.value) return '编辑上传图片'
@@ -447,6 +456,17 @@ function createUploadedImage(file: File): UploadedImage {
   }
 }
 
+function createUploadedImageFromFile(file: File, previewUrl: string): UploadedImage {
+  return {
+    id: createImageTaskId(),
+    file,
+    previewUrl,
+    name: file.name,
+    size: file.size,
+    type: file.type
+  }
+}
+
 function revokeUploadedImage(image: UploadedImage) {
   URL.revokeObjectURL(image.previewUrl)
 }
@@ -496,6 +516,62 @@ function onFilesChange(event: Event) {
 
 function normalizeApiErrorMessage(message: string) {
   return message.replace(/sub2api/gi, 'API')
+}
+
+function getImageFiles(filesLike: FileList | File[]) {
+  return Array.from(filesLike).filter(file => file.type.startsWith('image/'))
+}
+
+function appendUploadedImages(imageFiles: File[]) {
+  const remaining = uploadedImageLimit - files.value.length
+  if (remaining <= 0) {
+    toast.add({
+      description: `最多上传 ${uploadedImageLimit} 张图片`,
+      icon: 'i-lucide-circle-alert',
+      color: 'warning'
+    })
+    return
+  }
+
+  const accepted = imageFiles.slice(0, remaining)
+  files.value = [...files.value, ...accepted.map(createUploadedImage)]
+  if (imageFiles.length > remaining) {
+    toast.add({
+      description: `最多上传 ${uploadedImageLimit} 张图片，已自动保留前 ${remaining} 张`,
+      icon: 'i-lucide-circle-alert',
+      color: 'warning'
+    })
+  }
+}
+
+function onPasteImages(event: ClipboardEvent) {
+  const imageFiles = getImageFiles(event.clipboardData?.files || [])
+  if (!imageFiles.length) return
+
+  event.preventDefault()
+  appendUploadedImages(imageFiles)
+}
+
+function onDragOverImages(event: DragEvent) {
+  const hasImage = Array.from(event.dataTransfer?.items || []).some(item => item.type.startsWith('image/'))
+  if (!hasImage) return
+
+  event.preventDefault()
+  isDraggingImages.value = true
+}
+
+function onDragLeaveImages(event: DragEvent) {
+  if (event.currentTarget !== event.target) return
+  isDraggingImages.value = false
+}
+
+function onDropImages(event: DragEvent) {
+  const imageFiles = getImageFiles(event.dataTransfer?.files || [])
+  if (!imageFiles.length) return
+
+  event.preventDefault()
+  isDraggingImages.value = false
+  appendUploadedImages(imageFiles)
 }
 
 function toErrorMessage(error: unknown) {
@@ -752,6 +828,164 @@ function downloadImage(task: ImageTask) {
   document.body.appendChild(link)
   link.click()
   link.remove()
+}
+
+function toggleBatchMode() {
+  batchMode.value = !batchMode.value
+  selectedBatchIds.value = []
+}
+
+function toggleBatchTask(task: ImageTask) {
+  if (!task.imageUrl) return
+
+  const selected = new Set(selectedBatchIds.value)
+  if (selected.has(task.id)) {
+    selected.delete(task.id)
+  } else {
+    selected.add(task.id)
+  }
+  selectedBatchIds.value = Array.from(selected)
+}
+
+function selectAllBatchTasks() {
+  selectedBatchIds.value = downloadableTasks.value.map(task => task.id)
+}
+
+function downloadSelectedImages() {
+  selectedBatchTasks.value.forEach((task, index) => {
+    window.setTimeout(() => downloadImage(task), index * 150)
+  })
+}
+
+async function deleteSelectedImages() {
+  if (!selectedBatchTasks.value.length) return
+
+  const instance = deleteImageModal.open()
+  const result = await instance.result
+  if (!result) return
+
+  const selected = new Set(selectedBatchTasks.value.map(task => task.id))
+  queue.value = queue.value.filter(task => !selected.has(task.id))
+  selected.forEach(id => {
+    void deleteImageAsset(id).catch(() => {})
+  })
+
+  if (selectedTaskId.value && selected.has(selectedTaskId.value)) {
+    selectedTaskId.value = ''
+  }
+  if (previewTask.value?.id && selected.has(previewTask.value.id)) {
+    previewTask.value = null
+  }
+  selectedBatchIds.value = []
+  batchMode.value = false
+
+  toast.add({
+    title: '图片已删除',
+    description: `已删除 ${selected.size} 张图片`,
+    icon: 'i-lucide-trash'
+  })
+}
+
+async function copyImage(task: ImageTask) {
+  if (!task.imageUrl) return
+
+  try {
+    const file = await imageUrlToFile(task.imageUrl, getImageDownloadFilename(task))
+    await navigator.clipboard.write([
+      new ClipboardItem({ [file.type || 'image/png']: file })
+    ])
+    toast.add({
+      title: '图片已复制',
+      description: '已复制到剪贴板',
+      icon: 'i-lucide-copy'
+    })
+  } catch {
+    toast.add({
+      title: '复制失败',
+      description: '当前浏览器不支持复制图片，请使用下载',
+      icon: 'i-lucide-circle-alert',
+      color: 'warning'
+    })
+  }
+}
+
+async function addTaskImageAsReference(task: ImageTask) {
+  if (!task.imageUrl) return
+
+  const remaining = uploadedImageLimit - files.value.length
+  if (remaining <= 0) {
+    toast.add({
+      description: `最多上传 ${uploadedImageLimit} 张图片`,
+      icon: 'i-lucide-circle-alert',
+      color: 'warning'
+    })
+    return
+  }
+
+  try {
+    const file = await imageUrlToFile(task.imageUrl, getImageDownloadFilename(task))
+    const previewUrl = URL.createObjectURL(file)
+    files.value = [...files.value, createUploadedImageFromFile(file, previewUrl)]
+    clearSelectedTask()
+    closePreview()
+    toast.add({
+      title: '已加入参考图',
+      description: '会在下一次提交时作为编辑参考',
+      icon: 'i-lucide-paperclip'
+    })
+  } catch {
+    toast.add({
+      title: '加入参考图失败',
+      description: '图片读取失败，请重新生成或下载后上传',
+      icon: 'i-lucide-circle-alert',
+      color: 'error'
+    })
+  }
+}
+
+function getImageActionItems(task: ImageTask): DropdownMenuItem[][] {
+  return [[
+    {
+      label: '预览',
+      icon: 'i-lucide-eye',
+      onSelect: () => previewImage(task)
+    },
+    {
+      label: '设为当前编辑',
+      icon: 'i-lucide-pencil',
+      disabled: selectedTaskId.value === task.id,
+      onSelect: () => setCurrentTask(task)
+    },
+    {
+      label: '加入参考图',
+      icon: 'i-lucide-paperclip',
+      onSelect: () => {
+        void addTaskImageAsReference(task)
+      }
+    }
+  ], [
+    {
+      label: '复制图片',
+      icon: 'i-lucide-copy',
+      onSelect: () => {
+        void copyImage(task)
+      }
+    },
+    {
+      label: '下载',
+      icon: 'i-lucide-download',
+      onSelect: () => downloadImage(task)
+    }
+  ], [
+    {
+      label: '删除',
+      icon: 'i-lucide-trash',
+      color: 'error',
+      onSelect: () => {
+        void deleteImageTask(task)
+      }
+    }
+  ]]
 }
 
 async function copyRevisedPrompt(text?: string) {
@@ -1090,13 +1324,72 @@ async function retryImageTask(task: ImageTask) {
               左侧保存生成结果，选中图片后可在右侧继续编辑。
             </p>
           </div>
-          <UBadge
-            :label="queue.length ? `${queue.length} 个任务` : '等待提交'"
-            color="neutral"
-            variant="outline"
-            size="lg"
-            class="rounded-full"
-          />
+          <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <template v-if="batchMode">
+              <UButton
+                type="button"
+                icon="i-lucide-check-check"
+                label="全选"
+                color="neutral"
+                variant="soft"
+                size="sm"
+                class="rounded-full"
+                :disabled="!downloadableTasks.length"
+                @click="selectAllBatchTasks"
+              />
+              <UButton
+                type="button"
+                label="取消"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                class="rounded-full"
+                @click="toggleBatchMode"
+              />
+              <UButton
+                type="button"
+                icon="i-lucide-download"
+                :label="`下载 ${selectedBatchTasks.length}`"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                class="rounded-full"
+                :disabled="!selectedBatchTasks.length"
+                @click="downloadSelectedImages"
+              />
+              <UButton
+                type="button"
+                icon="i-lucide-trash"
+                :label="`删除 ${selectedBatchTasks.length}`"
+                color="error"
+                variant="soft"
+                size="sm"
+                class="rounded-full"
+                :disabled="!selectedBatchTasks.length"
+                @click="deleteSelectedImages"
+              />
+            </template>
+            <template v-else>
+              <UButton
+                type="button"
+                icon="i-lucide-list-checks"
+                label="批量"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                class="rounded-full"
+                :disabled="!downloadableTasks.length"
+                @click="toggleBatchMode"
+              />
+              <UBadge
+                :label="queue.length ? `${queue.length} 个任务` : '等待提交'"
+                color="neutral"
+                variant="outline"
+                size="lg"
+                class="rounded-full"
+              />
+            </template>
+          </div>
         </div>
 
         <div
@@ -1126,12 +1419,28 @@ async function retryImageTask(task: ImageTask) {
               v-for="item in queue"
               :key="item.id"
               class="warm-card-hover cursor-pointer p-4"
-              :class="selectedTaskId === item.id ? '!border-[var(--warm-accent)] ring-2 ring-[var(--warm-accent)]/20' : ''"
-              @click="selectImageTask(item)"
+              :class="[
+                selectedTaskId === item.id ? '!border-[var(--warm-accent)] ring-2 ring-[var(--warm-accent)]/20' : '',
+                selectedBatchIds.includes(item.id) ? '!border-[var(--warm-accent)] ring-2 ring-[var(--warm-accent)]/30' : ''
+              ]"
+              @click="batchMode ? toggleBatchTask(item) : selectImageTask(item)"
             >
               <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-slate-100/70 text-muted dark:bg-white/10">
+                <button
+                  v-if="batchMode && item.imageUrl"
+                  type="button"
+                  class="absolute left-3 top-3 z-20 flex size-8 items-center justify-center rounded-full border border-white/70 bg-black/35 text-white shadow-sm backdrop-blur transition"
+                  :class="selectedBatchIds.includes(item.id) ? '!bg-[var(--warm-accent)]' : ''"
+                  aria-label="Select image"
+                  @click.stop="toggleBatchTask(item)"
+                >
+                  <UIcon
+                    :name="selectedBatchIds.includes(item.id) ? 'i-lucide-check' : 'i-lucide-circle'"
+                    class="size-4"
+                  />
+                </button>
                 <UBadge
-                  v-if="selectedTaskId === item.id"
+                  v-if="selectedTaskId === item.id && !batchMode"
                   label="正在编辑"
                   color="primary"
                   variant="solid"
@@ -1169,8 +1478,9 @@ async function retryImageTask(task: ImageTask) {
                   class="size-full object-cover"
                 >
                 <div
-                  v-if="item.imageUrl"
+                  v-if="item.imageUrl && !batchMode"
                   class="absolute right-3 top-3 z-10 flex gap-2"
+                  @click.stop
                 >
                   <UButton
                     type="button"
@@ -1182,26 +1492,20 @@ async function retryImageTask(task: ImageTask) {
                     aria-label="Preview image"
                     @click.stop="previewImage(item)"
                   />
-                  <UButton
-                    type="button"
-                    icon="i-lucide-download"
-                    color="neutral"
-                    variant="solid"
-                    size="sm"
-                    class="rounded-full"
-                    aria-label="Download image"
-                    @click.stop="downloadImage(item)"
-                  />
-                  <UButton
-                    type="button"
-                    icon="i-lucide-trash"
-                    color="error"
-                    variant="solid"
-                    size="sm"
-                    class="rounded-full"
-                    aria-label="Delete image"
-                    @click.stop="deleteImageTask(item)"
-                  />
+                  <UDropdownMenu
+                    :items="getImageActionItems(item)"
+                    :content="{ align: 'end', collisionPadding: 12 }"
+                  >
+                    <UButton
+                      type="button"
+                      icon="i-lucide-more-horizontal"
+                      color="neutral"
+                      variant="solid"
+                      size="sm"
+                      class="rounded-full"
+                      aria-label="More image actions"
+                    />
+                  </UDropdownMenu>
                 </div>
                 <UIcon
                   v-else-if="item.status === 'generating'"
@@ -1448,7 +1752,20 @@ async function retryImageTask(task: ImageTask) {
           class="warm-divider border-t p-3 sm:p-4"
           @submit.prevent="submitImageTask"
         >
-          <div class="warm-input p-3">
+          <div
+            class="warm-input relative p-3"
+            :class="isDraggingImages ? 'ring-2 ring-[var(--warm-accent)]/35' : ''"
+            @paste="onPasteImages"
+            @dragover="onDragOverImages"
+            @dragleave="onDragLeaveImages"
+            @drop="onDropImages"
+          >
+            <div
+              v-if="isDraggingImages"
+              class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border border-dashed border-[var(--warm-accent)] bg-white/80 text-sm font-medium text-highlighted backdrop-blur dark:bg-black/50"
+            >
+              松开后加入参考图
+            </div>
             <div
               v-if="files.length"
               class="mb-3 flex gap-2 overflow-x-auto pb-1"
@@ -1589,10 +1906,10 @@ async function retryImageTask(task: ImageTask) {
                     type="button"
                     :icon="activeQualityIcon"
                     color="neutral"
-                    variant="soft"
-                    size="sm"
+                    variant="outline"
                     :label="`质量: ${getImageQualityLabel(quality)}`"
-                    class="shrink-0 rounded-full font-medium"
+                    class="shrink-0 rounded-full"
+                    :ui="{ leadingIcon: 'size-4' }"
                   />
 
                   <template #content>
@@ -1688,6 +2005,72 @@ async function retryImageTask(task: ImageTask) {
           :alt="previewImageAlt"
           class="max-h-[72vh] w-full bg-black object-contain"
         >
+        <div
+          v-if="previewTask"
+          class="flex flex-wrap items-center justify-between gap-3 border-t border-default p-4 text-left"
+        >
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-highlighted">
+              {{ getTaskNumber(previewTask) || '预览图片' }}
+            </p>
+            <p class="mt-1 text-xs text-muted">
+              {{ previewTask.resolution }} · {{ previewTask.ratio }} · {{ previewTask.size }}
+            </p>
+          </div>
+          <div class="flex flex-wrap justify-end gap-2">
+            <UButton
+              type="button"
+              icon="i-lucide-pencil"
+              label="设为当前"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              class="rounded-full"
+              :disabled="selectedTaskId === previewTask.id"
+              @click="setCurrentTask(previewTask)"
+            />
+            <UButton
+              type="button"
+              icon="i-lucide-paperclip"
+              label="加入参考图"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              class="rounded-full"
+              @click="addTaskImageAsReference(previewTask)"
+            />
+            <UButton
+              type="button"
+              icon="i-lucide-copy"
+              label="复制图片"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              class="rounded-full"
+              @click="copyImage(previewTask)"
+            />
+            <UButton
+              type="button"
+              icon="i-lucide-download"
+              label="下载"
+              color="neutral"
+              variant="soft"
+              size="sm"
+              class="rounded-full"
+              @click="downloadImage(previewTask)"
+            />
+            <UButton
+              type="button"
+              icon="i-lucide-trash"
+              label="删除"
+              color="error"
+              variant="soft"
+              size="sm"
+              class="rounded-full"
+              @click="deleteImageTask(previewTask)"
+            />
+          </div>
+        </div>
         <div
           v-if="previewRevisedPrompt"
           class="border-t border-default p-4 text-left"
