@@ -137,7 +137,6 @@ const quickChats = [
           </div>
           <h1 class="text-3xl font-black tracking-tight text-highlighted sm:text-5xl">
             {{ greeting }}
-            <span class="hero-text-gradient">，一起创造</span>
           </h1>
           <p class="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted sm:text-base">
             输入问题、上传资料，或从下方选择一个常用场景开始。

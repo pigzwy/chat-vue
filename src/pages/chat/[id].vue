@@ -249,15 +249,17 @@ onMounted(() => {
             v-if="isOwner"
             #actions="{ message }"
           >
-            <ChatMessageActions
-              :message="message"
-              :streaming="chat.status === 'streaming' && message.id === chat.messages[chat.messages.length - 1]?.id"
-              :editing="editingMessageId === message.id"
-              :vote="getVote(message.id)"
-              @edit="startEdit"
-              @regenerate="regenerateMessage"
-              @vote="vote"
-            />
+            <div :class="message.role === 'assistant' ? 'ml-12' : undefined">
+              <ChatMessageActions
+                :message="message"
+                :streaming="chat.status === 'streaming' && message.id === chat.messages[chat.messages.length - 1]?.id"
+                :editing="editingMessageId === message.id"
+                :vote="getVote(message.id)"
+                @edit="startEdit"
+                @regenerate="regenerateMessage"
+                @vote="vote"
+              />
+            </div>
           </template>
         </UChatMessages>
 

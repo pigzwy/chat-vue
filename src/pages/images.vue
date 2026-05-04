@@ -195,12 +195,12 @@ const submitLabel = computed(() => {
   return selectedTask.value ? '编辑所选图片' : '生成图片'
 })
 const panelDescription = computed(() => {
-  if (hasUploadedImages.value) return '基于本地上传的图片继续修改。'
-  return selectedTask.value ? '基于左侧选中的图片继续修改。' : '像聊天一样描述图片需求。'
+  if (hasUploadedImages.value) return '基于本地上传的图片继续修改，支持以图生图。'
+  return selectedTask.value ? '基于左侧选中的图片继续修改。' : '像聊天一样描述图片需求，也可以上传图片以图生图。'
 })
 const promptPlaceholder = computed(() => {
   if (hasUploadedImages.value) return '描述你想怎么编辑上传的图片...'
-  return selectedTask.value ? '描述你想怎么编辑这张图片...' : '描述你想生成的图片...'
+  return selectedTask.value ? '描述你想怎么编辑这张图片...' : '描述你想生成的图片，也可以上传或拖拽图片以图生图...'
 })
 const previewImageUrl = computed(() => previewTask.value?.imageUrl || previewUploadedImage.value?.previewUrl || '')
 const previewImageAlt = computed(() => {
@@ -1781,7 +1781,7 @@ async function retryImageTask(task: ImageTask) {
               v-if="isDraggingImages"
               class="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-2xl border border-dashed border-[var(--warm-accent)] bg-white/80 text-sm font-medium text-highlighted backdrop-blur dark:bg-black/50"
             >
-              松开后加入参考图
+              松开后加入参考图，用于以图生图
             </div>
             <div
               v-if="files.length"
@@ -1828,8 +1828,8 @@ async function retryImageTask(task: ImageTask) {
               :ui="{ root: 'w-full', base: 'w-full max-h-48 resize-none overflow-y-auto text-base leading-7' }"
             />
 
-            <div class="mt-2 flex flex-col gap-3 warm-divider border-t pt-3 sm:flex-row sm:items-center sm:justify-between">
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
+            <div class="mt-2 flex flex-col gap-3 warm-divider border-t pt-3">
+              <div class="flex min-w-0 flex-wrap items-center gap-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-nowrap sm:overflow-x-auto [&::-webkit-scrollbar]:hidden">
                 <UPopover>
                   <UButton
                     type="button"
@@ -1837,7 +1837,9 @@ async function retryImageTask(task: ImageTask) {
                     color="neutral"
                     variant="outline"
                     :label="`${resolution} · ${ratio}`"
-                    class="warm-pill shrink-0 rounded-full"
+                    size="sm"
+                    class="warm-pill shrink-0 rounded-full text-sm"
+                    :ui="{ leadingIcon: 'size-3.5' }"
                   />
 
                   <template #content>
@@ -1915,7 +1917,8 @@ async function retryImageTask(task: ImageTask) {
                   variant="soft"
                   size="sm"
                   :label="imageGroup.label"
-                  class="warm-pill shrink-0 rounded-full font-semibold"
+                  class="warm-pill shrink-0 rounded-full text-sm font-semibold"
+                  :ui="{ leadingIcon: 'size-3.5' }"
                 />
 
                 <UPopover>
@@ -1925,8 +1928,9 @@ async function retryImageTask(task: ImageTask) {
                     color="neutral"
                     variant="outline"
                     :label="`质量: ${getImageQualityLabel(quality)}`"
-                    class="warm-pill shrink-0 rounded-full"
-                    :ui="{ leadingIcon: 'size-4' }"
+                    size="sm"
+                    class="warm-pill shrink-0 rounded-full text-sm"
+                    :ui="{ leadingIcon: 'size-3.5' }"
                   />
 
                   <template #content>
@@ -1962,14 +1966,15 @@ async function retryImageTask(task: ImageTask) {
                   variant="soft"
                   size="sm"
                   :label="files.length ? `${files.length}/${uploadedImageLimit}` : undefined"
-                  class="warm-pill shrink-0 rounded-full font-semibold"
+                  class="warm-pill shrink-0 rounded-full text-sm font-semibold"
                   :disabled="files.length >= uploadedImageLimit"
+                  :ui="{ leadingIcon: 'size-3.5' }"
                   @click="pickFiles"
                 />
               </div>
 
-              <div class="flex shrink-0 items-center justify-end gap-3">
-                <span class="hidden items-center gap-1 text-xs text-muted sm:inline-flex"><UIcon name="i-lucide-coins" class="size-3" />{{ estimatedCost }}</span>
+              <div class="flex w-full shrink-0 items-center justify-end gap-3">
+                <span class="inline-flex items-center gap-1 text-xs text-muted"><UIcon name="i-lucide-coins" class="size-3" />{{ estimatedCost }}</span>
                 <UButton
                   type="submit"
                   icon="i-lucide-arrow-up"
