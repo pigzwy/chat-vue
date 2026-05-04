@@ -15,7 +15,7 @@
         variant="ghost"
         icon="i-lucide-plus"
         to="/"
-        class="rounded-full lg:hidden"
+        class="warm-chip rounded-full lg:hidden"
         aria-label="New chat"
       />
     </template>

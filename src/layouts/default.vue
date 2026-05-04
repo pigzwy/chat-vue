@@ -69,19 +69,19 @@ defineShortcuts({
     <div class="pointer-events-none fixed left-4 top-3 z-50">
       <ULink
         to="/"
-        class="warm-chip pointer-events-auto inline-flex items-center gap-1.5 py-1.5 pl-1.5 pr-2 sm:pr-3"
+        class="warm-chip pointer-events-auto inline-flex items-center gap-2 py-1.5 pl-1.5 pr-3 transition-transform hover:-translate-y-0.5"
       >
         <img
           src="/logo-mark.jpg"
           alt="pigcoder"
-          class="size-7 shrink-0 rounded-full object-cover"
+          class="size-7 shrink-0 rounded-full object-cover ring-2 ring-white/70 dark:ring-white/10"
         >
-        <span class="hidden text-sm font-semibold text-highlighted sm:inline">pigcoder</span>
+        <span class="hidden text-sm font-bold tracking-tight text-highlighted sm:inline">pigcoder</span>
       </ULink>
     </div>
 
     <div class="pointer-events-none fixed top-3 left-1/2 z-50 -translate-x-1/2">
-      <div class="warm-chip pointer-events-auto inline-flex items-center p-0.5">
+      <div class="warm-chip pointer-events-auto inline-flex items-center gap-1 p-1">
         <UButton
           to="/"
           label="对话"
@@ -89,7 +89,7 @@ defineShortcuts({
           size="sm"
           color="neutral"
           variant="ghost"
-          class="h-8 rounded-full px-3.5 font-medium"
+          class="h-8 rounded-full px-3.5 font-semibold transition-transform hover:-translate-y-0.5"
           :class="!isImagesRoute ? 'warm-btn' : ''"
           :style="!isImagesRoute ? 'border:none;box-shadow:none' : ''"
         />
@@ -100,7 +100,7 @@ defineShortcuts({
           size="sm"
           color="neutral"
           variant="ghost"
-          class="h-8 rounded-full px-3.5 font-medium"
+          class="h-8 rounded-full px-3.5 font-semibold transition-transform hover:-translate-y-0.5"
           :class="isImagesRoute ? 'warm-btn' : ''"
           :style="isImagesRoute ? 'border:none;box-shadow:none' : ''"
         />
@@ -115,7 +115,7 @@ defineShortcuts({
       />
     </div>
 
-    <UDashboardSidebar
+      <UDashboardSidebar
       v-if="!isImagesRoute"
       id="default"
       v-model:open="open"
@@ -123,6 +123,7 @@ defineShortcuts({
       collapsible
       resizable
       class="border-r-0 px-2 pb-4 pt-20"
+      :ui="{ root: 'bg-transparent', body: 'gap-3' }"
     >
       <template #default="{ collapsed }">
         <div
@@ -139,7 +140,7 @@ defineShortcuts({
             color="neutral"
             variant="soft"
             to="/"
-            class="shrink-0 rounded-xl font-semibold"
+            class="warm-btn shrink-0 rounded-full px-4 font-semibold"
             @click="open = false"
           />
         </div>
@@ -154,7 +155,7 @@ defineShortcuts({
             variant="soft"
             block
             to="/"
-            class="rounded-xl"
+            class="warm-btn rounded-full"
             aria-label="New chat"
             @click="open = false"
           />
@@ -166,7 +167,7 @@ defineShortcuts({
           :items="items"
           :collapsed="collapsed"
           orientation="vertical"
-          :ui="{ link: 'overflow-hidden rounded-xl data-[active=true]:bg-[var(--warm-accent)] data-[active=true]:text-white' }"
+          :ui="{ link: 'overflow-hidden rounded-2xl border border-transparent transition-all hover:border-[var(--warm-border)] hover:bg-[var(--warm-surface-hover)] data-[active=true]:border-transparent data-[active=true]:bg-[var(--warm-accent)] data-[active=true]:text-white data-[active=true]:shadow-lg' }"
         >
           <template #chat-trailing="{ item }">
             <div class="flex -mr-1.25 translate-x-full group-hover:translate-x-0 transition-transform">
@@ -205,7 +206,7 @@ defineShortcuts({
 
     <div
       class="flex-1 flex min-w-0 overflow-hidden"
-      :class="isImagesRoute ? 'mt-18' : 'warm-card mx-4 mb-4 mt-18 lg:ml-0'"
+      :class="isImagesRoute ? 'mt-18' : 'warm-card hero-shell mx-4 mb-4 mt-18 lg:ml-0'"
     >
       <RouterView :key="route.path" />
     </div>

@@ -1312,12 +1312,12 @@ async function retryImageTask(task: ImageTask) {
 </script>
 
 <template>
-  <div class="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
-    <div class="grid min-h-full gap-5 p-4 pt-0 lg:h-full lg:min-h-0 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6 lg:pt-0">
-      <section class="warm-card flex min-h-0 flex-col p-4 sm:p-6 lg:overflow-hidden">
+  <div class="hero-shell flex-1 min-h-0 overflow-y-auto lg:overflow-hidden">
+    <div class="relative grid min-h-full gap-5 p-4 pt-0 lg:h-full lg:min-h-0 lg:grid-cols-[1fr_minmax(360px,460px)] lg:p-6 lg:pt-0">
+      <section class="hero-panel flex min-h-0 flex-col p-4 sm:p-6 lg:overflow-hidden">
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h1 class="text-xl font-bold text-highlighted">
+            <h1 class="text-2xl font-black tracking-tight text-highlighted">
               图片队列
             </h1>
             <p class="mt-2 text-sm text-muted">
@@ -1343,7 +1343,7 @@ async function retryImageTask(task: ImageTask) {
                 color="neutral"
                 variant="ghost"
                 size="sm"
-                class="rounded-full"
+                class="warm-pill rounded-full"
                 @click="toggleBatchMode"
               />
               <UButton
@@ -1353,7 +1353,7 @@ async function retryImageTask(task: ImageTask) {
                 color="neutral"
                 variant="outline"
                 size="sm"
-                class="rounded-full"
+                class="warm-pill rounded-full"
                 :disabled="!selectedBatchTasks.length"
                 @click="downloadSelectedImages"
               />
@@ -1377,7 +1377,7 @@ async function retryImageTask(task: ImageTask) {
                 color="neutral"
                 variant="outline"
                 size="sm"
-                class="rounded-full"
+                class="warm-pill rounded-full"
                 :disabled="!downloadableTasks.length"
                 @click="toggleBatchMode"
               />
@@ -1386,7 +1386,7 @@ async function retryImageTask(task: ImageTask) {
                 color="neutral"
                 variant="outline"
                 size="lg"
-                class="rounded-full"
+                class="warm-pill rounded-full"
               />
             </template>
           </div>
@@ -1396,7 +1396,7 @@ async function retryImageTask(task: ImageTask) {
           v-if="!queue.length"
           class="flex min-h-0 flex-1 flex-col items-center justify-center text-center"
         >
-          <div class="flex size-24 items-center justify-center rounded-3xl text-violet-500" style="background: var(--warm-accent-soft)">
+          <div class="hero-orb flex size-24 items-center justify-center rounded-[2rem] text-white">
             <UIcon
               name="i-lucide-image"
               class="size-9"
@@ -1418,14 +1418,14 @@ async function retryImageTask(task: ImageTask) {
             <article
               v-for="item in queue"
               :key="item.id"
-              class="warm-card-hover cursor-pointer p-4"
+              class="warm-card-hover cursor-pointer p-3.5"
               :class="[
                 selectedTaskId === item.id ? '!border-[var(--warm-accent)] ring-2 ring-[var(--warm-accent)]/20' : '',
                 selectedBatchIds.includes(item.id) ? '!border-[var(--warm-accent)] ring-2 ring-[var(--warm-accent)]/30' : ''
               ]"
               @click="batchMode ? toggleBatchTask(item) : selectImageTask(item)"
             >
-              <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-slate-100/70 text-muted dark:bg-white/10">
+              <div class="group relative flex aspect-square items-center justify-center overflow-hidden rounded-[1.35rem] bg-slate-100/70 text-muted shadow-inner dark:bg-white/10">
                 <button
                   v-if="batchMode && item.imageUrl"
                   type="button"
@@ -1488,7 +1488,7 @@ async function retryImageTask(task: ImageTask) {
                     color="neutral"
                     variant="solid"
                     size="sm"
-                    class="rounded-full"
+                    class="warm-pill rounded-full"
                     aria-label="Preview image"
                     @click.stop="previewImage(item)"
                   />
@@ -1502,7 +1502,7 @@ async function retryImageTask(task: ImageTask) {
                       color="neutral"
                       variant="solid"
                       size="sm"
-                      class="rounded-full"
+                      class="warm-pill rounded-full"
                       aria-label="More image actions"
                     />
                   </UDropdownMenu>
@@ -1525,7 +1525,7 @@ async function retryImageTask(task: ImageTask) {
               </div>
               <div
                 v-if="getTaskById(item.parentId)"
-                class="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-2.5 py-2"
+                class="mt-3 flex items-center gap-2 rounded-2xl border border-[var(--warm-border)] bg-[var(--warm-surface-hover)] px-2.5 py-2"
               >
                 <img
                   v-if="getTaskById(item.parentId)?.imageUrl"
@@ -1575,7 +1575,7 @@ async function retryImageTask(task: ImageTask) {
               </p>
               <div
                 v-if="item.revisedPrompt"
-                class="mt-3 rounded-xl bg-muted/60 px-3 py-2"
+                class="mt-3 rounded-2xl border border-[var(--warm-border)] bg-[var(--warm-surface-hover)] px-3 py-2"
               >
                 <div class="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted">
                   <UIcon
@@ -1596,7 +1596,7 @@ async function retryImageTask(task: ImageTask) {
         </div>
       </section>
 
-      <section class="warm-card flex min-h-0 flex-col lg:h-full">
+      <section class="hero-panel flex min-h-0 flex-col lg:h-full">
         <div class="warm-divider border-b p-4 sm:p-5">
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -1614,7 +1614,7 @@ async function retryImageTask(task: ImageTask) {
               label="新建图片"
               color="neutral"
               variant="soft"
-              class="shrink-0 rounded-full"
+              class="warm-pill shrink-0 rounded-full"
               @click="clearSelectedTask"
             />
           </div>
@@ -1625,7 +1625,7 @@ async function retryImageTask(task: ImageTask) {
           :class="selectedTask ? 'flex' : 'hidden lg:flex'"
         >
           <div v-if="!selectedTask">
-            <div class="mx-auto flex size-16 items-center justify-center rounded-2xl text-violet-500" style="background: var(--warm-accent-soft)">
+            <div class="hero-orb mx-auto flex size-16 items-center justify-center rounded-2xl text-white">
               <UIcon
                 name="i-lucide-sparkles"
                 class="size-7"
@@ -1642,7 +1642,7 @@ async function retryImageTask(task: ImageTask) {
             v-else
             class="w-full space-y-5 text-left"
           >
-            <div class="warm-card rounded-2xl p-3">
+            <div class="warm-card rounded-3xl p-3">
               <div class="flex items-center gap-3">
                 <img
                   :src="selectedTask.imageUrl"
@@ -1671,7 +1671,7 @@ async function retryImageTask(task: ImageTask) {
                   icon="i-lucide-x"
                   color="neutral"
                   variant="ghost"
-                  class="rounded-full"
+                  class="warm-pill rounded-full"
                   aria-label="Clear selected image"
                   @click="clearSelectedTask"
                 />
@@ -1685,7 +1685,7 @@ async function retryImageTask(task: ImageTask) {
               <div
                 v-for="historyItem in selectedHistory"
                 :key="historyItem.id"
-                class="warm-card-hover rounded-2xl p-3"
+                class="warm-card-hover rounded-3xl p-3"
                 :class="selectedTaskId === historyItem.id ? 'ring-2 ring-[var(--warm-accent)]/20' : ''"
               >
                 <div class="flex items-start gap-3">
@@ -1726,7 +1726,7 @@ async function retryImageTask(task: ImageTask) {
                         color="neutral"
                         variant="ghost"
                         size="xs"
-                        class="rounded-full"
+                        class="warm-pill rounded-full"
                         @click="reusePrompt(historyItem)"
                       />
                       <UButton
@@ -1736,7 +1736,7 @@ async function retryImageTask(task: ImageTask) {
                         color="neutral"
                         variant="soft"
                         size="xs"
-                        class="rounded-full"
+                        class="warm-pill rounded-full"
                         :disabled="selectedTaskId === historyItem.id"
                         @click="setCurrentTask(historyItem)"
                       />
@@ -1753,7 +1753,7 @@ async function retryImageTask(task: ImageTask) {
           @submit.prevent="submitImageTask"
         >
           <div
-            class="warm-input relative p-3"
+            class="warm-input relative p-4"
             :class="isDraggingImages ? 'ring-2 ring-[var(--warm-accent)]/35' : ''"
             @paste="onPasteImages"
             @dragover="onDragOverImages"
@@ -1820,11 +1820,11 @@ async function retryImageTask(task: ImageTask) {
                     color="neutral"
                     variant="outline"
                     :label="`${resolution} · ${ratio}`"
-                    class="shrink-0 rounded-full"
+                    class="warm-pill shrink-0 rounded-full"
                   />
 
                   <template #content>
-                    <div class="w-[360px] max-w-[calc(100vw-2rem)] space-y-5 p-4">
+                    <div class="hero-panel w-[360px] max-w-[calc(100vw-2rem)] space-y-5 rounded-3xl p-4">
                       <div>
                         <h3 class="text-base font-bold text-highlighted">
                           生图参数
@@ -1889,7 +1889,7 @@ async function retryImageTask(task: ImageTask) {
                   </template>
                 </UPopover>
 
-                <div class="hidden h-6 w-px bg-default sm:block" />
+                <div class="hidden h-6 w-px bg-[var(--warm-border)] sm:block" />
 
                 <UButton
                   type="button"
@@ -1898,7 +1898,7 @@ async function retryImageTask(task: ImageTask) {
                   variant="soft"
                   size="sm"
                   :label="imageGroup.label"
-                  class="shrink-0 rounded-full font-medium"
+                  class="warm-pill shrink-0 rounded-full font-semibold"
                 />
 
                 <UPopover>
@@ -1908,12 +1908,12 @@ async function retryImageTask(task: ImageTask) {
                     color="neutral"
                     variant="outline"
                     :label="`质量: ${getImageQualityLabel(quality)}`"
-                    class="shrink-0 rounded-full"
+                    class="warm-pill shrink-0 rounded-full"
                     :ui="{ leadingIcon: 'size-4' }"
                   />
 
                   <template #content>
-                    <div class="w-48 p-1">
+                    <div class="hero-panel w-48 rounded-2xl p-1.5">
                       <UButton
                         v-for="item in imageQualityItems"
                         :key="item.value"
@@ -1945,7 +1945,7 @@ async function retryImageTask(task: ImageTask) {
                   variant="soft"
                   size="sm"
                   :label="files.length ? `${files.length}/${uploadedImageLimit}` : undefined"
-                  class="shrink-0 rounded-full font-medium"
+                  class="warm-pill shrink-0 rounded-full font-semibold"
                   :disabled="files.length >= uploadedImageLimit"
                   @click="pickFiles"
                 />
@@ -1970,7 +1970,7 @@ async function retryImageTask(task: ImageTask) {
               v-for="preset in imagePromptPresets"
               :key="preset.label"
               type="button"
-              class="warm-pill inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium"
+              class="warm-pill inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold"
               @click="useImagePromptPreset(preset.prompt)"
             >
               <UIcon
@@ -1990,7 +1990,7 @@ async function retryImageTask(task: ImageTask) {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
       @click.self="closePreview"
     >
-      <div class="relative flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-default shadow-2xl">
+      <div class="hero-panel relative flex max-h-full w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] shadow-2xl">
         <UButton
           type="button"
           icon="i-lucide-x"
@@ -2036,7 +2036,7 @@ async function retryImageTask(task: ImageTask) {
               color="neutral"
               variant="soft"
               size="sm"
-              class="rounded-full"
+              class="warm-pill rounded-full"
               @click="addTaskImageAsReference(previewTask)"
             />
             <UButton
@@ -2046,7 +2046,7 @@ async function retryImageTask(task: ImageTask) {
               color="neutral"
               variant="soft"
               size="sm"
-              class="rounded-full"
+              class="warm-pill rounded-full"
               @click="copyImage(previewTask)"
             />
             <UButton
@@ -2056,7 +2056,7 @@ async function retryImageTask(task: ImageTask) {
               color="neutral"
               variant="soft"
               size="sm"
-              class="rounded-full"
+              class="warm-pill rounded-full"
               @click="downloadImage(previewTask)"
             />
             <UButton
@@ -2089,7 +2089,7 @@ async function retryImageTask(task: ImageTask) {
               color="neutral"
               variant="ghost"
               size="xs"
-              class="rounded-full"
+              class="warm-pill rounded-full"
               aria-label="Copy revised prompt"
               @click="copyRevisedPrompt(previewRevisedPrompt)"
             />

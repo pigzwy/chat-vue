@@ -125,13 +125,22 @@ const quickChats = [
     </template>
 
     <template #body>
-      <UContainer class="flex-1 flex flex-col justify-center gap-6 py-8 sm:py-12">
-        <div class="text-center">
-          <h1 class="text-2xl font-bold text-highlighted sm:text-3xl">
+      <UContainer class="relative flex-1 flex flex-col justify-center gap-7 py-10 sm:py-14">
+        <div class="pointer-events-none absolute left-1/2 top-16 size-52 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+
+        <div class="relative mx-auto max-w-2xl text-center">
+          <div class="hero-orb mx-auto mb-5 flex size-13 items-center justify-center rounded-3xl text-white shadow-xl">
+            <UIcon
+              name="i-lucide-sparkles"
+              class="size-6"
+            />
+          </div>
+          <h1 class="text-3xl font-black tracking-tight text-highlighted sm:text-5xl">
             {{ greeting }}
+            <span class="hero-text-gradient">，一起创造</span>
           </h1>
-          <p class="mt-2 text-sm text-muted">
-            有什么可以帮你的？
+          <p class="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted sm:text-base">
+            像 HeroUI 一样轻盈、聚焦、响应迅速。输入问题，开始一段更顺滑的 AI 对话。
           </p>
         </div>
 
@@ -140,7 +149,7 @@ const quickChats = [
           :status="loading ? 'streaming' : 'ready'"
           class="warm-input mx-auto w-full max-w-3xl animate-fadeIn [view-transition-name:chat-prompt]"
           variant="subtle"
-          :ui="{ base: 'px-3 py-2', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
+          :ui="{ base: 'px-4 py-3 text-base', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
           @submit="onSubmit"
         >
           <template
@@ -175,7 +184,7 @@ const quickChats = [
                   color="neutral"
                   variant="ghost"
                   size="sm"
-                  class="shrink-0 rounded-full"
+                  class="warm-pill shrink-0 rounded-full"
                   :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
                   :disabled="loading || attachmentPending || attachments.length >= chatAttachmentLimit"
                   aria-label="Add attachments"
@@ -198,12 +207,12 @@ const quickChats = [
           </template>
         </UChatPrompt>
 
-        <div class="mx-auto flex w-full max-w-3xl flex-wrap justify-center gap-2">
+        <div class="mx-auto flex w-full max-w-3xl flex-wrap justify-center gap-2.5">
           <button
             v-for="quickChat in quickChats"
             :key="quickChat.label"
             type="button"
-            class="warm-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium"
+            class="warm-pill inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold"
             @click="useQuickChatPrompt(quickChat.label)"
           >
             <UIcon

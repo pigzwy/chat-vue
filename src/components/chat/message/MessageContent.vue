@@ -37,14 +37,18 @@ function getFileParts(parts: UIMessage['parts']) {
   <div
     :class="message.role === 'assistant' ? 'flex items-start gap-3' : undefined"
   >
-    <img
+    <div
       v-if="message.role === 'assistant'"
-      src="/logo-mark.jpg"
-      alt="pigcoder"
-      class="size-8 shrink-0 rounded-full object-cover ring-1 ring-default"
+      class="hero-orb mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl p-0.5"
     >
+      <img
+        src="/logo-mark.jpg"
+        alt="pigcoder"
+        class="size-full rounded-[0.85rem] object-cover ring-1 ring-white/70 dark:ring-white/10"
+      >
+    </div>
 
-    <div :class="message.role === 'assistant' ? 'min-w-0 max-w-full rounded-2xl bg-muted/60 px-4 py-3' : undefined">
+    <div :class="message.role === 'assistant' ? 'warm-card min-w-0 max-w-full px-4 py-3.5' : undefined">
       <template
         v-for="(part, index) in getMergedParts(message.parts)"
         :key="`${message.id}-${part.type}-${index}`"

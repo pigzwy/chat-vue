@@ -17,11 +17,11 @@ const activeIcon = computed(() => reasoningEffortItems.find(item => item.value =
       variant="soft"
       size="sm"
       :label="`思考: ${getReasoningEffortLabel(reasoningEffort)}`"
-      class="shrink-0 rounded-full"
+      class="warm-pill shrink-0 rounded-full font-medium"
     />
 
     <template #content>
-      <div class="w-40 p-1">
+      <div class="hero-panel w-44 rounded-2xl p-1.5">
         <UButton
           v-for="item in reasoningEffortItems"
           :key="item.value"
@@ -31,7 +31,7 @@ const activeIcon = computed(() => reasoningEffortItems.find(item => item.value =
           color="neutral"
           :variant="reasoningEffort === item.value ? 'soft' : 'ghost'"
           block
-          class="justify-start rounded-lg"
+          class="justify-start rounded-xl font-medium"
           @click="reasoningEffort = item.value"
         />
       </div>

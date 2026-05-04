@@ -7,45 +7,59 @@
 
 @layer base {
   :root {
-    --warm-bg: #faf8f5;
-    --warm-card: #ffffff;
-    --warm-border: rgba(0, 0, 0, 0.06);
-    --warm-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-    --warm-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.08);
-    --warm-accent: #6366f1;
-    --warm-accent-soft: rgba(99, 102, 241, 0.08);
-    --warm-accent-hover: rgba(99, 102, 241, 0.14);
-    --warm-text: #1e1e2e;
-    --warm-text-secondary: #6b7280;
-    --warm-surface-hover: rgba(0, 0, 0, 0.03);
+    --warm-bg: #f7f8ff;
+    --warm-card: rgba(255, 255, 255, 0.82);
+    --warm-border: rgba(15, 23, 42, 0.08);
+    --warm-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    --warm-shadow-lg: 0 24px 70px rgba(79, 70, 229, 0.14);
+    --warm-accent: #6d5dfc;
+    --warm-accent-soft: rgba(109, 93, 252, 0.1);
+    --warm-accent-hover: rgba(109, 93, 252, 0.16);
+    --warm-text: #111827;
+    --warm-text-secondary: #64748b;
+    --warm-surface-hover: rgba(109, 93, 252, 0.06);
+    --hero-bg-glow-1: rgba(109, 93, 252, 0.18);
+    --hero-bg-glow-2: rgba(45, 212, 191, 0.14);
+    --hero-bg-glow-3: rgba(244, 114, 182, 0.12);
+    --hero-ring: rgba(109, 93, 252, 0.28);
+    --hero-gradient: linear-gradient(135deg, #7c3aed 0%, #4f46e5 52%, #06b6d4 100%);
   }
 
   html.dark {
-    --warm-bg: #111118;
-    --warm-card: #1a1a24;
-    --warm-border: rgba(255, 255, 255, 0.06);
-    --warm-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
-    --warm-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --warm-accent: #818cf8;
-    --warm-accent-soft: rgba(129, 140, 248, 0.1);
-    --warm-accent-hover: rgba(129, 140, 248, 0.18);
-    --warm-text: #e4e4e7;
-    --warm-text-secondary: #71717a;
-    --warm-surface-hover: rgba(255, 255, 255, 0.04);
+    --warm-bg: #080a14;
+    --warm-card: rgba(16, 20, 36, 0.78);
+    --warm-border: rgba(255, 255, 255, 0.1);
+    --warm-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
+    --warm-shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.46);
+    --warm-accent: #9b8cff;
+    --warm-accent-soft: rgba(155, 140, 255, 0.13);
+    --warm-accent-hover: rgba(155, 140, 255, 0.2);
+    --warm-text: #f4f7fb;
+    --warm-text-secondary: #9ca3af;
+    --warm-surface-hover: rgba(255, 255, 255, 0.06);
+    --hero-bg-glow-1: rgba(109, 93, 252, 0.24);
+    --hero-bg-glow-2: rgba(45, 212, 191, 0.16);
+    --hero-bg-glow-3: rgba(244, 114, 182, 0.13);
+    --hero-ring: rgba(155, 140, 255, 0.34);
+    --hero-gradient: linear-gradient(135deg, #a78bfa 0%, #818cf8 52%, #22d3ee 100%);
   }
 
   body {
     @apply min-h-screen text-zinc-900 antialiased dark:text-zinc-100;
     background: var(--warm-bg);
     background-image:
-      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.06), transparent 60%),
-      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.05), transparent 60%);
+      radial-gradient(circle at 18% 8%, var(--hero-bg-glow-1), transparent 32rem),
+      radial-gradient(circle at 86% 18%, var(--hero-bg-glow-2), transparent 30rem),
+      radial-gradient(circle at 50% 100%, var(--hero-bg-glow-3), transparent 32rem),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0));
   }
 
   html.dark body {
     background-image:
-      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.08), transparent 60%),
-      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.06), transparent 60%);
+      radial-gradient(circle at 18% 8%, var(--hero-bg-glow-1), transparent 32rem),
+      radial-gradient(circle at 86% 18%, var(--hero-bg-glow-2), transparent 30rem),
+      radial-gradient(circle at 50% 100%, var(--hero-bg-glow-3), transparent 32rem),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0));
   }
 
   ::selection {
@@ -63,21 +77,23 @@
     background: var(--warm-card);
     border: 1px solid var(--warm-border);
     box-shadow: var(--warm-shadow);
-    border-radius: 1rem;
+    border-radius: 1.5rem;
+    backdrop-filter: blur(22px) saturate(1.35);
   }
 
   .warm-card-hover {
     background: var(--warm-card);
     border: 1px solid var(--warm-border);
     box-shadow: var(--warm-shadow);
-    border-radius: 1rem;
-    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    border-radius: 1.5rem;
+    backdrop-filter: blur(22px) saturate(1.35);
+    transition: box-shadow 0.22s ease, border-color 0.22s ease, transform 0.18s ease, background 0.22s ease;
   }
 
   .warm-card-hover:hover {
     box-shadow: var(--warm-shadow-lg);
-    border-color: rgba(99, 102, 241, 0.18);
-    transform: translateY(-1px);
+    border-color: var(--hero-ring);
+    transform: translateY(-2px);
   }
 
   html.dark .warm-card-hover:hover {
@@ -87,9 +103,10 @@
   .warm-pill {
     background: var(--warm-surface-hover);
     color: var(--warm-text-secondary);
-    border: 1px solid transparent;
+    border: 1px solid var(--warm-border);
     border-radius: 9999px;
-    transition: all 0.15s ease;
+    backdrop-filter: blur(14px);
+    transition: all 0.18s ease;
   }
 
   .warm-pill:hover {
@@ -106,12 +123,15 @@
     background: var(--warm-card);
     border: 1px solid var(--warm-border);
     box-shadow: var(--warm-shadow-lg);
-    border-radius: 1.25rem;
+    border-radius: 1.65rem;
+    backdrop-filter: blur(24px) saturate(1.35);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease;
   }
 
   .warm-input:focus-within {
-    border-color: rgba(99, 102, 241, 0.3);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 3px rgba(99, 102, 241, 0.08);
+    border-color: var(--hero-ring);
+    box-shadow: var(--warm-shadow-lg), 0 0 0 4px var(--warm-accent-soft);
+    transform: translateY(-1px);
   }
 
   html.dark .warm-input {
@@ -124,16 +144,17 @@
   }
 
   .warm-btn {
-    background: var(--warm-accent);
+    background: var(--hero-gradient);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 10px 30px rgba(79, 70, 229, 0.28);
     border-radius: 9999px;
-    transition: all 0.15s ease;
+    transition: all 0.18s ease;
   }
 
   .warm-btn:hover {
     filter: brightness(1.08);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 14px 38px rgba(79, 70, 229, 0.34);
+    transform: translateY(-1px);
   }
 
   html.dark .warm-btn {
@@ -145,10 +166,56 @@
     border: 1px solid var(--warm-border);
     box-shadow: var(--warm-shadow);
     border-radius: 9999px;
+    backdrop-filter: blur(18px) saturate(1.35);
   }
 
   .warm-divider {
     border-color: var(--warm-border);
+  }
+
+  .hero-shell {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(rgba(109, 93, 252, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(109, 93, 252, 0.045) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(circle at 50% 15%, black, transparent 72%);
+  }
+
+  .hero-panel {
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.58)),
+      var(--warm-card);
+    border: 1px solid var(--warm-border);
+    box-shadow: var(--warm-shadow-lg);
+    border-radius: 2rem;
+    backdrop-filter: blur(26px) saturate(1.45);
+  }
+
+  html.dark .hero-panel {
+    background:
+      linear-gradient(135deg, rgba(22, 28, 48, 0.86), rgba(13, 18, 32, 0.62)),
+      var(--warm-card);
+  }
+
+  .hero-orb {
+    background: var(--hero-gradient);
+    box-shadow: 0 18px 50px rgba(79, 70, 229, 0.35);
+  }
+
+  .hero-text-gradient {
+    background: var(--hero-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   /* 微妙的动画效果 */

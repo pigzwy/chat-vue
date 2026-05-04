@@ -216,13 +216,14 @@ onMounted(() => {
     </template>
 
     <template #body>
-      <UContainer class="flex-1 flex flex-col gap-4 sm:gap-6">
+      <UContainer class="relative flex-1 flex flex-col gap-4 sm:gap-6">
+        <div class="pointer-events-none absolute inset-x-10 top-8 h-24 rounded-full bg-primary/8 blur-3xl" />
         <UChatMessages
           should-auto-scroll
           :messages="chat.messages"
           :status="chat.status"
           :spacing-offset="isOwner ? 160 : 0"
-          class="pt-(--ui-header-height) pb-4 sm:pb-6"
+          class="relative pt-(--ui-header-height) pb-4 sm:pb-6"
         >
           <template #indicator>
             <div class="flex items-center gap-1.5">
@@ -266,13 +267,13 @@ onMounted(() => {
         >
           <div
             v-if="!attachments.length && !input.trim()"
-            class="mx-auto flex w-full max-w-3xl flex-wrap gap-1.5 px-2"
+            class="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-2"
           >
             <button
               v-for="preset in chatPromptPresets"
               :key="preset.label"
               type="button"
-              class="warm-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+              class="warm-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               :disabled="chat.status !== 'ready'"
               @click="useChatPromptPreset(preset.prompt)"
             >
@@ -292,7 +293,7 @@ onMounted(() => {
             :error="chat.error"
             variant="subtle"
             class="warm-input [view-transition-name:chat-prompt]"
-            :ui="{ base: 'px-3 py-2', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
+            :ui="{ base: 'px-4 py-3', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
             @submit="handleSubmit"
           >
             <template
@@ -327,7 +328,7 @@ onMounted(() => {
                     color="neutral"
                     variant="ghost"
                     size="sm"
-                    class="shrink-0 rounded-full"
+                    class="warm-pill shrink-0 rounded-full"
                     :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
                     :disabled="chat.status !== 'ready' || attachmentPending || attachments.length >= chatAttachmentLimit"
                     aria-label="Add attachments"
