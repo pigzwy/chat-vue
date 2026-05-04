@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { sub2apiBaseURL } from './sub2api'
+import { withImageRequestTimeout } from './imageUpstreamRequest'
 import { buildImagePrompt, type ImageQuality, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
 
 type ImageJobStatus = 'queued' | 'running' | 'completed' | 'error'
@@ -74,15 +75,6 @@ function parseJson<T>(text: string) {
 
 function toErrorMessage(text: string, status: number, statusText: string) {
   if (status === 524) return 'API 图片生成超时，建议降低分辨率或稍后重试'
-  return toNonTimeoutErrorMessage(text, status, statusText)
-}
-
-function toNonTimeoutErrorMessage(text: string, status: number, statusText: string) {
-  if (status === 524) return 'API 图片生成超时，建议降低分辨率或稍后重试'
-
-  if (status === 524) {
-    return 'API 图片生成超时，建议降低分辨率或稍后重试'
-  }
 
   const parsed = parseJson<ImageGenerationResponse>(text)
   if (parsed) {
@@ -221,7 +213,7 @@ async function readImageGenerationStream(response: Response) {
   } satisfies ImageGenerationResponse
 }
 
-async function callImageGeneration(job: ImageJob, stream: boolean) {
+async function callImageGeneration(job: ImageJob, stream: boolean, signal: AbortSignal) {
   const requestBody = JSON.stringify({
     model: imageModel,
     prompt: buildImagePrompt(job.prompt, job.size, job.quality),
@@ -243,7 +235,8 @@ async function callImageGeneration(job: ImageJob, stream: boolean) {
         'Content-Type': 'application/json',
         Accept: stream ? 'text/event-stream' : 'application/json'
       },
-      body: requestBody
+      body: requestBody,
+      signal
     })
 
     if (response.ok || !isPathFallbackStatus(response.status)) break
@@ -282,19 +275,19 @@ async function callImageGeneration(job: ImageJob, stream: boolean) {
   } satisfies ImageGenerationResponse
 }
 
-async function requestImageGeneration(job: ImageJob) {
+async function requestImageGeneration(job: ImageJob, signal: AbortSignal) {
   try {
-    return await callImageGeneration(job, true)
+    return await callImageGeneration(job, true, signal)
   } catch (error) {
     if (!shouldFallbackToNonStreaming(error)) {
       throw error
     }
 
-    return callImageGeneration(job, false)
+    return callImageGeneration(job, false, signal)
   }
 }
 
-async function callImageEdit(job: ImageJob) {
+async function callImageEdit(job: ImageJob, signal: AbortSignal) {
   if (!job.images?.length) {
     throw new Error('Image file is required')
   }
@@ -319,7 +312,8 @@ async function callImageEdit(job: ImageJob) {
       headers: {
         Authorization: `Bearer ${job.apiKey}`
       },
-      body: upstreamForm
+      body: upstreamForm,
+      signal
     })
 
     if (response.ok || !isPathFallbackStatus(response.status)) break
@@ -348,10 +342,10 @@ async function callImageEdit(job: ImageJob) {
   } satisfies ImageGenerationResponse
 }
 
-async function requestImageJob(job: ImageJob) {
-  if (job.kind === 'edit') return callImageEdit(job)
+async function requestImageJob(job: ImageJob, signal: AbortSignal) {
+  if (job.kind === 'edit') return callImageEdit(job, signal)
 
-  return requestImageGeneration(job)
+  return requestImageGeneration(job, signal)
 }
 
 export function cleanupImageJobs() {
@@ -408,7 +402,13 @@ export async function runImageJob(id: string) {
   job.startedAt = new Date().toISOString()
 
   try {
-    const result = await requestImageJob(job)
+    const timeoutMessage = job.kind === 'edit'
+      ? 'API 图片编辑超时，建议降低分辨率或稍后重试'
+      : 'API 图片生成超时，建议降低分辨率或稍后重试'
+    const result = await withImageRequestTimeout(
+      signal => requestImageJob(job, signal),
+      timeoutMessage
+    )
     const image = result.data?.[0]
     if (!image?.b64_json && !image?.url) {
       throw new Error('图片接口未返回图片数据')
@@ -425,6 +425,5 @@ export async function runImageJob(id: string) {
     job.errorStatus = requestError.status
     job.images = undefined
     job.error = requestError.message
-    job.error = error instanceof Error ? error.message : '图片生成失败'
   }
 }
