@@ -1752,6 +1752,23 @@ async function retryImageTask(task: ImageTask) {
           class="warm-divider border-t p-3 sm:p-4"
           @submit.prevent="submitImageTask"
         >
+          <div class="mb-3 flex flex-wrap justify-center gap-2">
+            <button
+              v-for="preset in imagePromptPresets"
+              :key="preset.label"
+              type="button"
+              class="warm-pill inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold"
+              @click="useImagePromptPreset(preset.prompt)"
+            >
+              <UIcon
+                :name="preset.icon"
+                class="size-3.5"
+                :class="preset.color"
+              />
+              {{ preset.label }}
+            </button>
+          </div>
+
           <div
             class="warm-input relative p-4"
             :class="isDraggingImages ? 'ring-2 ring-[var(--warm-accent)]/35' : ''"
@@ -1965,22 +1982,6 @@ async function retryImageTask(task: ImageTask) {
             </div>
           </div>
 
-          <div class="mt-3 flex flex-wrap justify-center gap-2">
-            <button
-              v-for="preset in imagePromptPresets"
-              :key="preset.label"
-              type="button"
-              class="warm-pill inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold"
-              @click="useImagePromptPreset(preset.prompt)"
-            >
-              <UIcon
-                :name="preset.icon"
-                class="size-3.5"
-                :class="preset.color"
-              />
-              {{ preset.label }}
-            </button>
-          </div>
         </form>
       </section>
     </div>
