@@ -54,6 +54,7 @@ function getFileParts(parts: UIMessage['parts']) {
           :text="part.text"
           :streaming="isPartStreaming(part)"
           chevron="leading"
+          :auto-close-delay="0"
         >
           <ChatComark
             :markdown="part.text"

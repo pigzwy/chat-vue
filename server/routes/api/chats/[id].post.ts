@@ -17,26 +17,34 @@ import { reasoningEffortValues } from '../../../../shared/utils/reasoning'
 import type { ReasoningEffort } from '../../../../shared/utils/reasoning'
 import { createSub2apiChatModel } from '../../../utils/sub2api'
 
+function isAnthropicModel(model: string) {
+  return model.startsWith('anthropic/') || model.startsWith('claude') || model.includes('claude')
+}
+
+function isOpenAIModel(model: string) {
+  return model.startsWith('openai/') || model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4') || model.includes('gpt')
+}
+
 function buildProviderOptions(model: string, usesSub2api: boolean, reasoningEffort: ReasoningEffort) {
   if (reasoningEffort === 'auto') return undefined
 
-  if (usesSub2api || model.startsWith('openai/')) {
+  if (isAnthropicModel(model)) {
+    return {
+      providerOptions: {
+        anthropic: {
+          effort: reasoningEffort
+        } satisfies AnthropicLanguageModelOptions
+      }
+    }
+  }
+
+  if (isOpenAIModel(model) || usesSub2api) {
     return {
       providerOptions: {
         openai: {
           reasoningEffort,
           reasoningSummary: 'detailed'
         } satisfies OpenAILanguageModelResponsesOptions
-      }
-    }
-  }
-
-  if (model.startsWith('anthropic/')) {
-    return {
-      providerOptions: {
-        anthropic: {
-          effort: reasoningEffort
-        } satisfies AnthropicLanguageModelOptions
       }
     }
   }
