@@ -138,7 +138,7 @@ const quickChats = [
         <UChatPrompt
           v-model="input"
           :status="loading ? 'streaming' : 'ready'"
-          class="warm-input mx-auto w-full max-w-3xl [view-transition-name:chat-prompt]"
+          class="warm-input mx-auto w-full max-w-3xl animate-fadeIn [view-transition-name:chat-prompt]"
           variant="subtle"
           :ui="{ base: 'px-3 py-2', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
           @submit="onSubmit"
