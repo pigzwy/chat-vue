@@ -140,7 +140,7 @@ const quickChats = [
             <span class="hero-text-gradient">，一起创造</span>
           </h1>
           <p class="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted sm:text-base">
-            像 HeroUI 一样轻盈、聚焦、响应迅速。输入问题，开始一段更顺滑的 AI 对话。
+            输入问题、上传资料，或从下方选择一个常用场景开始。
           </p>
         </div>
 

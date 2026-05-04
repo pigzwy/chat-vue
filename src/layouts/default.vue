@@ -185,10 +185,6 @@ defineShortcuts({
           </template>
         </UNavigationMenu>
       </template>
-
-      <template #footer="{ collapsed }">
-        <UserMenu :collapsed="collapsed" />
-      </template>
     </UDashboardSidebar>
 
     <UDashboardSearch
