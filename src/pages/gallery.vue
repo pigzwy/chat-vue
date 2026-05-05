@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { galleryCases, galleryMeta, type GalleryCase } from '../data/galleryCases'
 
 const toast = useToast()
+const featuredRotateInterval = 5000
 const search = ref('')
 const activeCategory = ref('全部')
 const activeSource = ref('全部来源')
 const selectedCase = ref<GalleryCase | null>(null)
 const failedImageIds = ref<string[]>([])
+const featuredCaseIndex = ref(0)
+let featuredRotateTimer: ReturnType<typeof setInterval> | undefined
 
 interface GalleryCaseSection {
   title: string
@@ -42,7 +45,7 @@ const filteredCases = computed(() => {
     return matchesCategory && matchesSource && matchesKeyword
   })
 })
-const featuredCase = computed(() => filteredCases.value[0] || galleryCases[0])
+const featuredCase = computed(() => filteredCases.value[featuredCaseIndex.value] || filteredCases.value[0] || galleryCases[0])
 
 const filteredCaseSections = computed<GalleryCaseSection[]>(() => {
   const groups = new Map<string, GalleryCase[]>()
@@ -55,6 +58,24 @@ const filteredCaseSections = computed<GalleryCaseSection[]>(() => {
 
   return [...groups.entries()].map(([title, cases]) => ({ title, cases }))
 })
+
+function getRandomFeaturedIndex(total: number) {
+  if (total <= 1) return 0
+
+  let nextIndex = Math.floor(Math.random() * total)
+  if (nextIndex === featuredCaseIndex.value) {
+    nextIndex = (nextIndex + 1) % total
+  }
+  return nextIndex
+}
+
+function rotateFeaturedCase() {
+  featuredCaseIndex.value = getRandomFeaturedIndex(filteredCases.value.length)
+}
+
+function startFeaturedRotation() {
+  featuredRotateTimer = setInterval(rotateFeaturedCase, featuredRotateInterval)
+}
 
 function openCase(item: GalleryCase) {
   selectedCase.value = item
@@ -84,6 +105,18 @@ async function copyPrompt(text: string) {
     icon: 'i-lucide-copy'
   })
 }
+
+watch(filteredCases, (cases) => {
+  featuredCaseIndex.value = getRandomFeaturedIndex(cases.length)
+})
+
+startFeaturedRotation()
+
+onBeforeUnmount(() => {
+  if (featuredRotateTimer) {
+    clearInterval(featuredRotateTimer)
+  }
+})
 </script>
 
 <template>
@@ -112,10 +145,10 @@ async function copyPrompt(text: string) {
               class="warm-btn rounded-full px-5 font-semibold"
             />
             <UButton
-              href="https://gpt.ominiapi.top/gallery/"
+              href="https://github.com/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts"
               target="_blank"
               icon="i-lucide-external-link"
-              label="参考来源"
+              label="原始仓库"
               color="neutral"
               variant="outline"
               class="warm-pill rounded-full px-5 font-semibold"
