@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
           class="hero-panel group overflow-hidden p-3 text-left"
           @click="openCase(featuredCase)"
         >
-          <div class="relative aspect-video overflow-hidden rounded-[1.25rem] bg-[var(--warm-surface-hover)]">
+          <div class="relative aspect-[3/4] overflow-hidden rounded-[1.25rem] bg-[var(--warm-surface-hover)]">
             <img
               :src="getImageUrl(featuredCase)"
               :alt="featuredCase.title"
@@ -289,7 +289,7 @@ onBeforeUnmount(() => {
               <div class="flex w-full flex-col">
                 <button
                   type="button"
-                  class="group relative aspect-video shrink-0 overflow-hidden bg-[var(--warm-surface-hover)] text-left"
+                  class="group relative aspect-[3/4] shrink-0 overflow-hidden bg-[var(--warm-surface-hover)] text-left"
                   @click="openCase(item)"
                 >
                   <img
