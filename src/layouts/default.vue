@@ -15,6 +15,8 @@ await fetchChats()
 
 const open = ref(false)
 const isImagesRoute = computed(() => route.path.startsWith('/images'))
+const isImageGalleryRoute = computed(() => route.path.startsWith('/gallery'))
+const isCreationRoute = computed(() => isImagesRoute.value || isImageGalleryRoute.value)
 
 const deleteModal = overlay.create(ModalConfirm, {
   props: {
@@ -90,8 +92,8 @@ defineShortcuts({
           color="neutral"
           variant="ghost"
           class="h-8 rounded-full px-3.5 font-semibold transition-transform hover:-translate-y-0.5"
-          :class="!isImagesRoute ? 'warm-btn' : ''"
-          :style="!isImagesRoute ? 'border:none;box-shadow:none' : ''"
+          :class="!isCreationRoute ? 'warm-btn' : ''"
+          :style="!isCreationRoute ? 'border:none;box-shadow:none' : ''"
         />
         <UButton
           to="/images"
@@ -101,8 +103,19 @@ defineShortcuts({
           color="neutral"
           variant="ghost"
           class="h-8 rounded-full px-3.5 font-semibold transition-transform hover:-translate-y-0.5"
-          :class="isImagesRoute ? 'warm-btn' : ''"
-          :style="isImagesRoute ? 'border:none;box-shadow:none' : ''"
+          :class="isImagesRoute && !isImageGalleryRoute ? 'warm-btn' : ''"
+          :style="isImagesRoute && !isImageGalleryRoute ? 'border:none;box-shadow:none' : ''"
+        />
+        <UButton
+          to="/gallery"
+          label="案例"
+          icon="i-lucide-images"
+          size="sm"
+          color="neutral"
+          variant="ghost"
+          class="h-8 rounded-full px-3.5 font-semibold transition-transform hover:-translate-y-0.5"
+          :class="isImageGalleryRoute ? 'warm-btn' : ''"
+          :style="isImageGalleryRoute ? 'border:none;box-shadow:none' : ''"
         />
       </div>
     </div>
@@ -116,7 +129,7 @@ defineShortcuts({
     </div>
 
       <UDashboardSidebar
-      v-if="!isImagesRoute"
+      v-if="!isCreationRoute"
       id="default"
       v-model:open="open"
       :min-size="12"
@@ -188,7 +201,7 @@ defineShortcuts({
     </UDashboardSidebar>
 
     <UDashboardSearch
-      v-if="!isImagesRoute"
+      v-if="!isCreationRoute"
       placeholder="Search chats..."
       :groups="[{
         id: 'links',
@@ -202,7 +215,7 @@ defineShortcuts({
 
     <div
       class="flex-1 flex min-w-0 overflow-hidden"
-      :class="isImagesRoute ? 'mt-18' : 'warm-card hero-shell mx-4 mb-4 mt-18 lg:ml-0'"
+      :class="isCreationRoute ? 'mt-18' : 'warm-card hero-shell mx-4 mb-4 mt-18 lg:ml-0'"
     >
       <RouterView :key="route.path" />
     </div>

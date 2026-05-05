@@ -41,6 +41,13 @@ declare module 'vue-router/auto-routes' {
       { id: ParamValue<false> },
       | never
     >,
+    '/gallery': RouteRecordInfo<
+      '/gallery',
+      '/gallery',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/images': RouteRecordInfo<
       '/images',
       '/images',
@@ -70,6 +77,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/chat/[id].vue': {
       routes:
         | '/chat/[id]'
+      views:
+        | never
+    }
+    'src/pages/gallery.vue': {
+      routes:
+        | '/gallery'
       views:
         | never
     }
