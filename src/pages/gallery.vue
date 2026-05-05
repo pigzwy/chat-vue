@@ -1,103 +1,40 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-
-interface GalleryCase {
-  id: string
-  title: string
-  category: string
-  author: string
-  imageUrl: string
-  prompt: string
-  ratio: string
-  tags: string[]
-}
+import { galleryCases, galleryMeta, type GalleryCase } from '../data/galleryCases'
 
 const toast = useToast()
 const search = ref('')
 const activeCategory = ref('全部')
+const activeSource = ref('全部来源')
 const selectedCase = ref<GalleryCase | null>(null)
-
-const galleryCases: GalleryCase[] = [
-  {
-    id: 'neon-portrait',
-    title: '便利店霓虹人像',
-    category: '人像摄影',
-    author: '@BubbleBrain',
-    imageUrl: 'https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-prompts@main/images/portrait_case1/output.jpg',
-    prompt: '35mm film photography with harsh convenience store fluorescent lighting mixed with colorful neon signs from outside, authentic film grain, high contrast, cinematic street editorial style, late-night convenience store atmosphere, realistic reflections, natural skin texture, no watermark, no text',
-    ratio: '4:5',
-    tags: ['35mm', '霓虹', '电影感']
-  },
-  {
-    id: 'minimal-cinematic',
-    title: '电影感极简人像',
-    category: '人像摄影',
-    author: '@iam_miharbi',
-    imageUrl: 'https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-prompts@main/images/portrait_case2/output.jpg',
-    prompt: 'Generate a cinematic minimal portrait of a solitary man standing in an intense orange to red gradient environment, strong silhouette lighting, deep shadow contrast, reflective glossy floor, symmetrical composition, minimal',
-    ratio: '4:5',
-    tags: ['极简', '轮廓光', '渐变']
-  },
-  {
-    id: 'onsen-portrait',
-    title: '日式温泉旅馆人像',
-    category: '人像摄影',
-    author: '@BubbleBrain',
-    imageUrl: 'https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-prompts@main/images/portrait_case3/output.jpg',
-    prompt: '35mm film photography, warm vintage Japanese onsen ryokan aesthetic, soft ambient wooden lantern lighting, gentle natural window light, subtle film grain, warm tones, traditional wooden interior, paper sliding doors, authentic Japanese onsen ryokan atmosphere',
-    ratio: '4:5',
-    tags: ['日式', '温泉', '胶片']
-  },
-  {
-    id: 'spring-poster',
-    title: '2026 波士顿春季城市海报',
-    category: '海报插画',
-    author: '@BubbleBrain',
-    imageUrl: 'https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-prompts@main/images/poster_case1/output.jpg',
-    prompt: 'A refined 2026 Boston spring city poster, editorial travel illustration, fresh spring palette, elegant typography layout, landmark composition, premium magazine cover feeling, clean details, poster design',
-    ratio: '2:3',
-    tags: ['城市海报', '旅行', '春季']
-  },
-  {
-    id: 'persona-card',
-    title: 'Persona5 角色设定卡',
-    category: '角色设计',
-    author: '@iamrednightS',
-    imageUrl: 'https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-prompts@main/images/character_case2/output.jpg',
-    prompt: 'Persona 5 style character design sheet, bold red black white graphic layout, full body character, expressions, dynamic poses, anime key art, stylish UI panels, high contrast, clean character concept presentation',
-    ratio: '16:9',
-    tags: ['角色设定', '动漫', '设定表']
-  },
-  {
-    id: 'ui-design',
-    title: '单一提示词生成 UI 设计',
-    category: 'UI 截图',
-    author: '@austinit',
-    imageUrl: 'https://cdn.jsdelivr.net/gh/EvoLinkAI/awesome-gpt-image-2-prompts@main/images/ui_case1/output.jpg',
-    prompt: 'Create a polished modern app UI design from one prompt, clean dashboard layout, soft gradients, glass cards, thoughtful spacing, production-ready visual design, realistic interface screenshot',
-    ratio: '16:9',
-    tags: ['UI', 'Dashboard', '界面']
-  }
-]
+const failedImageIds = ref<string[]>([])
 
 const categories = computed(() => {
   const values = new Set(galleryCases.map(item => item.category))
   return ['全部', ...values]
 })
 
+const sources = computed(() => {
+  const values = new Set(galleryCases.map(item => item.sourceLabel).filter(Boolean))
+  return ['全部来源', ...values]
+})
+
 const filteredCases = computed(() => {
   const keyword = search.value.trim().toLowerCase()
   return galleryCases.filter((item) => {
     const matchesCategory = activeCategory.value === '全部' || item.category === activeCategory.value
+    const matchesSource = activeSource.value === '全部来源' || item.sourceLabel === activeSource.value
     const matchesKeyword = !keyword || [
       item.title,
       item.category,
       item.author,
       item.prompt,
+      item.sourceLabel,
+      item.searchIndex,
       ...item.tags
     ].join(' ').toLowerCase().includes(keyword)
 
-    return matchesCategory && matchesKeyword
+    return matchesCategory && matchesSource && matchesKeyword
   })
 })
 const featuredCase = computed(() => filteredCases.value[0] || galleryCases[0])
@@ -108,6 +45,18 @@ function openCase(item: GalleryCase) {
 
 function closeCase() {
   selectedCase.value = null
+}
+
+function getImageUrl(item: GalleryCase) {
+  return failedImageIds.value.includes(item.id) && item.fallbackImageUrl
+    ? item.fallbackImageUrl
+    : item.imageUrl || item.fallbackImageUrl
+}
+
+function onImageError(item: GalleryCase) {
+  if (!failedImageIds.value.includes(item.id) && item.fallbackImageUrl && item.fallbackImageUrl !== item.imageUrl) {
+    failedImageIds.value = [...failedImageIds.value, item.id]
+  }
 }
 
 async function copyPrompt(text: string) {
@@ -159,26 +108,26 @@ async function copyPrompt(text: string) {
           <div class="mt-9 grid gap-3 sm:grid-cols-3">
             <div class="warm-card rounded-3xl p-4">
               <p class="text-2xl font-black text-highlighted">
-                {{ galleryCases.length }}
+                {{ galleryMeta.totalCases }}
               </p>
               <p class="mt-1 text-sm text-muted">
-                精选案例
+                完整案例
               </p>
             </div>
             <div class="warm-card rounded-3xl p-4">
               <p class="text-2xl font-black text-highlighted">
-                {{ categories.length - 1 }}
+                {{ galleryMeta.sectionCount }}
               </p>
               <p class="mt-1 text-sm text-muted">
-                创作分类
+                原站分区
               </p>
             </div>
             <div class="warm-card rounded-3xl p-4">
               <p class="text-2xl font-black text-highlighted">
-                Prompt
+                {{ galleryMeta.dataVersion }}
               </p>
               <p class="mt-1 text-sm text-muted">
-                一键复制
+                数据版本
               </p>
             </div>
           </div>
@@ -192,9 +141,10 @@ async function copyPrompt(text: string) {
         >
           <div class="relative h-full min-h-[396px] overflow-hidden rounded-[1.25rem]">
             <img
-              :src="featuredCase.imageUrl"
+              :src="getImageUrl(featuredCase)"
               :alt="featuredCase.title"
               class="size-full object-cover transition duration-500 group-hover:scale-105"
+              @error="onImageError(featuredCase)"
             >
             <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-6 text-white">
               <UBadge
@@ -221,7 +171,7 @@ async function copyPrompt(text: string) {
               浏览案例
             </h2>
             <p class="mt-1 text-sm text-muted">
-              按分类筛选，或搜索标题、作者、标签和 Prompt。
+              按分类和来源筛选，或搜索标题、作者、标签和 Prompt。
             </p>
           </div>
           <UInput
@@ -245,6 +195,19 @@ async function copyPrompt(text: string) {
             {{ category }}
           </button>
         </div>
+
+        <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
+          <button
+            v-for="source in sources"
+            :key="source"
+            type="button"
+            class="warm-pill shrink-0 px-4 py-2 text-sm font-semibold"
+            :class="activeSource === source ? 'warm-btn' : ''"
+            @click="activeSource = source"
+          >
+            {{ source }}
+          </button>
+        </div>
       </section>
 
       <section
@@ -263,12 +226,13 @@ async function copyPrompt(text: string) {
               @click="openCase(item)"
             >
               <img
-                :src="item.imageUrl"
+                :src="getImageUrl(item)"
                 :alt="item.title"
                 class="size-full object-cover transition duration-500 group-hover:scale-105"
+                @error="onImageError(item)"
               >
               <div class="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur">
-                {{ item.ratio }}
+                {{ item.sourceLabel || item.imageCount + ' 张' }}
               </div>
             </button>
 
@@ -352,9 +316,10 @@ async function copyPrompt(text: string) {
       <div class="hero-panel grid max-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-[2rem] lg:grid-cols-[0.95fr_0.85fr]">
         <div class="min-h-0 bg-black">
           <img
-            :src="selectedCase.imageUrl"
+            :src="getImageUrl(selectedCase)"
             :alt="selectedCase.title"
             class="max-h-[45vh] w-full object-contain lg:h-full lg:max-h-[calc(100vh-2rem)]"
+            @error="onImageError(selectedCase)"
           >
         </div>
         <div class="flex min-h-0 flex-col p-5 sm:p-6">
@@ -370,7 +335,7 @@ async function copyPrompt(text: string) {
                 {{ selectedCase.title }}
               </h2>
               <p class="mt-2 text-sm text-muted">
-                {{ selectedCase.author }} · {{ selectedCase.ratio }}
+                {{ selectedCase.author }} · {{ selectedCase.sourceLabel || '未标记来源' }}
               </p>
             </div>
             <UButton
@@ -385,6 +350,28 @@ async function copyPrompt(text: string) {
           </div>
 
           <div class="mt-5 flex flex-wrap gap-2">
+            <UButton
+              v-if="selectedCase.sourceUrl"
+              :href="selectedCase.sourceUrl"
+              target="_blank"
+              icon="i-lucide-external-link"
+              label="原始来源"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              class="warm-pill rounded-full"
+            />
+            <UButton
+              v-if="selectedCase.authorUrl"
+              :href="selectedCase.authorUrl"
+              target="_blank"
+              icon="i-lucide-user"
+              label="作者"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              class="warm-pill rounded-full"
+            />
             <UBadge
               v-for="tag in selectedCase.tags"
               :key="tag"
