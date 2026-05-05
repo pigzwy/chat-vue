@@ -9,6 +9,11 @@ const activeSource = ref('全部来源')
 const selectedCase = ref<GalleryCase | null>(null)
 const failedImageIds = ref<string[]>([])
 
+interface GalleryCaseSection {
+  title: string
+  cases: GalleryCase[]
+}
+
 const categories = computed(() => {
   const values = new Set(galleryCases.map(item => item.category))
   return ['全部', ...values]
@@ -38,6 +43,18 @@ const filteredCases = computed(() => {
   })
 })
 const featuredCase = computed(() => filteredCases.value[0] || galleryCases[0])
+
+const filteredCaseSections = computed<GalleryCaseSection[]>(() => {
+  const groups = new Map<string, GalleryCase[]>()
+
+  for (const item of filteredCases.value) {
+    const sectionCases = groups.get(item.category) || []
+    sectionCases.push(item)
+    groups.set(item.category, sectionCases)
+  }
+
+  return [...groups.entries()].map(([title, cases]) => ({ title, cases }))
+})
 
 function openCase(item: GalleryCase) {
   selectedCase.value = item
@@ -210,84 +227,103 @@ async function copyPrompt(text: string) {
         </div>
       </section>
 
-      <section
-        v-if="filteredCases.length"
-        class="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
-      >
-        <article
-          v-for="item in filteredCases"
-          :key="item.id"
-          class="warm-card-hover flex overflow-hidden rounded-[1.5rem] p-0"
+      <template v-if="filteredCases.length">
+        <section
+          v-for="section in filteredCaseSections"
+          :key="section.title"
+          class="hero-panel p-4 sm:p-5"
         >
-          <div class="flex w-full flex-col">
-            <button
-              type="button"
-              class="group relative aspect-[4/5] overflow-hidden text-left"
-              @click="openCase(item)"
-            >
-              <img
-                :src="getImageUrl(item)"
-                :alt="item.title"
-                class="size-full object-cover transition duration-500 group-hover:scale-105"
-                @error="onImageError(item)"
-              >
-              <div class="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur">
-                {{ item.sourceLabel || item.imageCount + ' 张' }}
-              </div>
-            </button>
-
-            <div class="flex flex-1 flex-col gap-3 p-5">
-              <div class="flex items-center justify-between gap-3">
-                <UBadge
-                  :label="item.category"
-                  color="neutral"
-                  variant="subtle"
-                  class="rounded-full"
-                />
-                <span class="text-xs text-muted">{{ item.author }}</span>
-              </div>
-              <h3 class="text-lg font-black text-highlighted">
-                {{ item.title }}
-              </h3>
-              <p class="line-clamp-3 text-sm leading-6 text-muted">
-                {{ item.prompt }}
+          <div class="mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p class="text-xs font-bold uppercase tracking-[0.2em] text-muted">
+                Gallery
               </p>
-              <div class="mt-auto flex flex-wrap gap-2">
-                <UBadge
-                  v-for="tag in item.tags"
-                  :key="tag"
-                  :label="tag"
-                  color="neutral"
-                  variant="outline"
-                  class="rounded-full"
-                />
-              </div>
-              <div class="flex flex-wrap gap-2 pt-1">
-                <UButton
-                  type="button"
-                  icon="i-lucide-eye"
-                  label="查看"
-                  color="neutral"
-                  variant="soft"
-                  size="sm"
-                  class="warm-pill rounded-full"
-                  @click="openCase(item)"
-                />
-                <UButton
-                  type="button"
-                  icon="i-lucide-copy"
-                  label="复制 Prompt"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  class="warm-pill rounded-full"
-                  @click="copyPrompt(item.prompt)"
-                />
-              </div>
+              <h2 class="mt-2 text-2xl font-black text-highlighted">
+                {{ section.title }}
+              </h2>
+            </div>
+            <div class="warm-pill shrink-0 px-4 py-2 text-sm font-semibold text-muted">
+              {{ section.cases.length }} 个案例
             </div>
           </div>
-        </article>
-      </section>
+
+          <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            <article
+              v-for="item in section.cases"
+              :key="item.id"
+              class="warm-card-hover flex overflow-hidden rounded-[1.5rem] p-0"
+            >
+              <div class="flex w-full flex-col">
+                <button
+                  type="button"
+                  class="group relative aspect-[4/5] overflow-hidden text-left"
+                  @click="openCase(item)"
+                >
+                  <img
+                    :src="getImageUrl(item)"
+                    :alt="item.title"
+                    class="size-full object-cover transition duration-500 group-hover:scale-105"
+                    @error="onImageError(item)"
+                  >
+                  <div class="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur">
+                    {{ item.sourceLabel || item.imageCount + ' 张' }}
+                  </div>
+                </button>
+
+                <div class="flex flex-1 flex-col gap-3 p-5">
+                  <div class="flex items-center justify-between gap-3">
+                    <UBadge
+                      :label="item.category"
+                      color="neutral"
+                      variant="subtle"
+                      class="rounded-full"
+                    />
+                    <span class="text-xs text-muted">{{ item.author }}</span>
+                  </div>
+                  <h3 class="text-lg font-black text-highlighted">
+                    {{ item.title }}
+                  </h3>
+                  <p class="line-clamp-3 text-sm leading-6 text-muted">
+                    {{ item.prompt }}
+                  </p>
+                  <div class="mt-auto flex flex-wrap gap-2">
+                    <UBadge
+                      v-for="tag in item.tags"
+                      :key="tag"
+                      :label="tag"
+                      color="neutral"
+                      variant="outline"
+                      class="rounded-full"
+                    />
+                  </div>
+                  <div class="flex flex-wrap gap-2 pt-1">
+                    <UButton
+                      type="button"
+                      icon="i-lucide-eye"
+                      label="查看"
+                      color="neutral"
+                      variant="soft"
+                      size="sm"
+                      class="warm-pill rounded-full"
+                      @click="openCase(item)"
+                    />
+                    <UButton
+                      type="button"
+                      icon="i-lucide-copy"
+                      label="复制 Prompt"
+                      color="neutral"
+                      variant="outline"
+                      size="sm"
+                      class="warm-pill rounded-full"
+                      @click="copyPrompt(item.prompt)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </template>
 
       <section
         v-else
