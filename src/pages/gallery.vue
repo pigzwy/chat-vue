@@ -122,7 +122,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="hero-shell min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-0 sm:px-6">
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-5">
-      <section class="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+      <section class="grid gap-5 xl:grid-cols-2">
         <div class="hero-panel p-6 sm:p-8 lg:p-10">
           <UBadge
             label="GPT-Image-2 Gallery"
@@ -186,10 +186,10 @@ onBeforeUnmount(() => {
         <button
           v-if="featuredCase"
           type="button"
-          class="hero-panel group h-[420px] overflow-hidden p-3 text-left"
+          class="hero-panel group overflow-hidden p-3 text-left"
           @click="openCase(featuredCase)"
         >
-          <div class="relative h-full overflow-hidden rounded-[1.25rem] bg-[var(--warm-surface-hover)]">
+          <div class="relative aspect-video overflow-hidden rounded-[1.25rem] bg-[var(--warm-surface-hover)]">
             <img
               :src="getImageUrl(featuredCase)"
               :alt="featuredCase.title"
@@ -284,12 +284,12 @@ onBeforeUnmount(() => {
             <article
               v-for="item in section.cases"
               :key="item.id"
-              class="warm-card-hover flex h-full min-h-[34rem] overflow-hidden rounded-[1.5rem] p-0"
+              class="warm-card-hover flex h-full overflow-hidden rounded-[1.5rem] p-0"
             >
               <div class="flex w-full flex-col">
                 <button
                   type="button"
-                  class="group relative h-80 shrink-0 overflow-hidden bg-[var(--warm-surface-hover)] text-left sm:h-96 xl:h-[26rem]"
+                  class="group relative aspect-video shrink-0 overflow-hidden bg-[var(--warm-surface-hover)] text-left"
                   @click="openCase(item)"
                 >
                   <img
@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
                   </div>
                 </button>
 
-                <div class="flex min-h-60 flex-1 flex-col gap-3 p-5">
+                <div class="flex min-h-64 flex-1 flex-col gap-3 p-5">
                   <div class="flex items-center justify-between gap-3">
                     <UBadge
                       :label="item.category"
