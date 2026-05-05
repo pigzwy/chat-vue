@@ -186,14 +186,14 @@ onBeforeUnmount(() => {
         <button
           v-if="featuredCase"
           type="button"
-          class="hero-panel group min-h-[420px] overflow-hidden p-3 text-left"
+          class="hero-panel group h-[420px] overflow-hidden p-3 text-left"
           @click="openCase(featuredCase)"
         >
-          <div class="relative h-full min-h-[396px] overflow-hidden rounded-[1.25rem]">
+          <div class="relative h-full overflow-hidden rounded-[1.25rem] bg-[var(--warm-surface-hover)]">
             <img
               :src="getImageUrl(featuredCase)"
               :alt="featuredCase.title"
-              class="size-full object-cover transition duration-500 group-hover:scale-105"
+              class="block size-full object-cover transition duration-500 group-hover:scale-105"
               @error="onImageError(featuredCase)"
             >
             <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-6 text-white">
@@ -280,22 +280,22 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div class="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
             <article
               v-for="item in section.cases"
               :key="item.id"
-              class="warm-card-hover flex overflow-hidden rounded-[1.5rem] p-0"
+              class="warm-card-hover flex h-full min-h-[34rem] overflow-hidden rounded-[1.5rem] p-0"
             >
               <div class="flex w-full flex-col">
                 <button
                   type="button"
-                  class="group relative aspect-[4/5] overflow-hidden text-left"
+                  class="group relative h-80 shrink-0 overflow-hidden bg-[var(--warm-surface-hover)] text-left sm:h-96 xl:h-[26rem]"
                   @click="openCase(item)"
                 >
                   <img
                     :src="getImageUrl(item)"
                     :alt="item.title"
-                    class="size-full object-cover transition duration-500 group-hover:scale-105"
+                    class="block size-full object-cover transition duration-500 group-hover:scale-105"
                     @error="onImageError(item)"
                   >
                   <div class="absolute bottom-3 right-3 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur">
@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
                   </div>
                 </button>
 
-                <div class="flex flex-1 flex-col gap-3 p-5">
+                <div class="flex min-h-60 flex-1 flex-col gap-3 p-5">
                   <div class="flex items-center justify-between gap-3">
                     <UBadge
                       :label="item.category"
