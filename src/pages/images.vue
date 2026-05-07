@@ -40,6 +40,8 @@ interface ImageJobResponse extends ImageGenerationResponse {
   createdAt: string
   startedAt?: string
   completedAt?: string
+  mode?: 'stream' | 'sync'
+  streamAttempts?: number
   jobError?: string
   jobErrorStatus?: number
 }
@@ -62,6 +64,8 @@ interface ImageTask {
   error?: string
   durationSeconds?: number
   jobId?: string
+  mode?: 'stream' | 'sync'
+  streamAttempts?: number
   completedAt?: Date
   createdAt: Date
 }
@@ -1130,6 +1134,8 @@ async function resumeImageGenerationTask(task: ImageTask) {
       status: 'completed',
       imageUrl,
       revisedPrompt: image.revised_prompt,
+      mode: result.mode,
+      streamAttempts: result.streamAttempts,
       durationSeconds: getDurationSeconds(task.createdAt),
       completedAt: result.completedAt ? new Date(result.completedAt) : new Date()
     })
@@ -1167,7 +1173,7 @@ async function executeImageTask(
     let apiKey = await getApiKeyForGroup(imageGroup.id, imageApiKeyName)
     const editSources = await getEditSources()
 
-    let result: ImageGenerationResponse
+    let result: ImageJobResponse
     try {
       result = editSources.length
         ? await requestImageEdit(apiKey, task, editSources)
@@ -1195,6 +1201,8 @@ async function executeImageTask(
       status: 'completed' as const,
       imageUrl,
       revisedPrompt: image.revised_prompt,
+      mode: result.mode,
+      streamAttempts: result.streamAttempts,
       durationSeconds: getDurationSeconds(task.createdAt),
       completedAt: new Date()
     })

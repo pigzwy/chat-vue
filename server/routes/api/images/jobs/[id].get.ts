@@ -19,6 +19,8 @@ export default defineHandler((event) => {
     createdAt: job.createdAt,
     startedAt: job.startedAt,
     completedAt: job.completedAt,
+    mode: job.mode,
+    streamAttempts: job.streamAttempts,
     jobError: job.error,
     jobErrorStatus: job.errorStatus,
     data: job.data

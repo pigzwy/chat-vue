@@ -52,15 +52,20 @@ export interface ImageJob extends ImageJobInput {
   errorStatus?: number
   images?: File[]
   data?: GeneratedImage[]
+  mode?: 'stream' | 'sync'
+  streamAttempts?: number
 }
 
 interface RequestError extends Error {
   status?: number
   streamStarted?: boolean
+  retryableStream?: boolean
 }
 
 const imageModel = 'gpt-image-2'
 const maxJobAgeMs = 1000 * 60 * 60
+const maxStreamAttempts = 2
+const streamRetryDelayMs = 1500
 const imageJobs = new Map<string, ImageJob>()
 
 function parseJson<T>(text: string) {
@@ -108,6 +113,39 @@ function normalizeErrorMessage(message: string) {
   }
 
   return text
+}
+
+function isStreamDisconnectMessage(message: string) {
+  const lower = message.toLowerCase()
+  return lower.includes('stream disconnected')
+    || lower.includes('before image generation completed')
+    || lower.includes('stream error')
+    || lower.includes('internal_error')
+    || lower.includes('received from peer')
+    || lower.includes('fetch failed')
+    || lower.includes('econnreset')
+    || lower.includes('etimedout')
+    || lower.includes('premature')
+    || lower.includes('terminated')
+    || lower.includes('socket')
+    || lower.includes('connection')
+    || lower.includes('aborted')
+    || lower.includes('closed')
+    || lower.includes('body')
+    || lower.includes('图片流未返回最终图片')
+}
+
+function shouldRetryStreaming(error: unknown) {
+  const requestError = error as RequestError
+  if (!requestError.streamStarted) return false
+  if (requestError.retryableStream === false) return false
+
+  const message = error instanceof Error ? error.message : ''
+  return requestError.retryableStream === true || isStreamDisconnectMessage(message)
+}
+
+function shouldFallbackAfterStreamingRetries(error: unknown) {
+  return shouldRetryStreaming(error)
 }
 
 function toRequestError(error: unknown) {
@@ -163,12 +201,29 @@ function parseStreamEvent(data: string) {
   const event = parseJson<ImageStreamEvent>(data)
   if (!event) return null
   if (event.message || event.error?.message) {
-    const error = new Error(event.error?.message || event.message) as RequestError
+    const message = event.error?.message || event.message || ''
+    const error = new Error(message) as RequestError
     error.streamStarted = true
+    error.retryableStream = isStreamDisconnectMessage(message)
     throw error
   }
 
   return event
+}
+
+function waitForStreamRetry(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'))
+      return
+    }
+
+    const timeout = setTimeout(resolve, ms)
+    signal.addEventListener('abort', () => {
+      clearTimeout(timeout)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }, { once: true })
+  })
 }
 
 async function readImageGenerationStream(response: Response) {
@@ -258,7 +313,9 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
     try {
       return await readImageGenerationStream(response)
     } catch (error) {
-      (error as RequestError).streamStarted = true
+      const requestError = error as RequestError
+      requestError.streamStarted = true
+      requestError.retryableStream ??= error instanceof Error && isStreamDisconnectMessage(error.message)
       throw error
     }
   }
@@ -276,18 +333,42 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
 }
 
 async function requestImageGeneration(job: ImageJob, signal: AbortSignal) {
-  try {
-    return await callImageGeneration(job, true, signal)
-  } catch (error) {
-    if (!shouldFallbackToNonStreaming(error)) {
-      throw error
-    }
+  let streamError: unknown
+  job.mode = undefined
+  job.streamAttempts = 0
 
+  for (let attempt = 1; attempt <= maxStreamAttempts; attempt += 1) {
+    try {
+      job.streamAttempts = attempt
+      job.mode = 'stream'
+      return await callImageGeneration(job, true, signal)
+    } catch (error) {
+      streamError = error
+      if (signal.aborted || !shouldRetryStreaming(error) || attempt === maxStreamAttempts) {
+        break
+      }
+
+      await waitForStreamRetry(streamRetryDelayMs * attempt, signal)
+    }
+  }
+
+  if (shouldFallbackToNonStreaming(streamError)) {
+    job.mode = 'sync'
     return callImageGeneration(job, false, signal)
   }
+
+  if (shouldFallbackAfterStreamingRetries(streamError)) {
+    job.mode = 'sync'
+    return callImageGeneration(job, false, signal)
+  }
+
+  throw streamError
 }
 
 async function callImageEdit(job: ImageJob, signal: AbortSignal) {
+  job.mode = 'sync'
+  job.streamAttempts = 0
+
   if (!job.images?.length) {
     throw new Error('Image file is required')
   }
