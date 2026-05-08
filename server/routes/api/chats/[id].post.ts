@@ -1,4 +1,4 @@
-import type { UIMessage } from 'ai'
+import type { TextStreamPart, ToolSet, UIMessage } from 'ai'
 import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, smoothStream, stepCountIs, streamText } from 'ai'
 import { gateway } from '@ai-sdk/gateway'
 import { z } from 'zod'
@@ -17,7 +17,25 @@ import { reasoningEffortValues } from '../../../../shared/utils/reasoning'
 import type { ReasoningEffort } from '../../../../shared/utils/reasoning'
 import { createSub2apiChatModel, isAnthropicModel, isOpenAIResponsesModel } from '../../../utils/sub2api'
 
+const THINK_OPEN_TAG = '<think>'
+const THINK_CLOSE_TAG = '</think>'
+
 type ProviderOptionsResult = { providerOptions: Record<string, any> } | undefined
+type StreamPart = TextStreamPart<ToolSet>
+type RawOpenAIChatChunk = {
+  choices?: Array<{
+    delta?: {
+      reasoning_content?: string | null
+      reasoning?: string | null
+    }
+  }>
+}
+type ThinkStreamState = {
+  isReasoning: boolean
+  textId: string
+  reasoningId: number
+  buffer: string
+}
 
 function buildProviderOptions(
   model: string,
@@ -61,6 +79,129 @@ function buildProviderOptions(
   }
 
   return undefined
+}
+
+function createNewApiReasoningTransform() {
+  return () => {
+    const state: ThinkStreamState = {
+      isReasoning: false,
+      textId: '',
+      reasoningId: 0,
+      buffer: ''
+    }
+
+    return new TransformStream<StreamPart, StreamPart>({
+      transform(chunk, controller) {
+        if (chunk.type === 'raw') {
+          enqueueRawReasoning(chunk.rawValue, controller, state.reasoningId++)
+          return
+        }
+
+        if (chunk.type === 'text-start') state.textId = chunk.id
+        if (chunk.type !== 'text-delta') {
+          flushBuffer(controller, state)
+          controller.enqueue(chunk)
+          return
+        }
+
+        state.textId = chunk.id
+        state.buffer += chunk.text
+        flushThinkBuffer(controller, state)
+      },
+      flush(controller) {
+        flushBuffer(controller, state)
+      }
+    })
+  }
+}
+
+function flushThinkBuffer(
+  controller: TransformStreamDefaultController<StreamPart>,
+  state: ThinkStreamState
+) {
+  while (state.buffer) {
+    const tag = state.isReasoning ? THINK_CLOSE_TAG : THINK_OPEN_TAG
+    const tagIndex = state.buffer.indexOf(tag)
+    const possibleTagIndex = getPartialTagIndex(state.buffer, tag)
+
+    if (tagIndex === -1) {
+      const publishEnd = possibleTagIndex ?? state.buffer.length
+      publishTextChunk(controller, state.buffer.slice(0, publishEnd), state)
+      state.buffer = state.buffer.slice(publishEnd)
+      break
+    }
+
+    publishTextChunk(controller, state.buffer.slice(0, tagIndex), state)
+    state.buffer = state.buffer.slice(tagIndex + tag.length)
+
+    if (state.isReasoning) {
+      controller.enqueue({ type: 'reasoning-end', id: getReasoningId(state.reasoningId) })
+      state.reasoningId++
+    } else {
+      controller.enqueue({ type: 'reasoning-start', id: getReasoningId(state.reasoningId) })
+    }
+    state.isReasoning = !state.isReasoning
+  }
+}
+
+function flushBuffer(
+  controller: TransformStreamDefaultController<StreamPart>,
+  state: ThinkStreamState
+) {
+  if (!state.buffer) return
+  publishTextChunk(controller, state.buffer, state)
+  state.buffer = ''
+
+  if (state.isReasoning) {
+    controller.enqueue({ type: 'reasoning-end', id: getReasoningId(state.reasoningId) })
+    state.reasoningId++
+    state.isReasoning = false
+  }
+}
+
+function publishTextChunk(
+  controller: TransformStreamDefaultController<StreamPart>,
+  text: string,
+  state: ThinkStreamState
+) {
+  if (!text) return
+
+  if (state.isReasoning) {
+    controller.enqueue({ type: 'reasoning-delta', id: getReasoningId(state.reasoningId), text })
+    return
+  }
+
+  controller.enqueue({ type: 'text-delta', id: state.textId, text })
+}
+
+function enqueueRawReasoning(
+  rawValue: unknown,
+  controller: TransformStreamDefaultController<StreamPart>,
+  reasoningId: number
+) {
+  const reasoningText = getRawReasoningText(rawValue)
+  if (!reasoningText) return
+
+  const id = `raw-reasoning-${reasoningId}`
+  controller.enqueue({ type: 'reasoning-start', id })
+  controller.enqueue({ type: 'reasoning-delta', id, text: reasoningText })
+  controller.enqueue({ type: 'reasoning-end', id })
+}
+
+function getRawReasoningText(rawValue: unknown) {
+  const value = rawValue as RawOpenAIChatChunk
+  const delta = value.choices?.[0]?.delta
+  return delta?.reasoning_content || delta?.reasoning || ''
+}
+
+function getReasoningId(index: number) {
+  return `think-reasoning-${index}`
+}
+
+function getPartialTagIndex(text: string, tag: string) {
+  for (let length = tag.length - 1; length > 0; length--) {
+    if (text.endsWith(tag.slice(0, length))) return text.length - length
+  }
 }
 
 export default defineHandler(async (event) => {
@@ -124,7 +265,8 @@ export default defineHandler(async (event) => {
         },
         ...buildProviderOptions(model, usesSub2api, reasoningEffort),
         stopWhen: stepCountIs(5),
-        experimental_transform: smoothStream()
+        includeRawChunks: usesSub2api,
+        experimental_transform: [createNewApiReasoningTransform(), smoothStream()]
       })
 
       writer.merge(result.toUIMessageStream({
