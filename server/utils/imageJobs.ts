@@ -65,6 +65,25 @@ interface RequestError extends Error {
 const imageModel = 'gpt-image-2'
 const maxJobAgeMs = 1000 * 60 * 60
 const imageJobs = new Map<string, ImageJob>()
+const imageLogPrefix = '[image-job]'
+
+function getElapsedMs(startedAt: number) {
+  return Math.round(performance.now() - startedAt)
+}
+
+function logImageJob(job: Pick<ImageJob, 'id' | 'kind' | 'mode'>, event: string, data: Record<string, unknown> = {}) {
+  console.info(imageLogPrefix, {
+    jobId: job.id,
+    kind: job.kind,
+    mode: job.mode,
+    event,
+    ...data
+  })
+}
+
+function toSafeError(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
 
 function parseJson<T>(text: string) {
   if (!text) return null
@@ -205,7 +224,7 @@ function parseStreamEvent(data: string) {
   return event
 }
 
-async function readImageGenerationStream(response: Response) {
+async function readImageGenerationStream(response: Response, job: ImageJob, startedAt: number) {
   if (!response.body) {
     throw new Error('图片流没有返回响应体')
   }
@@ -214,10 +233,16 @@ async function readImageGenerationStream(response: Response) {
   const decoder = new TextDecoder()
   let buffer = ''
   let completedImage: GeneratedImage | null = null
+  let eventCount = 0
+  let chunkCount = 0
+  let firstChunkMs: number | null = null
+  let finalImageMs: number | null = null
 
   while (true) {
     const { value, done } = await reader.read()
     if (value) {
+      chunkCount++
+      firstChunkMs ??= getElapsedMs(startedAt)
       buffer += decoder.decode(value, { stream: true })
       const blocks = buffer.split(/\r?\n\r?\n/)
       buffer = blocks.pop() || ''
@@ -226,8 +251,13 @@ async function readImageGenerationStream(response: Response) {
         const event = parseStreamEvent(extractStreamData(block))
         if (!event) continue
 
+        eventCount++
         const image = toStreamImage(event)
-        if (image) completedImage = image
+        if (image) {
+          completedImage = image
+          finalImageMs = getElapsedMs(startedAt)
+          logImageJob(job, 'stream-final-image', { elapsedMs: finalImageMs, eventCount, chunkCount })
+        }
       }
     }
 
@@ -236,7 +266,21 @@ async function readImageGenerationStream(response: Response) {
 
   const tail = parseStreamEvent(extractStreamData(buffer))
   const tailImage = tail ? toStreamImage(tail) : null
-  completedImage = tailImage || completedImage
+  if (tail) eventCount++
+  if (tailImage) {
+    completedImage = tailImage
+    finalImageMs = getElapsedMs(startedAt)
+    logImageJob(job, 'stream-final-image-tail', { elapsedMs: finalImageMs, eventCount, chunkCount })
+  }
+
+  logImageJob(job, 'stream-done', {
+    elapsedMs: getElapsedMs(startedAt),
+    firstChunkMs,
+    finalImageMs,
+    eventCount,
+    chunkCount,
+    hasCompletedImage: Boolean(completedImage)
+  })
 
   if (!completedImage) {
     throw new Error('图片流未返回最终图片')
@@ -248,6 +292,14 @@ async function readImageGenerationStream(response: Response) {
 }
 
 async function callImageGeneration(job: ImageJob, stream: boolean, signal: AbortSignal) {
+  const startedAt = performance.now()
+  logImageJob(job, stream ? 'stream-request-start' : 'sync-request-start', {
+    size: job.size,
+    quality: job.quality,
+    resolution: job.resolution,
+    ratio: job.ratio
+  })
+
   const requestBody = JSON.stringify({
     model: imageModel,
     prompt: buildImagePrompt(job.prompt, job.size, job.quality),
@@ -262,6 +314,7 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
   let response: Response | null = null
 
   for (const path of upstreamPaths) {
+    const pathStartedAt = performance.now()
     response = await fetch(`${sub2apiBaseURL()}${path}`, {
       method: 'POST',
       headers: {
@@ -271,6 +324,15 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
       },
       body: requestBody,
       signal
+    })
+
+    logImageJob(job, stream ? 'stream-response-headers' : 'sync-response-headers', {
+      path,
+      status: response.status,
+      ok: response.ok,
+      contentType: response.headers.get('Content-Type'),
+      elapsedMs: getElapsedMs(pathStartedAt),
+      totalElapsedMs: getElapsedMs(startedAt)
     })
 
     if (response.ok || !isPathFallbackStatus(response.status)) break
@@ -283,6 +345,11 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
 
   if (!response.ok) {
     const text = await response.text()
+    logImageJob(job, stream ? 'stream-response-error' : 'sync-response-error', {
+      status: response.status,
+      elapsedMs: getElapsedMs(startedAt),
+      bodyLength: text.length
+    })
     const error = new Error(toErrorMessage(text, response.status, response.statusText)) as RequestError
     error.status = response.status
     throw error
@@ -290,21 +357,35 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
 
   if (stream && response.headers.get('Content-Type')?.includes('text/event-stream')) {
     try {
-      return await readImageGenerationStream(response)
+      return await readImageGenerationStream(response, job, startedAt)
     } catch (error) {
       const requestError = error as RequestError
       requestError.streamStarted = true
       requestError.retryableStream ??= error instanceof Error && isStreamDisconnectMessage(error.message)
+      logImageJob(job, 'stream-read-error', {
+        elapsedMs: getElapsedMs(startedAt),
+        error: toSafeError(error)
+      })
       throw error
     }
   }
 
   const text = await response.text()
+  logImageJob(job, stream ? 'stream-json-body-read' : 'sync-json-body-read', {
+    elapsedMs: getElapsedMs(startedAt),
+    bodyLength: text.length
+  })
+
   const result = parseJson<ImageGenerationResponse>(text) || {}
   const image = result.data?.[0]
   if (!image?.b64_json && !image?.url) {
     throw new Error('Image API did not return image data')
   }
+
+  logImageJob(job, stream ? 'stream-request-complete' : 'sync-request-complete', {
+    elapsedMs: getElapsedMs(startedAt),
+    hasImage: true
+  })
 
   return {
     data: result.data
@@ -319,22 +400,35 @@ async function requestImageGeneration(job: ImageJob, signal: AbortSignal) {
   try {
     return await callImageGeneration(job, true, signal)
   } catch (error) {
+    logImageJob(job, 'stream-request-failed', { error: toSafeError(error) })
     if (signal.aborted) {
       throw error
     }
 
-    if (!shouldFallbackToNonStreaming(error) && !shouldRetryStreaming(error)) {
+    const fallbackToSync = shouldFallbackToNonStreaming(error) || shouldRetryStreaming(error)
+    logImageJob(job, 'stream-fallback-check', { fallbackToSync })
+    if (!fallbackToSync) {
       throw error
     }
 
     job.mode = 'sync'
+    logImageJob(job, 'sync-fallback-start')
     return callImageGeneration(job, false, signal)
   }
 }
 
 async function callImageEdit(job: ImageJob, signal: AbortSignal) {
+  const startedAt = performance.now()
   job.mode = 'sync'
   job.streamAttempts = 0
+
+  logImageJob(job, 'edit-request-start', {
+    imageCount: job.images?.length || 0,
+    size: job.size,
+    quality: job.quality,
+    resolution: job.resolution,
+    ratio: job.ratio
+  })
 
   if (!job.images?.length) {
     throw new Error('Image file is required')
@@ -355,6 +449,7 @@ async function callImageEdit(job: ImageJob, signal: AbortSignal) {
   let response: Response | null = null
 
   for (const path of upstreamPaths) {
+    const pathStartedAt = performance.now()
     response = await fetch(`${sub2apiBaseURL()}${path}`, {
       method: 'POST',
       headers: {
@@ -362,6 +457,15 @@ async function callImageEdit(job: ImageJob, signal: AbortSignal) {
       },
       body: upstreamForm,
       signal
+    })
+
+    logImageJob(job, 'edit-response-headers', {
+      path,
+      status: response.status,
+      ok: response.ok,
+      contentType: response.headers.get('Content-Type'),
+      elapsedMs: getElapsedMs(pathStartedAt),
+      totalElapsedMs: getElapsedMs(startedAt)
     })
 
     if (response.ok || !isPathFallbackStatus(response.status)) break
@@ -373,6 +477,11 @@ async function callImageEdit(job: ImageJob, signal: AbortSignal) {
   }
 
   const text = await response.text()
+  logImageJob(job, 'edit-json-body-read', {
+    elapsedMs: getElapsedMs(startedAt),
+    bodyLength: text.length
+  })
+
   if (!response.ok) {
     const error = new Error(toErrorMessage(text, response.status, response.statusText)) as RequestError
     error.status = response.status
@@ -384,6 +493,11 @@ async function callImageEdit(job: ImageJob, signal: AbortSignal) {
   if (!image?.b64_json && !image?.url) {
     throw new Error('Image API did not return image data')
   }
+
+  logImageJob(job, 'edit-request-complete', {
+    elapsedMs: getElapsedMs(startedAt),
+    hasImage: true
+  })
 
   return {
     data: result.data
@@ -417,6 +531,13 @@ export function createImageJob(input: ImageJobInput) {
   }
   imageJobs.set(job.id, job)
 
+  logImageJob(job, 'job-created', {
+    size: job.size,
+    quality: job.quality,
+    resolution: job.resolution,
+    ratio: job.ratio
+  })
+
   void runImageJob(job.id)
   return job
 }
@@ -433,6 +554,14 @@ export function createImageEditJob(input: ImageEditJobInput) {
   }
   imageJobs.set(job.id, job)
 
+  logImageJob(job, 'job-created', {
+    imageCount: job.images.length,
+    size: job.size,
+    quality: job.quality,
+    resolution: job.resolution,
+    ratio: job.ratio
+  })
+
   void runImageJob(job.id)
   return job
 }
@@ -446,8 +575,10 @@ export async function runImageJob(id: string) {
   const job = imageJobs.get(id)
   if (!job || job.status !== 'queued') return
 
+  const startedAt = performance.now()
   job.status = 'running'
   job.startedAt = new Date().toISOString()
+  logImageJob(job, 'job-started')
 
   try {
     const timeoutMessage = job.kind === 'edit'
@@ -466,6 +597,10 @@ export async function runImageJob(id: string) {
     job.completedAt = new Date().toISOString()
     job.data = result.data
     job.images = undefined
+    logImageJob(job, 'job-completed', {
+      elapsedMs: getElapsedMs(startedAt),
+      completedAt: job.completedAt
+    })
   } catch (error) {
     const requestError = toRequestError(error) as RequestError
     job.status = 'error'
@@ -473,5 +608,10 @@ export async function runImageJob(id: string) {
     job.errorStatus = requestError.status
     job.images = undefined
     job.error = requestError.message
+    logImageJob(job, 'job-error', {
+      elapsedMs: getElapsedMs(startedAt),
+      errorStatus: job.errorStatus,
+      error: job.error
+    })
   }
 }
