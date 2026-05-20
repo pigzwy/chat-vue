@@ -167,23 +167,25 @@ function isPathFallbackStatus(status: number) {
   return status === 404 || status === 405
 }
 
-function shouldFallbackToStreaming(error: unknown) {
+function isRecoverableImageError(error: unknown) {
   const requestError = error as RequestError
-  if (requestError.streamStarted) return false
-
   const status = requestError.status
-  if (status && ![408, 500, 502, 503, 504, 524].includes(status)) return false
+  if (status) return [408, 500, 502, 503, 504, 524].includes(status)
 
   const message = error instanceof Error ? error.message.toLowerCase() : ''
-  return !status
-    || message.includes('timeout')
+  return message.includes('timeout')
     || message.includes('超时')
     || message.includes('temporarily unavailable')
     || message.includes('暂时不可用')
+    || message.includes('upstream request failed')
     || message.includes('did not return image data')
     || message.includes('no output data')
     || message.includes('未返回图片数据')
     || isStreamDisconnectMessage(message)
+}
+
+function shouldFallbackFromStreamToSync(error: unknown) {
+  return isRecoverableImageError(error)
 }
 
 function extractStreamData(block: string) {
@@ -399,20 +401,19 @@ async function requestImageGeneration(job: ImageJob, signal: AbortSignal) {
     return callImageGeneration(job, job.stream, signal)
   }
 
-  job.mode = 'sync'
-  job.streamAttempts = 0
+  job.mode = 'stream'
+  job.streamAttempts = 1
   try {
-    return await callImageGeneration(job, false, signal)
+    return await callImageGeneration(job, true, signal)
   } catch (error) {
-    logImageJob(job, 'sync-request-failed', { error: toSafeError(error) })
-    if (signal.aborted || !shouldFallbackToStreaming(error)) {
+    logImageJob(job, 'stream-request-failed', { error: toSafeError(error) })
+    if (signal.aborted || !shouldFallbackFromStreamToSync(error)) {
       throw error
     }
 
-    job.mode = 'stream'
-    job.streamAttempts = 1
-    logImageJob(job, 'stream-fallback-start')
-    return callImageGeneration(job, true, signal)
+    job.mode = 'sync'
+    logImageJob(job, 'sync-fallback-start')
+    return callImageGeneration(job, false, signal)
   }
 }
 
@@ -529,15 +530,15 @@ async function requestImageEditJob(job: ImageJob, signal: AbortSignal) {
   }
 
   try {
-    return await callImageEdit(job, false, signal)
+    return await callImageEdit(job, true, signal)
   } catch (error) {
-    logImageJob(job, 'edit-sync-request-failed', { error: toSafeError(error) })
-    if (signal.aborted || !shouldFallbackToStreaming(error)) {
+    logImageJob(job, 'edit-stream-request-failed', { error: toSafeError(error) })
+    if (signal.aborted || !shouldFallbackFromStreamToSync(error)) {
       throw error
     }
 
-    logImageJob(job, 'edit-stream-fallback-start')
-    return callImageEdit(job, true, signal)
+    logImageJob(job, 'edit-sync-fallback-start')
+    return callImageEdit(job, false, signal)
   }
 }
 
