@@ -21,6 +21,7 @@ interface ImageGenerationResponse {
 }
 
 interface ImageStreamEvent extends GeneratedImage {
+  type?: string
   message?: string
   error?: {
     message?: string
@@ -35,6 +36,7 @@ export interface ImageJobInput {
   resolution: ImageResolution
   size: string
   quality: ImageQuality
+  stream?: boolean
 }
 
 export interface ImageEditJobInput extends ImageJobInput {
@@ -152,15 +154,6 @@ function isStreamDisconnectMessage(message: string) {
     || lower.includes('图片流未返回最终图片')
 }
 
-function shouldRetryStreaming(error: unknown) {
-  const requestError = error as RequestError
-  if (!requestError.streamStarted) return false
-  if (requestError.retryableStream === false) return false
-
-  const message = error instanceof Error ? error.message : ''
-  return requestError.retryableStream === true || isStreamDisconnectMessage(message)
-}
-
 function toRequestError(error: unknown) {
   if (error instanceof Error) {
     error.message = normalizeErrorMessage(error.message)
@@ -174,18 +167,23 @@ function isPathFallbackStatus(status: number) {
   return status === 404 || status === 405
 }
 
-function shouldFallbackToNonStreaming(error: unknown) {
+function shouldFallbackToStreaming(error: unknown) {
   const requestError = error as RequestError
   if (requestError.streamStarted) return false
 
   const status = requestError.status
-  if (status && ![400, 404, 405, 406, 415, 422].includes(status)) return false
+  if (status && ![408, 500, 502, 503, 504, 524].includes(status)) return false
 
   const message = error instanceof Error ? error.message.toLowerCase() : ''
-  return message.includes('stream')
-    || message.includes('event-stream')
-    || message.includes('not supported')
-    || message.includes('unsupported')
+  return !status
+    || message.includes('timeout')
+    || message.includes('超时')
+    || message.includes('temporarily unavailable')
+    || message.includes('暂时不可用')
+    || message.includes('did not return image data')
+    || message.includes('no output data')
+    || message.includes('未返回图片数据')
+    || isStreamDisconnectMessage(message)
 }
 
 function extractStreamData(block: string) {
@@ -198,6 +196,8 @@ function extractStreamData(block: string) {
 }
 
 function toStreamImage(event: ImageStreamEvent): GeneratedImage | null {
+  if (event.type?.includes('partial_image')) return null
+
   const image = event.data?.[0] || event
   if (!image.b64_json && !image.url) return null
 
@@ -355,7 +355,7 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
     throw error
   }
 
-  if (stream && response.headers.get('Content-Type')?.includes('text/event-stream')) {
+  if (response.headers.get('Content-Type')?.includes('text/event-stream')) {
     try {
       return await readImageGenerationStream(response, job, startedAt)
     } catch (error) {
@@ -393,34 +393,33 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
 }
 
 async function requestImageGeneration(job: ImageJob, signal: AbortSignal) {
-  job.mode = undefined
-  job.streamAttempts = 1
-  job.mode = 'stream'
+  if (typeof job.stream === 'boolean') {
+    job.mode = job.stream ? 'stream' : 'sync'
+    job.streamAttempts = job.stream ? 1 : 0
+    return callImageGeneration(job, job.stream, signal)
+  }
 
+  job.mode = 'sync'
+  job.streamAttempts = 0
   try {
-    return await callImageGeneration(job, true, signal)
+    return await callImageGeneration(job, false, signal)
   } catch (error) {
-    logImageJob(job, 'stream-request-failed', { error: toSafeError(error) })
-    if (signal.aborted) {
+    logImageJob(job, 'sync-request-failed', { error: toSafeError(error) })
+    if (signal.aborted || !shouldFallbackToStreaming(error)) {
       throw error
     }
 
-    const fallbackToSync = shouldFallbackToNonStreaming(error) || shouldRetryStreaming(error)
-    logImageJob(job, 'stream-fallback-check', { fallbackToSync })
-    if (!fallbackToSync) {
-      throw error
-    }
-
-    job.mode = 'sync'
-    logImageJob(job, 'sync-fallback-start')
-    return callImageGeneration(job, false, signal)
+    job.mode = 'stream'
+    job.streamAttempts = 1
+    logImageJob(job, 'stream-fallback-start')
+    return callImageGeneration(job, true, signal)
   }
 }
 
-async function callImageEdit(job: ImageJob, signal: AbortSignal) {
+async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal) {
   const startedAt = performance.now()
-  job.mode = 'sync'
-  job.streamAttempts = 0
+  job.mode = stream ? 'stream' : 'sync'
+  job.streamAttempts = stream ? 1 : 0
 
   logImageJob(job, 'edit-request-start', {
     imageCount: job.images?.length || 0,
@@ -441,6 +440,10 @@ async function callImageEdit(job: ImageJob, signal: AbortSignal) {
   upstreamForm.set('quality', job.quality)
   upstreamForm.set('response_format', 'b64_json')
   upstreamForm.set('n', '1')
+  upstreamForm.set('stream', String(stream))
+  if (stream) {
+    upstreamForm.set('partial_images', '1')
+  }
   job.images.forEach((image) => {
     upstreamForm.append('image', image)
   })
@@ -476,17 +479,33 @@ async function callImageEdit(job: ImageJob, signal: AbortSignal) {
     throw new Error('Image edit API did not return response')
   }
 
+  if (!response.ok) {
+    const text = await response.text()
+    const error = new Error(toErrorMessage(text, response.status, response.statusText)) as RequestError
+    error.status = response.status
+    throw error
+  }
+
+  if (response.headers.get('Content-Type')?.includes('text/event-stream')) {
+    try {
+      return await readImageGenerationStream(response, job, startedAt)
+    } catch (error) {
+      const requestError = error as RequestError
+      requestError.streamStarted = true
+      requestError.retryableStream ??= error instanceof Error && isStreamDisconnectMessage(error.message)
+      logImageJob(job, 'edit-stream-read-error', {
+        elapsedMs: getElapsedMs(startedAt),
+        error: toSafeError(error)
+      })
+      throw error
+    }
+  }
+
   const text = await response.text()
   logImageJob(job, 'edit-json-body-read', {
     elapsedMs: getElapsedMs(startedAt),
     bodyLength: text.length
   })
-
-  if (!response.ok) {
-    const error = new Error(toErrorMessage(text, response.status, response.statusText)) as RequestError
-    error.status = response.status
-    throw error
-  }
 
   const result = parseJson<ImageGenerationResponse>(text) || {}
   const image = result.data?.[0]
@@ -504,8 +523,26 @@ async function callImageEdit(job: ImageJob, signal: AbortSignal) {
   } satisfies ImageGenerationResponse
 }
 
+async function requestImageEditJob(job: ImageJob, signal: AbortSignal) {
+  if (typeof job.stream === 'boolean') {
+    return callImageEdit(job, job.stream, signal)
+  }
+
+  try {
+    return await callImageEdit(job, false, signal)
+  } catch (error) {
+    logImageJob(job, 'edit-sync-request-failed', { error: toSafeError(error) })
+    if (signal.aborted || !shouldFallbackToStreaming(error)) {
+      throw error
+    }
+
+    logImageJob(job, 'edit-stream-fallback-start')
+    return callImageEdit(job, true, signal)
+  }
+}
+
 async function requestImageJob(job: ImageJob, signal: AbortSignal) {
-  if (job.kind === 'edit') return callImageEdit(job, signal)
+  if (job.kind === 'edit') return requestImageEditJob(job, signal)
 
   return requestImageGeneration(job, signal)
 }

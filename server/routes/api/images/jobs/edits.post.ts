@@ -9,6 +9,11 @@ const imageRatioSchema = z.enum(['1:1', '3:2', '16:9', '21:9', '9:16', '4:3', '3
 const imageResolutionSchema = z.enum(['1K', '2K', '4K'])
 const imageQualitySchema = z.enum(['low', 'medium', 'high'])
 
+function parseOptionalFormBoolean(value: unknown) {
+  if (typeof value !== 'string') return undefined
+  return value.toLowerCase() === 'true'
+}
+
 export default defineHandler(async (event) => {
   const form = await event.req.formData()
   const payload = z.object({
@@ -16,13 +21,15 @@ export default defineHandler(async (event) => {
     prompt: z.string().trim().min(1),
     ratio: imageRatioSchema,
     resolution: imageResolutionSchema,
-    quality: imageQualitySchema.optional()
+    quality: imageQualitySchema.optional(),
+    size: z.string().trim().min(1).optional()
   }).parse({
     apiKey: form.get('apiKey'),
     prompt: form.get('prompt'),
     ratio: form.get('ratio'),
     resolution: form.get('resolution'),
-    quality: form.get('quality')
+    quality: form.get('quality'),
+    size: form.get('size')
   })
   const images = form.getAll('image').filter((image): image is File => image instanceof File)
   if (!images.length) {
@@ -37,8 +44,9 @@ export default defineHandler(async (event) => {
     prompt: payload.prompt,
     ratio: payload.ratio,
     resolution: payload.resolution,
-    size: imageSizeMap[payload.resolution][payload.ratio],
+    size: payload.size || imageSizeMap[payload.resolution][payload.ratio],
     quality: payload.quality || defaultImageQuality,
+    stream: parseOptionalFormBoolean(form.get('stream')),
     images
   })
 

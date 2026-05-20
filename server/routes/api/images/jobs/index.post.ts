@@ -9,21 +9,23 @@ const imageResolutionSchema = z.enum(['1K', '2K', '4K'])
 const imageQualitySchema = z.enum(['low', 'medium', 'high'])
 
 export default defineHandler(async (event) => {
-  const { apiKey, prompt, ratio, resolution, quality } = await readValidatedBody(event, z.object({
+  const { apiKey, prompt, ratio, resolution, quality, size, stream } = await readValidatedBody(event, z.object({
     apiKey: z.string().min(1),
     prompt: z.string().trim().min(1),
     ratio: imageRatioSchema,
     resolution: imageResolutionSchema,
     quality: imageQualitySchema.optional(),
-    size: z.string().trim().min(1).optional()
+    size: z.string().trim().min(1).optional(),
+    stream: z.boolean().optional()
   }).parse)
   const job = createImageJob({
     apiKey,
     prompt,
     ratio,
     resolution,
-    size: imageSizeMap[resolution][ratio],
-    quality: quality || defaultImageQuality
+    size: size || imageSizeMap[resolution][ratio],
+    quality: quality || defaultImageQuality,
+    stream
   })
 
   return {
