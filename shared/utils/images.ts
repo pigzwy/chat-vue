@@ -22,9 +22,9 @@ export function getImageQualityLabel(value: ImageQuality) {
 export const imageSizeMap: Record<ImageResolution, Record<ImageRatio, string>> = {
   '1K': {
     '1:1': '1024x1024',
-    '3:2': '1620x1080',
+    '3:2': '1024x683',
     '16:9': '1024x576',
-    '21:9': '2520x1080',
+    '21:9': '1024x439',
     '9:16': '576x1024',
     '4:3': '1024x768',
     '3:4': '768x1024',

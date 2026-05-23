@@ -39,12 +39,20 @@ export default defineHandler(async (event) => {
     throw new HTTPError({ statusCode: 400, statusMessage: `Too many images. Maximum is ${imageInputLimit}` })
   }
 
+  const expectedSize = imageSizeMap[payload.resolution][payload.ratio]
+  if (payload.size && payload.size !== expectedSize) {
+    throw new HTTPError({
+      statusCode: 400,
+      statusMessage: `Invalid image size for ${payload.resolution} ${payload.ratio}. Expected ${expectedSize}`
+    })
+  }
+
   const job = createImageEditJob({
     apiKey: payload.apiKey,
     prompt: payload.prompt,
     ratio: payload.ratio,
     resolution: payload.resolution,
-    size: payload.size || imageSizeMap[payload.resolution][payload.ratio],
+    size: payload.size || expectedSize,
     quality: payload.quality || defaultImageQuality,
     stream: parseOptionalFormBoolean(form.get('stream')),
     images

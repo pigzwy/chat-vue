@@ -1,4 +1,4 @@
-import { defineHandler } from 'nitro'
+import { defineHandler, HTTPError } from 'nitro'
 import { readValidatedBody } from 'nitro/h3'
 import { z } from 'zod'
 import { createImageJob } from '../../../../utils/imageJobs'
@@ -18,12 +18,20 @@ export default defineHandler(async (event) => {
     size: z.string().trim().min(1).optional(),
     stream: z.boolean().optional()
   }).parse)
+  const expectedSize = imageSizeMap[resolution][ratio]
+  if (size && size !== expectedSize) {
+    throw new HTTPError({
+      statusCode: 400,
+      statusMessage: `Invalid image size for ${resolution} ${ratio}. Expected ${expectedSize}`
+    })
+  }
+
   const job = createImageJob({
     apiKey,
     prompt,
     ratio,
     resolution,
-    size: size || imageSizeMap[resolution][ratio],
+    size: size || expectedSize,
     quality: quality || defaultImageQuality,
     stream
   })
