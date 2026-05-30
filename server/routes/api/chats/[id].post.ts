@@ -16,9 +16,12 @@ import { MODELS } from '../../../../shared/utils/models'
 import { reasoningEffortValues } from '../../../../shared/utils/reasoning'
 import type { ReasoningEffort } from '../../../../shared/utils/reasoning'
 import { createSub2apiChatModel, isAnthropicModel, isOpenAIResponsesModel } from '../../../utils/sub2api'
+import { CHAT_SYSTEM_PROMPT } from '../../../utils/prompts'
 
 const THINK_OPEN_TAG = '<think>'
 const THINK_CLOSE_TAG = '</think>'
+// 工具调用最多串联的步数（一次对话内）。控制成本与延迟，必要时按模型/工具数调整。
+const MAX_TOOL_STEPS = 5
 
 type ProviderOptionsResult = { providerOptions: Record<string, any> } | undefined
 type StreamPart = TextStreamPart<ToolSet>
@@ -210,9 +213,13 @@ export default defineHandler(async (event) => {
   }).parse)
 
   const { apiKey, model, messages, reasoningEffort } = await readValidatedBody(event, z.object({
-    apiKey: z.string().optional(),
+    apiKey: z.string().trim().min(20).optional(),
     model: z.string().min(1),
-    messages: z.array(z.custom<UIMessage>()),
+    messages: z.array(z.object({
+      id: z.string().optional(),
+      role: z.enum(['system', 'user', 'assistant']),
+      parts: z.array(z.object({ type: z.string() }).passthrough()).min(1)
+    }).passthrough()).min(1) as unknown as z.ZodType<UIMessage[]>,
     reasoningEffort: z.enum(reasoningEffortValues).optional().default('auto')
   }).parse)
 
@@ -224,36 +231,12 @@ export default defineHandler(async (event) => {
   // SQL 聊天存储已停用：会话、标题、消息和投票都由前端 localStorage 管理。
   // 这里不再查询 chats 表，也不再把用户消息或助手回复写入 messages 表。
 
-  const abortController = new AbortController()
-  event.runtime?.node?.req?.on('close', () => abortController.abort())
-
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       const result = streamText({
-        abortSignal: abortController.signal,
+        abortSignal: event.req.signal,
         model: apiKey ? createSub2apiChatModel(apiKey, model) : gateway(model),
-        system: `You are a knowledgeable and helpful AI assistant. Your goal is to provide clear, accurate, and well-structured responses.
-
-**FORMATTING RULES (CRITICAL):**
-- ABSOLUTELY NO MARKDOWN HEADINGS: Never use #, ##, ###, ####, #####, or ######
-- NO underline-style headings with === or ---
-- Use **bold text** for emphasis and section labels instead
-- Examples:
-  * Instead of "## Usage", write "**Usage:**" or just "Here's how to use it:"
-  * Instead of "# Complete Guide", write "**Complete Guide**" or start directly with content
-- Start all responses with content, never with a heading
-
-**WEB SEARCH:**
-- You have access to a web search tool to find current, up-to-date information
-- Only use it when the user explicitly asks about recent events, real-time data, or current facts
-- Do NOT search proactively — rely on your knowledge first
-- Cite your sources when providing information from web search results
-
-**RESPONSE QUALITY:**
-- Be concise yet comprehensive
-- Use examples when helpful
-- Break down complex topics into digestible parts
-- Maintain a friendly, professional tone`,
+        system: CHAT_SYSTEM_PROMPT,
         messages: await convertToModelMessages(messages),
         tools: {
           chart: chartTool,
@@ -264,7 +247,7 @@ export default defineHandler(async (event) => {
           // ...(model.startsWith('google/') && { google_search: google.tools.googleSearch({}) })
         },
         ...buildProviderOptions(model, usesSub2api, reasoningEffort),
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(MAX_TOOL_STEPS),
         includeRawChunks: usesSub2api,
         experimental_transform: [createNewApiReasoningTransform(), smoothStream()]
       })
