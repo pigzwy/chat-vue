@@ -78,7 +78,10 @@ const chat = new Chat({
     persistMessages(messages)
   },
   onError(error) {
-    const { message } = typeof error.message === 'string' && error.message[0] === '{' ? JSON.parse(error.message) : error
+    let message = error.message
+    if (typeof message === 'string') {
+      try { message = JSON.parse(message).message ?? message } catch { /* not JSON */ }
+    }
     toast.add({
       description: message,
       icon: 'i-lucide-alert-circle',
@@ -124,20 +127,17 @@ async function handleSubmit(e?: Event) {
     if (hasAttachments.value && !validateAttachments(model.value)) return
 
     const attachmentParts = hasAttachments.value ? await toMessageParts() : []
-    if (attachmentParts.length) {
-      const request = chat.sendMessage({
+    const request = attachmentParts.length
+      ? chat.sendMessage({
         parts: [
           ...(text ? [{ type: 'text' as const, text }] : []),
           ...attachmentParts
         ]
       })
-      persistMessages()
-      void request.catch(() => persistMessages())
-    } else {
-      const request = chat.sendMessage({ text })
-      persistMessages()
-      void request.catch(() => persistMessages())
-    }
+      : chat.sendMessage({ text })
+    persistMessages()
+    void request.catch(() => persistMessages())
+
     input.value = ''
     clearAttachments()
   } catch (error) {

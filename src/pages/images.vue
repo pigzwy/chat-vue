@@ -13,6 +13,7 @@ import {
   type ImageRatio,
   type ImageResolution
 } from '../../shared/utils/images'
+import type { RequestError } from '../../shared/utils/errors'
 type ImageTaskType = 'generation' | 'edit'
 type TaskStatus = 'generating' | 'completed' | 'error'
 
@@ -28,11 +29,6 @@ interface ImageGenerationResponse {
 }
 
 type GeneratedImage = NonNullable<ImageGenerationResponse['data']>[number]
-
-interface RequestError extends Error {
-  status?: number
-  streamStarted?: boolean
-}
 
 interface ImageJobResponse extends ImageGenerationResponse {
   id: string
@@ -99,6 +95,7 @@ const imageStorageLimit = 12
 const uploadedImageLimit = 8
 const imageRequestTimeoutMs = 300000
 const imageJobPollIntervalMs = 2500
+const imageJobPollMaxMs = 10 * 60 * 1000
 const ratioItems: ImageRatio[] = ['1:1', '3:2', '16:9', '21:9', '9:16', '4:3', '3:4', 'Auto']
 const ratioOptions: Array<{ value: ImageRatio, aspect: string, auto?: boolean }> = [
   { value: '1:1', aspect: '1 / 1' },
@@ -714,9 +711,13 @@ function wait(ms: number) {
 }
 
 async function pollImageGenerationJob(jobId: string) {
+  const deadline = Date.now() + imageJobPollMaxMs
   while (true) {
     if (isUnmounted) {
       throw new Error('图片任务已暂停，请刷新后继续查看')
+    }
+    if (Date.now() > deadline) {
+      throw new Error('图片任务等待超时，请稍后重试')
     }
 
     const job = await getImageGenerationJob(jobId)

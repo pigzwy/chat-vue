@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { sub2apiBaseURL } from './sub2api'
 import { withImageRequestTimeout } from './imageUpstreamRequest'
 import { buildImagePrompt, type ImageQuality, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
+import type { RequestError } from '../../shared/utils/errors'
 
 type ImageJobStatus = 'queued' | 'running' | 'completed' | 'error'
 type ImageJobKind = 'generation' | 'edit'
@@ -56,12 +57,6 @@ export interface ImageJob extends ImageJobInput {
   data?: GeneratedImage[]
   mode?: 'stream' | 'sync'
   streamAttempts?: number
-}
-
-interface RequestError extends Error {
-  status?: number
-  streamStarted?: boolean
-  retryableStream?: boolean
 }
 
 const imageModel = 'gpt-image-2'
