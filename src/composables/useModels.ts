@@ -111,9 +111,10 @@ function toErrorMessage(error: unknown) {
 
   try {
     const parsed = JSON.parse(message)
-    return parsed.message || parsed.error?.message || message
+    const errorMessage = parsed.message || parsed.error?.message || message
+    return errorMessage === 'Token has expired' ? 'Token失效 请从主网站重新登录' : errorMessage
   } catch {
-    return message
+    return message === 'Token has expired' ? 'Token失效 请从主网站重新登录' : message
   }
 }
 
