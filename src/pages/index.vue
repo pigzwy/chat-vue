@@ -113,7 +113,7 @@ function useQuickChatPrompt(prompt: string) {
         <div class="pointer-events-none absolute left-1/2 top-16 size-52 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
 
         <div class="relative mx-auto max-w-2xl text-center">
-          <div class="glass-orb mx-auto mb-5 flex size-14 items-center justify-center rounded-3xl text-white">
+          <div class="glass-orb mx-auto mb-5 flex size-14 items-center justify-center rounded-3xl">
             <UIcon
               name="i-lucide-sparkles"
               class="size-6"

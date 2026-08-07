@@ -10,22 +10,25 @@
  * 玻璃拟态设计 token（--app-*）
  * ------------------------------------------------------------------------- */
 :root {
-  --app-bg-deep: #f2f3f8;
+  --app-bg-deep: #f3f4f7;
   --app-bg-glass: rgba(255, 255, 255, 0.72);
   --app-bg-glass-strong: rgba(255, 255, 255, 0.86);
-  --app-bg-hover: rgba(99, 102, 241, 0.06);
+  --app-bg-hover: rgba(79, 70, 229, 0.05);
 
-  --app-primary: var(--ui-color-primary-500);
-  --app-primary-subtle: rgba(99, 102, 241, 0.1);
-  --app-primary-glow: rgba(99, 102, 241, 0.28);
+  /* 强调色：indigo 沉一档（600），降饱和降噪 */
+  --app-primary: #4f46e5;
+  --app-primary-subtle: rgba(79, 70, 229, 0.08);
+
+  /* 主操作墨色：按钮用实底墨色而非彩色发光，亮暗互换 */
+  --app-ink: #191a23;
+  --app-ink-contrast: #ffffff;
 
   --app-border-subtle: rgba(20, 22, 45, 0.07);
-  --app-glass-border: color-mix(in oklab, var(--app-primary) 22%, transparent);
+  --app-glass-border: color-mix(in oklab, var(--app-primary) 20%, transparent);
 
-  --app-shadow-sm: 0 2px 8px rgba(15, 17, 35, 0.06);
-  --app-shadow-md: 0 8px 24px rgba(15, 17, 35, 0.1);
-  --app-shadow-lg: 0 16px 48px rgba(15, 17, 35, 0.14);
-  --app-shadow-glow: 0 4px 20px var(--app-primary-glow);
+  --app-shadow-sm: 0 1px 3px rgba(15, 17, 35, 0.06), 0 4px 14px rgba(15, 17, 35, 0.05);
+  --app-shadow-md: 0 8px 24px rgba(15, 17, 35, 0.09);
+  --app-shadow-lg: 0 16px 48px rgba(15, 17, 35, 0.13);
 
   --app-glass-blur: 24px;
   --app-glass-saturate: 1.2;
@@ -37,19 +40,22 @@
 }
 
 .dark {
-  --app-bg-deep: #0c0d14;
-  --app-bg-glass: rgba(22, 24, 38, 0.66);
-  --app-bg-glass-strong: rgba(23, 25, 40, 0.88);
-  --app-bg-hover: rgba(129, 140, 248, 0.08);
+  --app-bg-deep: #0b0c11;
+  --app-bg-glass: rgba(21, 23, 34, 0.66);
+  --app-bg-glass-strong: rgba(22, 24, 36, 0.88);
+  --app-bg-hover: rgba(165, 180, 252, 0.07);
 
-  --app-primary: var(--ui-color-primary-400);
-  --app-primary-subtle: rgba(129, 140, 248, 0.14);
-  --app-primary-glow: rgba(129, 140, 248, 0.35);
+  /* 暗色强调改用柔和的 indigo-300，避免霓虹感 */
+  --app-primary: #a5b4fc;
+  --app-primary-subtle: rgba(165, 180, 252, 0.11);
+
+  --app-ink: #eceef5;
+  --app-ink-contrast: #15161e;
 
   --app-border-subtle: rgba(255, 255, 255, 0.07);
-  --app-glass-border: color-mix(in oklab, var(--app-primary) 30%, transparent);
+  --app-glass-border: color-mix(in oklab, var(--app-primary) 26%, transparent);
 
-  --app-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --app-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35), 0 4px 14px rgba(0, 0, 0, 0.25);
   --app-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38);
   --app-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.46);
 }
@@ -61,6 +67,9 @@
 :root {
   --ui-radius: 0.375rem;
   --ui-container: var(--container-3xl);
+
+  /* 语义主色直接指向沉降后的强调色（覆盖 Nuxt UI 的 500/400 映射） */
+  --ui-primary: var(--app-primary);
 
   --ui-bg: var(--app-bg-deep);
   --ui-bg-muted: rgba(20, 22, 45, 0.03);
@@ -79,9 +88,11 @@
 }
 
 .dark {
+  --ui-primary: var(--app-primary);
+
   --ui-bg: var(--app-bg-deep);
   --ui-bg-muted: rgba(255, 255, 255, 0.03);
-  --ui-bg-elevated: #171928;
+  --ui-bg-elevated: #161824;
   --ui-bg-accented: rgba(255, 255, 255, 0.07);
 
   --ui-border: var(--app-border-subtle);
@@ -96,18 +107,17 @@
 }
 
 @layer base {
+  /* 背景只留一处极淡的冷紫渐晕：高级感来自克制，不来自光斑 */
   body {
     min-height: 100vh;
     background-image:
-      radial-gradient(ellipse at 18% -5%, color-mix(in oklab, var(--app-primary) 8%, transparent), transparent 55%),
-      radial-gradient(ellipse at 85% 105%, rgba(244, 114, 182, 0.05), transparent 55%);
+      radial-gradient(ellipse 90% 60% at 50% -12%, color-mix(in oklab, var(--app-primary) 5%, transparent), transparent 60%);
     background-attachment: fixed;
   }
 
   .dark body {
     background-image:
-      radial-gradient(ellipse at 18% -5%, color-mix(in oklab, var(--app-primary) 10%, transparent), transparent 55%),
-      radial-gradient(ellipse at 85% 105%, rgba(244, 114, 182, 0.06), transparent 55%);
+      radial-gradient(ellipse 90% 60% at 50% -12%, color-mix(in oklab, var(--app-primary) 7%, transparent), transparent 60%);
   }
 
   ::selection {
@@ -214,24 +224,27 @@
     border-color: var(--app-glass-border);
   }
 
+  /* 主操作按钮：墨色实底，无彩色发光——质感来自对比与克制 */
   .glass-btn {
-    background: var(--app-primary);
-    color: #fff;
+    background: var(--app-ink);
+    color: var(--app-ink-contrast);
+    border: 1px solid transparent;
     border-radius: 9999px;
-    box-shadow: var(--app-shadow-glow);
+    box-shadow: var(--app-shadow-sm);
     transition:
-      filter var(--motion-fast) var(--motion-ease),
+      background-color var(--motion-fast) var(--motion-ease),
       box-shadow var(--motion-fast) var(--motion-ease),
       transform var(--motion-fast) var(--motion-ease);
   }
 
   .glass-btn:hover {
-    filter: brightness(1.08);
-    box-shadow: 0 6px 24px var(--app-primary-glow);
+    background: color-mix(in oklab, var(--app-ink) 86%, var(--app-primary));
+    box-shadow: var(--app-shadow-md);
+    transform: translateY(-1px);
   }
 
   .glass-btn:active {
-    transform: scale(0.98);
+    transform: scale(0.97);
   }
 
   .glass-input {
@@ -254,8 +267,9 @@
   }
 
   .glass-orb {
-    background: linear-gradient(135deg, var(--app-primary), color-mix(in oklab, var(--app-primary) 60%, #c084fc));
-    box-shadow: var(--app-shadow-glow);
+    background: var(--app-ink);
+    color: var(--app-ink-contrast);
+    box-shadow: var(--app-shadow-md);
   }
 
   .aurora-shell {
@@ -268,9 +282,7 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background:
-      radial-gradient(ellipse at 20% 0%, color-mix(in oklab, var(--app-primary) 5%, transparent), transparent 60%),
-      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.04), transparent 60%);
+    background: radial-gradient(ellipse at 50% 0%, color-mix(in oklab, var(--app-primary) 4%, transparent), transparent 62%);
     mask-image: radial-gradient(circle at 50% 15%, black, transparent 72%);
   }
 
