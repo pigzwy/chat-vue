@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
         prose: true,
         ui: {
           colors: {
-            primary: 'blue',
+            primary: 'indigo',
             neutral: 'zinc'
           }
         }

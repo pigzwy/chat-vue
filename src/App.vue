@@ -6,9 +6,9 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const colorMode = useColorMode()
-const themeColor = computed(() => colorMode.value === 'dark' ? '#111118' : '#faf8f5')
+const themeColor = computed(() => colorMode.value === 'dark' ? '#0c0d14' : '#f2f3f8')
 const title = computed(() => {
-  if (route.path.startsWith('/images')) return '画图 - PIG Coder'
+  if (route.path.startsWith('/studio') || route.path.startsWith('/images')) return '创作台 - PIG Coder'
   if (route.path.startsWith('/gallery')) return '案例观摩馆 - PIG Coder'
   return '对话 - PIG Coder'
 })

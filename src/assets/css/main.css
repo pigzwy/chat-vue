@@ -2,208 +2,312 @@
 @import "@nuxt/ui";
 
 @theme static {
-  --font-sans: Inter, 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', 'Public Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* ---------------------------------------------------------------------------
+ * 玻璃拟态设计 token（--app-*）
+ * ------------------------------------------------------------------------- */
+:root {
+  --app-bg-deep: #f2f3f8;
+  --app-bg-glass: rgba(255, 255, 255, 0.72);
+  --app-bg-glass-strong: rgba(255, 255, 255, 0.86);
+  --app-bg-hover: rgba(99, 102, 241, 0.06);
+
+  --app-primary: var(--ui-color-primary-500);
+  --app-primary-subtle: rgba(99, 102, 241, 0.1);
+  --app-primary-glow: rgba(99, 102, 241, 0.28);
+
+  --app-border-subtle: rgba(20, 22, 45, 0.07);
+  --app-glass-border: color-mix(in oklab, var(--app-primary) 22%, transparent);
+
+  --app-shadow-sm: 0 2px 8px rgba(15, 17, 35, 0.06);
+  --app-shadow-md: 0 8px 24px rgba(15, 17, 35, 0.1);
+  --app-shadow-lg: 0 16px 48px rgba(15, 17, 35, 0.14);
+  --app-shadow-glow: 0 4px 20px var(--app-primary-glow);
+
+  --app-glass-blur: 24px;
+  --app-glass-saturate: 1.2;
+
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-fast: 150ms;
+  --motion-base: 250ms;
+  --motion-slow: 350ms;
+}
+
+.dark {
+  --app-bg-deep: #0c0d14;
+  --app-bg-glass: rgba(22, 24, 38, 0.66);
+  --app-bg-glass-strong: rgba(23, 25, 40, 0.88);
+  --app-bg-hover: rgba(129, 140, 248, 0.08);
+
+  --app-primary: var(--ui-color-primary-400);
+  --app-primary-subtle: rgba(129, 140, 248, 0.14);
+  --app-primary-glow: rgba(129, 140, 248, 0.35);
+
+  --app-border-subtle: rgba(255, 255, 255, 0.07);
+  --app-glass-border: color-mix(in oklab, var(--app-primary) 30%, transparent);
+
+  --app-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --app-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.38);
+  --app-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.46);
+}
+
+/* ---------------------------------------------------------------------------
+ * 桥接层：把 Nuxt UI 的 --ui-* 语义变量指向玻璃 token
+ * （Nuxt UI 的默认值在 @layer theme 内，此处无 layer 的声明天然优先）
+ * ------------------------------------------------------------------------- */
+:root {
+  --ui-radius: 0.375rem;
+  --ui-container: var(--container-3xl);
+
+  --ui-bg: var(--app-bg-deep);
+  --ui-bg-muted: rgba(20, 22, 45, 0.03);
+  --ui-bg-elevated: #ffffff;
+  --ui-bg-accented: rgba(20, 22, 45, 0.06);
+
+  --ui-border: var(--app-border-subtle);
+  --ui-border-muted: var(--app-border-subtle);
+  --ui-border-accented: rgba(20, 22, 45, 0.12);
+
+  --ui-text-dimmed: #9ca0b3;
+  --ui-text-muted: #6b6f82;
+  --ui-text-toned: #4d5163;
+  --ui-text: #3d4152;
+  --ui-text-highlighted: #1c1d2b;
+}
+
+.dark {
+  --ui-bg: var(--app-bg-deep);
+  --ui-bg-muted: rgba(255, 255, 255, 0.03);
+  --ui-bg-elevated: #171928;
+  --ui-bg-accented: rgba(255, 255, 255, 0.07);
+
+  --ui-border: var(--app-border-subtle);
+  --ui-border-muted: var(--app-border-subtle);
+  --ui-border-accented: rgba(255, 255, 255, 0.13);
+
+  --ui-text-dimmed: #62677e;
+  --ui-text-muted: #8b90a5;
+  --ui-text-toned: #a8adc0;
+  --ui-text: #c3c6d4;
+  --ui-text-highlighted: #eceef5;
 }
 
 @layer base {
-  :root {
-    --warm-bg: #faf8f5;
-    --warm-card: #ffffff;
-    --warm-border: rgba(0, 0, 0, 0.06);
-    --warm-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-    --warm-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.08);
-    --warm-accent: #6366f1;
-    --warm-accent-soft: rgba(99, 102, 241, 0.08);
-    --warm-accent-hover: rgba(99, 102, 241, 0.14);
-    --warm-text: #1e1e2e;
-    --warm-text-secondary: #6b7280;
-    --warm-surface-hover: rgba(0, 0, 0, 0.03);
-  }
-
-  html.dark {
-    --warm-bg: #111118;
-    --warm-card: #1a1a24;
-    --warm-border: rgba(255, 255, 255, 0.06);
-    --warm-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
-    --warm-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.3);
-    --warm-accent: #818cf8;
-    --warm-accent-soft: rgba(129, 140, 248, 0.1);
-    --warm-accent-hover: rgba(129, 140, 248, 0.18);
-    --warm-text: #e4e4e7;
-    --warm-text-secondary: #71717a;
-    --warm-surface-hover: rgba(255, 255, 255, 0.04);
-  }
-
   body {
-    @apply min-h-screen text-zinc-900 antialiased dark:text-zinc-100;
-    background: var(--warm-bg);
+    min-height: 100vh;
     background-image:
-      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.06), transparent 60%),
-      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.05), transparent 60%);
+      radial-gradient(ellipse at 18% -5%, color-mix(in oklab, var(--app-primary) 8%, transparent), transparent 55%),
+      radial-gradient(ellipse at 85% 105%, rgba(244, 114, 182, 0.05), transparent 55%);
+    background-attachment: fixed;
   }
 
-  html.dark body {
+  .dark body {
     background-image:
-      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.08), transparent 60%),
-      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.06), transparent 60%);
+      radial-gradient(ellipse at 18% -5%, color-mix(in oklab, var(--app-primary) 10%, transparent), transparent 55%),
+      radial-gradient(ellipse at 85% 105%, rgba(244, 114, 182, 0.06), transparent 55%);
   }
 
   ::selection {
-    background: var(--warm-accent-soft);
-    color: var(--warm-accent);
+    background: var(--app-primary-subtle);
+    color: var(--app-primary);
   }
 }
 
-:root {
-  --ui-container: var(--container-3xl);
+@keyframes fade-scale {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
+@keyframes shimmer-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * 组件类
+ * 注：性能约定——backdrop blur 只出现在少量常驻悬浮件（chip / input / overlay），
+ * 流内卡片（.glass-panel 系）用高不透明度底避免大面积 blur。
+ * ------------------------------------------------------------------------- */
 @layer components {
-  .warm-card {
-    background: var(--warm-card);
-    border: 1px solid var(--warm-border);
-    box-shadow: var(--warm-shadow);
-    border-radius: 1rem;
+  .glass-panel {
+    background: var(--app-bg-glass-strong);
+    border: 1px solid var(--app-border-subtle);
+    border-radius: 20px;
+    box-shadow: var(--app-shadow-sm);
   }
 
-  .warm-card-hover {
-    background: var(--warm-card);
-    border: 1px solid var(--warm-border);
-    box-shadow: var(--warm-shadow);
-    border-radius: 1rem;
-    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  .glass-panel--lg {
+    border-radius: 24px;
+    box-shadow: var(--app-shadow-md);
   }
 
-  .warm-card-hover:hover {
-    box-shadow: var(--warm-shadow-lg);
-    border-color: rgba(99, 102, 241, 0.18);
-    transform: translateY(-1px);
+  .glass-card-hover {
+    background: var(--app-bg-glass-strong);
+    border: 1px solid var(--app-border-subtle);
+    border-radius: 20px;
+    box-shadow: var(--app-shadow-sm);
+    transition:
+      transform var(--motion-base) var(--motion-ease),
+      box-shadow var(--motion-base) var(--motion-ease),
+      border-color var(--motion-base) var(--motion-ease);
   }
 
-  html.dark .warm-card-hover:hover {
-    border-color: rgba(129, 140, 248, 0.22);
+  .glass-card-hover:hover {
+    transform: translateY(-3px) scale(1.005);
+    border-color: var(--app-glass-border);
+    box-shadow: var(--app-shadow-md);
   }
 
-  .warm-pill {
-    background: var(--warm-surface-hover);
-    color: var(--warm-text-secondary);
+  .glass-chip {
+    background: var(--app-bg-glass);
+    -webkit-backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturate));
+    backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturate));
+    border: 1px solid var(--app-border-subtle);
+    border-radius: 9999px;
+    box-shadow: var(--app-shadow-sm);
+  }
+
+  .glass-pill {
+    background: transparent;
+    color: var(--ui-text-muted);
     border: 1px solid transparent;
     border-radius: 9999px;
-    transition: all 0.15s ease;
+    transition:
+      background-color var(--motion-fast) var(--motion-ease),
+      color var(--motion-fast) var(--motion-ease),
+      border-color var(--motion-fast) var(--motion-ease);
   }
 
-  .warm-pill:hover {
-    background: var(--warm-accent-soft);
-    color: var(--warm-accent);
-    border-color: rgba(99, 102, 241, 0.12);
+  .glass-pill:hover {
+    background: var(--app-bg-hover);
+    color: var(--app-primary);
+    border-color: color-mix(in oklab, var(--app-primary) 14%, transparent);
   }
 
-  html.dark .warm-pill:hover {
-    border-color: rgba(129, 140, 248, 0.15);
+  .glass-pill[data-selected="true"],
+  .glass-pill.is-selected {
+    background: var(--app-primary-subtle);
+    color: var(--app-primary);
+    border-color: var(--app-glass-border);
   }
 
-  .warm-input {
-    background: var(--warm-card);
-    border: 1px solid var(--warm-border);
-    box-shadow: var(--warm-shadow-lg);
-    border-radius: 1.25rem;
-  }
-
-  .warm-input:focus-within {
-    border-color: rgba(99, 102, 241, 0.3);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 0 0 3px rgba(99, 102, 241, 0.08);
-  }
-
-  html.dark .warm-input {
-    box-shadow: var(--warm-shadow-lg);
-  }
-
-  html.dark .warm-input:focus-within {
-    border-color: rgba(129, 140, 248, 0.3);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(129, 140, 248, 0.1);
-  }
-
-  .warm-btn {
-    background: var(--warm-accent);
+  .glass-btn {
+    background: var(--app-primary);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
     border-radius: 9999px;
-    transition: all 0.15s ease;
+    box-shadow: var(--app-shadow-glow);
+    transition:
+      filter var(--motion-fast) var(--motion-ease),
+      box-shadow var(--motion-fast) var(--motion-ease),
+      transform var(--motion-fast) var(--motion-ease);
   }
 
-  .warm-btn:hover {
+  .glass-btn:hover {
     filter: brightness(1.08);
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 6px 24px var(--app-primary-glow);
   }
 
-  html.dark .warm-btn {
-    box-shadow: 0 4px 14px rgba(129, 140, 248, 0.2);
+  .glass-btn:active {
+    transform: scale(0.98);
   }
 
-  .warm-chip {
-    background: var(--warm-card);
-    border: 1px solid var(--warm-border);
-    box-shadow: var(--warm-shadow);
-    border-radius: 9999px;
+  .glass-input {
+    background: var(--app-bg-glass-strong);
+    -webkit-backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturate));
+    backdrop-filter: blur(var(--app-glass-blur)) saturate(var(--app-glass-saturate));
+    border: 1px solid var(--app-border-subtle);
+    border-radius: 18px;
+    box-shadow: var(--app-shadow-md);
+    transition:
+      border-color var(--motion-base) var(--motion-ease),
+      box-shadow var(--motion-base) var(--motion-ease);
   }
 
-  .warm-divider {
-    border-color: var(--warm-border);
+  .glass-input:focus-within {
+    border-color: var(--app-glass-border);
+    box-shadow:
+      0 0 0 3px var(--app-primary-subtle),
+      var(--app-shadow-md);
   }
 
-  /* 微妙的动画效果 */
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+  .glass-orb {
+    background: linear-gradient(135deg, var(--app-primary), color-mix(in oklab, var(--app-primary) 60%, #c084fc));
+    box-shadow: var(--app-shadow-glow);
   }
 
-  .animate-fadeIn {
-    animation: fadeIn 0.3s ease-out;
-  }
-}
-
-html.dark .shiki span {
-  color: var(--shiki-dark) !important;
-  background-color: var(--shiki-dark-bg) !important;
-  font-style: var(--shiki-dark-font-style) !important;
-  font-weight: var(--shiki-dark-font-weight) !important;
-  text-decoration: var(--shiki-dark-text-decoration) !important;
-}
-
-@layer components {
-  .hero-shell {
+  .aurora-shell {
     position: relative;
     overflow: hidden;
   }
 
-  .hero-shell::before {
+  .aurora-shell::before {
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
     background:
-      radial-gradient(ellipse at 20% 0%, rgba(99, 102, 241, 0.04), transparent 60%),
-      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.035), transparent 60%);
+      radial-gradient(ellipse at 20% 0%, color-mix(in oklab, var(--app-primary) 5%, transparent), transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(244, 114, 182, 0.04), transparent 60%);
     mask-image: radial-gradient(circle at 50% 15%, black, transparent 72%);
   }
 
-  .hero-panel {
-    background: var(--warm-card);
-    border: 1px solid var(--warm-border);
-    box-shadow: var(--warm-shadow-lg);
-    border-radius: 1.5rem;
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ui-text-muted);
   }
 
-  .hero-orb {
-    background: var(--warm-accent);
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+  .shimmer-block {
+    background: linear-gradient(
+      100deg,
+      var(--ui-bg-accented) 40%,
+      color-mix(in oklab, var(--app-primary) 12%, var(--ui-bg-accented)) 50%,
+      var(--ui-bg-accented) 60%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-sweep 1.6s var(--motion-ease) infinite;
   }
 
-  html.dark .hero-orb {
-    box-shadow: 0 4px 14px rgba(129, 140, 248, 0.2);
+  .animate-pulse-soft {
+    animation: pulse-soft 1.8s var(--motion-ease) infinite;
   }
 
-  .hero-text-gradient {
-    color: var(--warm-accent);
+  .animate-fade-scale {
+    animation: fade-scale var(--motion-slow) var(--motion-ease);
   }
+
+}
+
+.dark .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
 }
