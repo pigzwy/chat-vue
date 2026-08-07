@@ -6,10 +6,11 @@ function isAbortError(error: unknown) {
 
 export async function withImageRequestTimeout<T>(
   request: (signal: AbortSignal) => Promise<T>,
-  timeoutMessage = '图片请求超时，请稍后重试'
+  timeoutMessage = '图片请求超时，请稍后重试',
+  timeoutMs = imageRequestTimeoutMs
 ) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), imageRequestTimeoutMs)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     return await request(controller.signal)

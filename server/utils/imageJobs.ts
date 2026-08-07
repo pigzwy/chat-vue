@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { sub2apiBaseURL } from './sub2api'
 import { withImageRequestTimeout } from './imageUpstreamRequest'
 import { buildImagePrompt, type ImageQuality, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
+import { defaultImageModelId, resolveMediaModelSpec } from '../../shared/utils/mediaModels'
+import { createJobStore, getElapsedMs, parseJson, toSafeError } from './mediaJobStore'
 import type { RequestError } from '../../shared/utils/errors'
 
 type ImageJobStatus = 'queued' | 'running' | 'completed' | 'error'
@@ -33,6 +35,7 @@ interface ImageStreamEvent extends GeneratedImage {
 export interface ImageJobInput {
   apiKey: string
   prompt: string
+  model?: string
   ratio: ImageRatio
   resolution: ImageResolution
   size: string
@@ -59,14 +62,9 @@ export interface ImageJob extends ImageJobInput {
   streamAttempts?: number
 }
 
-const imageModel = 'gpt-image-2'
 const maxJobAgeMs = 1000 * 60 * 60
-const imageJobs = new Map<string, ImageJob>()
+const store = createJobStore<ImageJob>(maxJobAgeMs)
 const imageLogPrefix = '[image-job]'
-
-function getElapsedMs(startedAt: number) {
-  return Math.round(performance.now() - startedAt)
-}
 
 function logImageJob(job: Pick<ImageJob, 'id' | 'kind' | 'mode'>, event: string, data: Record<string, unknown> = {}) {
   console.info(imageLogPrefix, {
@@ -78,18 +76,24 @@ function logImageJob(job: Pick<ImageJob, 'id' | 'kind' | 'mode'>, event: string,
   })
 }
 
-function toSafeError(error: unknown) {
-  return error instanceof Error ? error.message : String(error)
+function jobModel(job: ImageJob) {
+  return job.model || defaultImageModelId
 }
 
-function parseJson<T>(text: string) {
-  if (!text) return null
+function supportsSizeQuality(job: ImageJob) {
+  return resolveMediaModelSpec(jobModel(job)).supportsSizeQuality ?? false
+}
 
-  try {
-    return JSON.parse(text) as T
-  } catch {
-    return null
+// gpt-image 系通过 size/quality 参数 + 提示词注入控制画幅；
+// 其他模型（grok-imagine 等）只吃纯提示词，画幅以文字提示尽力约束。
+function buildJobPrompt(job: ImageJob) {
+  if (supportsSizeQuality(job)) {
+    return buildImagePrompt(job.prompt, job.size, job.quality)
   }
+  if (job.ratio && job.ratio !== 'Auto') {
+    return `${job.prompt}\n\nAspect ratio: ${job.ratio}.`
+  }
+  return job.prompt
 }
 
 function toErrorMessage(text: string, status: number, statusText: string) {
@@ -298,10 +302,9 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
   })
 
   const requestBody = JSON.stringify({
-    model: imageModel,
-    prompt: buildImagePrompt(job.prompt, job.size, job.quality),
-    size: job.size,
-    quality: job.quality,
+    model: jobModel(job),
+    prompt: buildJobPrompt(job),
+    ...(supportsSizeQuality(job) && { size: job.size, quality: job.quality }),
     response_format: 'b64_json',
     n: 1,
     stream,
@@ -430,10 +433,12 @@ async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal
   }
 
   const upstreamForm = new FormData()
-  upstreamForm.set('model', imageModel)
-  upstreamForm.set('prompt', buildImagePrompt(job.prompt, job.size, job.quality))
-  upstreamForm.set('size', job.size)
-  upstreamForm.set('quality', job.quality)
+  upstreamForm.set('model', jobModel(job))
+  upstreamForm.set('prompt', buildJobPrompt(job))
+  if (supportsSizeQuality(job)) {
+    upstreamForm.set('size', job.size)
+    upstreamForm.set('quality', job.quality)
+  }
   upstreamForm.set('response_format', 'b64_json')
   upstreamForm.set('n', '1')
   upstreamForm.set('stream', String(stream))
@@ -543,28 +548,25 @@ async function requestImageJob(job: ImageJob, signal: AbortSignal) {
   return requestImageGeneration(job, signal)
 }
 
-export function cleanupImageJobs() {
-  const now = Date.now()
-  for (const [id, job] of imageJobs) {
-    if (now - new Date(job.createdAt).getTime() > maxJobAgeMs) {
-      imageJobs.delete(id)
-    }
-  }
+// 不支持流式的模型（grok-imagine 等）强制走同步请求，跳过 SSE 尝试与降级重试
+function resolveStreamOption(input: ImageJobInput) {
+  const supportsStream = resolveMediaModelSpec(input.model || defaultImageModelId).supportsStream ?? false
+  return supportsStream ? input.stream : false
 }
 
 export function createImageJob(input: ImageJobInput) {
-  cleanupImageJobs()
-
   const job: ImageJob = {
     ...input,
+    stream: resolveStreamOption(input),
     id: randomUUID(),
     kind: 'generation',
     status: 'queued',
     createdAt: new Date().toISOString()
   }
-  imageJobs.set(job.id, job)
+  store.set(job)
 
   logImageJob(job, 'job-created', {
+    model: jobModel(job),
     size: job.size,
     quality: job.quality,
     resolution: job.resolution,
@@ -576,19 +578,19 @@ export function createImageJob(input: ImageJobInput) {
 }
 
 export function createImageEditJob(input: ImageEditJobInput) {
-  cleanupImageJobs()
-
   const job: ImageJob = {
     ...input,
+    stream: resolveStreamOption(input),
     id: randomUUID(),
     kind: 'edit',
     status: 'queued',
     createdAt: new Date().toISOString()
   }
-  imageJobs.set(job.id, job)
+  store.set(job)
 
   logImageJob(job, 'job-created', {
-    imageCount: job.images.length,
+    model: jobModel(job),
+    imageCount: input.images.length,
     size: job.size,
     quality: job.quality,
     resolution: job.resolution,
@@ -600,12 +602,11 @@ export function createImageEditJob(input: ImageEditJobInput) {
 }
 
 export function getImageJob(id: string) {
-  cleanupImageJobs()
-  return imageJobs.get(id) || null
+  return store.get(id)
 }
 
 export async function runImageJob(id: string) {
-  const job = imageJobs.get(id)
+  const job = store.jobs.get(id)
   if (!job || job.status !== 'queued') return
 
   const startedAt = performance.now()

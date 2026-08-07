@@ -1,6 +1,10 @@
-export type ImageRatio = '1:1' | '3:2' | '16:9' | '21:9' | '9:16' | '4:3' | '3:4' | 'Auto'
-export type ImageResolution = '1K' | '2K' | '4K'
-export type ImageQuality = 'low' | 'medium' | 'high'
+export const imageRatios = ['1:1', '3:2', '16:9', '21:9', '9:16', '4:3', '3:4', 'Auto'] as const
+export const imageResolutions = ['1K', '2K', '4K'] as const
+export const imageQualities = ['low', 'medium', 'high'] as const
+
+export type ImageRatio = typeof imageRatios[number]
+export type ImageResolution = typeof imageResolutions[number]
+export type ImageQuality = typeof imageQualities[number]
 
 export const defaultImageQuality: ImageQuality = 'high'
 
