@@ -87,7 +87,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'grok-imagine-video-1.5',
     label: 'Grok 视频 · 1.5',
-    description: '新版模型，画面与音频表现更好',
+    description: '图生视频用新版模型；纯文生视频网关会自动使用标准版',
     kind: 'video',
     provider: 'grok',
     supportsSourceImage: true,
@@ -132,4 +132,9 @@ export function isVideoMediaModelId(id: string) {
 
 export function isGrokMediaModelId(id: string) {
   return /^(grok-|x-ai\/)/.test(id)
+}
+
+/** 媒体模型（画图/视频/编辑），不能出现在聊天模型列表里——发到聊天端点会被上游 400 */
+export function isMediaModelId(id: string) {
+  return isImageMediaModelId(id) || isVideoMediaModelId(id) || /^grok-imagine/.test(id)
 }

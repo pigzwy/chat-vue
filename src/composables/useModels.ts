@@ -1,6 +1,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { createSharedComposable, useStorage } from '@vueuse/core'
 import { MODELS } from '../../shared/utils/models'
+import { isMediaModelId } from '../../shared/utils/mediaModels'
 import type { ReasoningEffort } from '../../shared/utils/reasoning'
 import { useCsrf } from './useCsrf'
 
@@ -228,9 +229,12 @@ export const useModels = createSharedComposable(() => {
     const cacheKey = String(groupId)
     apiKey.value = await getApiKeyForGroup(groupId)
 
+    // 媒体模型（grok-imagine/gpt-image 系）发到聊天端点会被上游 400，聊天列表里过滤掉
+    const toChatModels = (items: ModelSelectItem[]) => items.filter(item => !isMediaModelId(item.value))
+
     const cachedModels = cachedModelsByGroup.value[cacheKey]
     if (cachedModels?.token === token.value && cachedModels.items.length) {
-      modelItems.value = cachedModels.items
+      modelItems.value = toChatModels(cachedModels.items)
       if (!modelItems.value.some(item => item.value === model.value)) {
         model.value = modelItems.value[0]?.value || ''
       }
@@ -238,17 +242,19 @@ export const useModels = createSharedComposable(() => {
     }
 
     const modelsResponse = await sub2apiFetch<unknown>('/v1/models', apiKey.value)
-    modelItems.value = getItems<ModelItem>(modelsResponse).map(toModelSelectItem)
+    const allItems = getItems<ModelItem>(modelsResponse).map(toModelSelectItem)
+    modelItems.value = toChatModels(allItems)
 
     if (!modelItems.value.length) {
       throw new Error('没有可用模型')
     }
 
+    // 缓存存全量列表（创作台从同一缓存取媒体模型），只在聊天展示层过滤
     cachedModelsByGroup.value = {
       ...cachedModelsByGroup.value,
       [cacheKey]: {
         token: token.value,
-        items: modelItems.value
+        items: allItems
       }
     }
 
