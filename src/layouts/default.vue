@@ -86,20 +86,21 @@ defineShortcuts({
       <template #default="{ collapsed }">
         <div
           v-if="!collapsed"
-          class="flex items-center gap-2"
+          class="flex flex-col gap-1.5"
         >
-          <UDashboardSearchButton
-            collapsed
-            class="shrink-0"
-          />
           <UButton
             icon="i-lucide-plus"
             label="新建对话"
             color="neutral"
             variant="soft"
+            block
             to="/"
-            class="glass-btn shrink-0 rounded-full px-4 font-semibold"
+            class="glass-btn rounded-full font-semibold"
             @click="open = false"
+          />
+          <UDashboardSearchButton
+            label="搜索对话"
+            class="glass-pill w-full justify-start rounded-full"
           />
         </div>
 

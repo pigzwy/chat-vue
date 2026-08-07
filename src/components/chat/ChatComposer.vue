@@ -4,8 +4,6 @@ import type { ChatStatus } from 'ai'
 import { chatAttachmentAccept, chatAttachmentLimit } from '../../utils/chatAttachments'
 import type { ChatAttachment } from '../../composables/useChatAttachments'
 import ChatAttachmentPreviewList from './AttachmentPreviewList.vue'
-import ModelSelect from '../ModelSelect.vue'
-import ReasoningEffortSelect from '../ReasoningEffortSelect.vue'
 
 const props = withDefaults(defineProps<{
   status?: ChatStatus
@@ -53,10 +51,11 @@ function onAttachmentFilesChange(event: Event) {
     v-model="input"
     :error="error"
     variant="subtle"
+    placeholder="输入消息..."
     class="glass-input [view-transition-name:chat-prompt]"
     :ui="{
       base: large ? 'px-4 py-3 text-base' : 'px-4 py-3',
-      footer: 'flex flex-wrap items-center justify-between gap-3 border-t border-default pt-3'
+      footer: 'flex flex-wrap items-center justify-between gap-3 pt-2'
     }"
     @submit="emit('submit', $event)"
   >
@@ -73,10 +72,6 @@ function onAttachmentFilesChange(event: Event) {
 
     <template #footer>
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-        <ModelSelect />
-
-        <ReasoningEffortSelect />
-
         <input
           ref="attachmentInput"
           type="file"
@@ -99,6 +94,10 @@ function onAttachmentFilesChange(event: Event) {
             @click="pickAttachmentFiles"
           />
         </UTooltip>
+
+        <span class="label-mono hidden normal-case sm:inline">
+          Enter 发送 · Shift+Enter 换行
+        </span>
       </div>
 
       <div class="flex shrink-0 items-center">

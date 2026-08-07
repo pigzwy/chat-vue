@@ -34,81 +34,64 @@ function getFileParts(parts: UIMessage['parts']) {
     :files="getFileParts(message.parts)"
   />
 
-  <div
-    :class="message.role === 'assistant' ? 'flex items-start gap-3' : undefined"
+  <template
+    v-for="(part, index) in getMergedParts(message.parts)"
+    :key="`${message.id}-${part.type}-${index}`"
   >
-    <div
-      v-if="message.role === 'assistant'"
-      class="glass-orb mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl p-0.5"
+    <UChatReasoning
+      v-if="isReasoningUIPart(part)"
+      :text="part.text"
+      :streaming="isPartStreaming(part)"
+      chevron="leading"
+      :auto-close-delay="0"
     >
-      <img
-        src="/logo-mark.jpg"
-        alt="pigcoder"
-        class="size-full rounded-lg object-cover ring-1 ring-white/70 dark:ring-white/10"
-      >
-    </div>
+      <ChatComark
+        :markdown="part.text"
+        :streaming="isPartStreaming(part)"
+      />
+    </UChatReasoning>
 
-    <div :class="message.role === 'assistant' ? 'glass-panel min-w-0 max-w-full px-4 py-3.5' : undefined">
-      <template
-        v-for="(part, index) in getMergedParts(message.parts)"
-        :key="`${message.id}-${part.type}-${index}`"
+    <template v-else-if="isToolUIPart(part)">
+      <ChatToolChart
+        v-if="getToolName(part) === 'chart'"
+        :invocation="{ ...(part as ChartUIToolInvocation) }"
+      />
+      <ChatToolWeather
+        v-else-if="getToolName(part) === 'weather'"
+        :invocation="{ ...(part as WeatherUIToolInvocation) }"
+      />
+      <UChatTool
+        v-else-if="getToolName(part) === 'web_search' || getToolName(part) === 'google_search'"
+        :text="isToolStreaming(part) ? '正在搜索网页...' : '已搜索网页'"
+        :suffix="getSearchQuery(part)"
+        :streaming="isToolStreaming(part)"
+        chevron="leading"
       >
-        <UChatReasoning
-          v-if="isReasoningUIPart(part)"
+        <ChatToolSources :sources="getSources(part)" />
+      </UChatTool>
+    </template>
+
+    <template v-else-if="isTextUIPart(part)">
+      <ChatComark
+        v-if="message.role === 'assistant'"
+        :markdown="part.text"
+        :streaming="isPartStreaming(part)"
+      />
+      <template v-else-if="message.role === 'user'">
+        <ChatMessageEdit
+          v-if="editing"
+          :message="message"
           :text="part.text"
-          :streaming="isPartStreaming(part)"
-          chevron="leading"
-          :auto-close-delay="0"
+          @save="(msg, text) => emit('save', msg, text)"
+          @cancel="emit('cancelEdit')"
+        />
+        <p
+          v-else
+          class="whitespace-pre-wrap"
         >
-          <ChatComark
-            :markdown="part.text"
-            :streaming="isPartStreaming(part)"
-          />
-        </UChatReasoning>
-
-        <template v-else-if="isToolUIPart(part)">
-          <ChatToolChart
-            v-if="getToolName(part) === 'chart'"
-            :invocation="{ ...(part as ChartUIToolInvocation) }"
-          />
-          <ChatToolWeather
-            v-else-if="getToolName(part) === 'weather'"
-            :invocation="{ ...(part as WeatherUIToolInvocation) }"
-          />
-          <UChatTool
-            v-else-if="getToolName(part) === 'web_search' || getToolName(part) === 'google_search'"
-            :text="isToolStreaming(part) ? '正在搜索网页...' : '已搜索网页'"
-            :suffix="getSearchQuery(part)"
-            :streaming="isToolStreaming(part)"
-            chevron="leading"
-          >
-            <ChatToolSources :sources="getSources(part)" />
-          </UChatTool>
-        </template>
-
-        <template v-else-if="isTextUIPart(part)">
-          <ChatComark
-            v-if="message.role === 'assistant'"
-            :markdown="part.text"
-            :streaming="isPartStreaming(part)"
-          />
-          <template v-else-if="message.role === 'user'">
-            <ChatMessageEdit
-              v-if="editing"
-              :message="message"
-              :text="part.text"
-              @save="(msg, text) => emit('save', msg, text)"
-              @cancel="emit('cancelEdit')"
-            />
-            <p
-              v-else
-              class="whitespace-pre-wrap"
-            >
-              {{ part.text }}
-            </p>
-          </template>
-        </template>
+          {{ part.text }}
+        </p>
       </template>
-    </div>
-  </div>
+    </template>
+  </template>
 </template>

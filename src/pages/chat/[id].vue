@@ -11,9 +11,8 @@ import ChatMessageContent from '../../components/chat/message/MessageContent.vue
 import ChatMessageActions from '../../components/chat/message/MessageActions.vue'
 import ChatIndicator from '../../components/chat/Indicator.vue'
 import ChatComposer from '../../components/chat/ChatComposer.vue'
+import ChatModelMenu from '../../components/ChatModelMenu.vue'
 import Navbar from '../../components/Navbar.vue'
-import PromptPresetRow from '../../components/PromptPresetRow.vue'
-import { chatFollowupPresets } from '../../data/promptPresets'
 import { useChatAttachments } from '../../composables/useChatAttachments'
 
 const route = useRoute<'/chat/[id]'>()
@@ -95,11 +94,6 @@ function persistMessages(messages = chat.messages) {
 
 function onAttachmentFiles(files: File[]) {
   addFiles(files, model.value)
-}
-
-function useChatPromptPreset(prompt: string) {
-  if (chat.status !== 'ready') return
-  input.value = prompt
 }
 
 async function handleSubmit(e?: Event) {
@@ -197,7 +191,11 @@ onMounted(() => {
     :ui="{ body: 'p-0 sm:p-0 overscroll-none' }"
   >
     <template #header>
-      <Navbar />
+      <Navbar>
+        <template #left>
+          <ChatModelMenu />
+        </template>
+      </Navbar>
     </template>
 
     <template #body>
@@ -208,6 +206,8 @@ onMounted(() => {
           :messages="chat.messages"
           :status="chat.status"
           :spacing-offset="isOwner ? 160 : 0"
+          :user="{ side: 'right', variant: 'subtle' }"
+          :assistant="{ side: 'left', variant: 'naked' }"
           class="relative pt-(--ui-header-height) pb-4 sm:pb-6"
         >
           <template #indicator>
@@ -234,17 +234,15 @@ onMounted(() => {
             v-if="isOwner"
             #actions="{ message }"
           >
-            <div :class="message.role === 'assistant' ? 'ml-12' : undefined">
-              <ChatMessageActions
-                :message="message"
-                :streaming="chat.status === 'streaming' && message.id === chat.messages[chat.messages.length - 1]?.id"
-                :editing="editingMessageId === message.id"
-                :vote="getVote(message.id)"
-                @edit="startEdit"
-                @regenerate="regenerateMessage"
-                @vote="vote"
-              />
-            </div>
+            <ChatMessageActions
+              :message="message"
+              :streaming="chat.status === 'streaming' && message.id === chat.messages[chat.messages.length - 1]?.id"
+              :editing="editingMessageId === message.id"
+              :vote="getVote(message.id)"
+              @edit="startEdit"
+              @regenerate="regenerateMessage"
+              @vote="vote"
+            />
           </template>
         </UChatMessages>
 
@@ -252,14 +250,6 @@ onMounted(() => {
           v-if="isOwner"
           class="sticky bottom-4 z-10 space-y-2"
         >
-          <PromptPresetRow
-            v-if="!attachments.length && !input.trim()"
-            class="mx-auto max-w-3xl px-2"
-            :presets="chatFollowupPresets"
-            :disabled="chat.status !== 'ready'"
-            @select="useChatPromptPreset"
-          />
-
           <ChatComposer
             v-model="input"
             :status="chat.status"

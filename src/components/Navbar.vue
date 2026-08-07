@@ -5,6 +5,7 @@
   >
     <template #left>
       <UDashboardSidebarCollapse />
+      <slot name="left" />
     </template>
 
     <template #right>

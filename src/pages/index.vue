@@ -6,6 +6,7 @@ import { useChats } from '../composables/useChats'
 import { useChatAttachments } from '../composables/useChatAttachments'
 import { useModels } from '../composables/useModels'
 import ChatComposer from '../components/chat/ChatComposer.vue'
+import ChatModelMenu from '../components/ChatModelMenu.vue'
 import Navbar from '../components/Navbar.vue'
 import PromptPresetRow from '../components/PromptPresetRow.vue'
 import { homeQuickPrompts } from '../data/promptPresets'
@@ -100,7 +101,11 @@ function useQuickChatPrompt(prompt: string) {
     :ui="{ body: 'p-0 sm:p-0' }"
   >
     <template #header>
-      <Navbar />
+      <Navbar>
+        <template #left>
+          <ChatModelMenu />
+        </template>
+      </Navbar>
     </template>
 
     <template #body>
