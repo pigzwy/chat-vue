@@ -22,7 +22,14 @@ import {
   type ImageRatio,
   type ImageResolution
 } from '../../../shared/utils/images'
-import { mediaApiKeyName, resolveMediaModelSpec, type MediaKind } from '../../../shared/utils/mediaModels'
+import {
+  defaultVideoResolution,
+  mediaApiKeyName,
+  resolveMediaModelSpec,
+  videoCostPerSecondByResolution,
+  type MediaKind,
+  type VideoResolution
+} from '../../../shared/utils/mediaModels'
 import type { RequestError } from '../../../shared/utils/errors'
 
 export type MediaTaskType = 'generation' | 'edit'
@@ -45,6 +52,8 @@ export interface MediaTask {
   imageUrl?: string
   /** 视频时长参数（秒） */
   duration?: number
+  /** 视频分辨率参数（480p/720p） */
+  videoResolution?: VideoResolution
   videoUrl?: string
   revisedPrompt?: string
   error?: string
@@ -127,6 +136,7 @@ export const useStudioTasks = createSharedComposable(() => {
   const resolution = useStorage<ImageResolution>('sub2api-media-resolution', '2K')
   const quality = ref<ImageQuality>(loadStoredImageQuality())
   const videoDuration = useStorage<number>('sub2api-media-video-duration', 10)
+  const videoResolution = useStorage<VideoResolution>('sub2api-media-video-resolution', defaultVideoResolution)
   const files = ref<UploadedImage[]>([])
   const queue = ref<MediaTask[]>(loadStoredTasks())
   const previewTask = ref<MediaTask | null>(null)
@@ -148,7 +158,11 @@ export const useStudioTasks = createSharedComposable(() => {
   const hasUploadedImages = computed(() => files.value.length > 0)
   const imageSize = computed(() => imageSizeMap[resolution.value][ratio.value])
   const estimatedCost = computed(() => {
-    const spec = resolveMediaModelSpec(mediaModels.activeModel.value)
+    if (isVideoMode.value) {
+      return videoCostPerSecondByResolution[videoResolution.value] * videoDuration.value
+    }
+    const spec = resolveMediaModelSpec(mediaModels.imageModel.value)
+    if (spec.costPerImage) return spec.costPerImage
     return spec.costByResolution?.[resolution.value]
   })
   const imageTasks = computed(() => queue.value.filter(task => task.kind === 'image'))
@@ -966,7 +980,8 @@ export const useStudioTasks = createSharedComposable(() => {
       return {
         ...base,
         kind: 'video',
-        duration: videoDuration.value
+        duration: videoDuration.value,
+        videoResolution: videoResolution.value
       }
     }
 
@@ -1008,6 +1023,7 @@ export const useStudioTasks = createSharedComposable(() => {
       prompt: task.prompt,
       model: task.model,
       duration: task.duration || 10,
+      resolution: task.videoResolution,
       image: sourceImage
     })
     updateTask(task.id, { jobId: job.id })
@@ -1115,7 +1131,8 @@ export const useStudioTasks = createSharedComposable(() => {
       resolution: task.resolution,
       quality: task.quality,
       size: task.size,
-      duration: task.duration
+      duration: task.duration,
+      videoResolution: task.videoResolution
     }
     if (cachedSources.length) {
       sourceFilesByTaskId.set(retryTask.id, cachedSources)
@@ -1231,6 +1248,7 @@ export const useStudioTasks = createSharedComposable(() => {
     resolution,
     quality,
     videoDuration,
+    videoResolution,
     files,
     isDraggingImages,
     canSubmit,

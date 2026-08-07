@@ -10,6 +10,8 @@ export interface VideoJobInput {
   prompt: string
   /** 秒，1-15 */
   duration: number
+  /** 480p / 720p（不传时上游默认 480p） */
+  resolution?: string
   /** 图生视频源图（base64，不含 data: 前缀） */
   image?: {
     data: string
@@ -195,6 +197,7 @@ async function submitVideoGeneration(job: VideoJob, signal: AbortSignal) {
     model: job.model,
     prompt: job.prompt,
     duration: job.duration,
+    ...(job.resolution && { resolution: job.resolution }),
     ...(job.image && { image_url: `data:${job.image.mediaType};base64,${job.image.data}` })
   })
 

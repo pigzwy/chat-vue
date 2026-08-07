@@ -2,9 +2,21 @@ import type { ImageResolution } from './images'
 
 export type MediaKind = 'image' | 'video'
 
+export const videoResolutions = ['480p', '720p'] as const
+export type VideoResolution = typeof videoResolutions[number]
+export const defaultVideoResolution: VideoResolution = '480p'
+
+/** 网关实测计费：视频按秒计价，与模型无关，只随分辨率变化 */
+export const videoCostPerSecondByResolution: Record<VideoResolution, number> = {
+  '480p': 0.05,
+  '720p': 0.07
+}
+
 export interface MediaModelSpec {
   id: string
   label: string
+  /** 模型选择器里的一句话说明 */
+  description?: string
   kind: MediaKind
   provider: 'openai' | 'grok'
   /** 支持 multipart 图片编辑（/images/edits） */
@@ -15,8 +27,12 @@ export interface MediaModelSpec {
   supportsStream?: boolean
   /** 支持图生视频源图 */
   supportsSourceImage?: boolean
+  /** 支持视频 resolution 参数（480p/720p） */
+  supportsVideoResolution?: boolean
   maxDurationSeconds?: number
   costByResolution?: Partial<Record<ImageResolution, number>>
+  /** 每张图片费用（美元） */
+  costPerImage?: number
   /** 该模型默认使用的 Sub2API 分组 */
   defaultGroupId?: number
 }
@@ -30,6 +46,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'gpt-image-2',
     label: 'GPT Image 2',
+    description: '细节丰富，支持编辑与多参考图，按分辨率计费',
     kind: 'image',
     provider: 'openai',
     supportsEdit: true,
@@ -40,33 +57,41 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   },
   {
     id: 'grok-imagine-image',
-    label: 'Grok Imagine',
+    label: 'Grok 画图 · 快速',
+    description: '出图快、成本低，适合起稿和批量尝试',
     kind: 'image',
     provider: 'grok',
+    costPerImage: 0.02,
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
     id: 'grok-imagine-image-quality',
-    label: 'Grok Imagine HQ',
+    label: 'Grok 画图 · 高清',
+    description: '更高质量输出，适合出成品',
     kind: 'image',
     provider: 'grok',
+    costPerImage: 0.05,
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
     id: 'grok-imagine-video',
-    label: 'Grok 视频',
+    label: 'Grok 视频 · 标准',
+    description: '文生视频 / 图生视频，最长 15 秒',
     kind: 'video',
     provider: 'grok',
     supportsSourceImage: true,
+    supportsVideoResolution: true,
     maxDurationSeconds: 15,
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
     id: 'grok-imagine-video-1.5',
-    label: 'Grok 视频 1.5',
+    label: 'Grok 视频 · 1.5',
+    description: '新版模型，画面与音频表现更好',
     kind: 'video',
     provider: 'grok',
     supportsSourceImage: true,
+    supportsVideoResolution: true,
     maxDurationSeconds: 15,
     defaultGroupId: defaultGrokMediaGroupId
   }

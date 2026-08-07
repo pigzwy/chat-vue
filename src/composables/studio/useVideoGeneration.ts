@@ -7,6 +7,8 @@ export interface VideoJobRequest {
   model: string
   /** 秒，1-15 */
   duration: number
+  /** 480p / 720p */
+  resolution?: string
   image?: File
 }
 
@@ -38,6 +40,9 @@ export async function createVideoGenerationJob(apiKey: string, task: VideoJobReq
   formData.set('model', task.model)
   formData.set('prompt', task.prompt)
   formData.set('duration', String(task.duration))
+  if (task.resolution) {
+    formData.set('resolution', task.resolution)
+  }
   if (task.image) {
     formData.append('image', task.image)
   }

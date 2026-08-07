@@ -66,7 +66,7 @@ function iconForProvider(value?: string) {
   const normalized = value?.toLowerCase() || ''
   if (normalized.includes('anthropic') || normalized.includes('claude')) return 'i-simple-icons:anthropic'
   if (normalized.includes('google') || normalized.includes('gemini')) return 'i-simple-icons:google'
-  if (normalized.includes('grok') || normalized.includes('xai') || normalized.includes('x-ai')) return 'i-simple-icons:xai'
+  if (normalized.includes('grok') || normalized.includes('xai') || normalized.includes('x-ai')) return 'i-mingcute:grok-fill'
   if (normalized.includes('openai') || normalized.includes('gpt')) return 'i-simple-icons:openai'
   return 'i-lucide-box'
 }

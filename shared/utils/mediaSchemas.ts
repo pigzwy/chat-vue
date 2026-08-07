@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { imageQualities, imageRatios, imageResolutions } from './images'
-import { isImageMediaModelId, isVideoMediaModelId } from './mediaModels'
+import { isImageMediaModelId, isVideoMediaModelId, videoResolutions } from './mediaModels'
 
 export const imageRatioSchema = z.enum(imageRatios)
 export const imageResolutionSchema = z.enum(imageResolutions)
@@ -17,3 +17,5 @@ export const videoModelSchema = z.string()
   .refine(isVideoMediaModelId, 'Unsupported video model')
 
 export const videoDurationSchema = z.coerce.number().int().min(1).max(15)
+
+export const videoResolutionSchema = z.enum(videoResolutions)

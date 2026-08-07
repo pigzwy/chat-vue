@@ -6,9 +6,7 @@ const {
   activeModel,
   activeModelLabel,
   activeModelOptions,
-  activeGroupId,
   loadingModels,
-  groupForModel,
   selectModel
 } = useMediaModels()
 
@@ -27,44 +25,53 @@ const activeIcon = computed(() => {
       :icon="activeIcon"
       :label="activeModelLabel"
       trailing-icon="i-lucide-chevron-up"
-      class="glass-pill max-w-44 shrink-0 rounded-full font-medium"
+      class="glass-pill max-w-48 shrink-0 rounded-full font-medium"
       :ui="{ label: 'truncate' }"
     />
 
     <template #content>
-      <div class="glass-panel w-72 p-3">
-        <p class="label-mono mb-1.5 flex items-center gap-1.5">
-          模型
+      <div class="glass-panel w-80 p-2">
+        <p class="label-mono mb-1.5 flex items-center gap-1.5 px-1.5 pt-1">
+          选择模型
           <UIcon
             v-if="loadingModels"
             name="i-lucide-loader-circle"
             class="size-3 animate-spin"
           />
         </p>
-        <div class="flex max-h-64 flex-col gap-1 overflow-y-auto">
-          <UButton
+        <div class="flex max-h-80 flex-col gap-1 overflow-y-auto">
+          <button
             v-for="item in activeModelOptions"
             :key="item.value"
             type="button"
-            :icon="item.icon"
-            :label="item.label"
-            color="neutral"
-            :variant="activeModel === item.value ? 'soft' : 'ghost'"
-            block
-            class="justify-start rounded-xl font-medium"
+            class="glass-pill flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left"
+            :data-selected="activeModel === item.value"
             @click="selectModel(item.value)"
           >
-            <template #trailing>
-              <span class="label-mono ms-auto text-[10px]">
-                组 {{ groupForModel(item.value) }}
+            <UIcon
+              :name="item.icon"
+              class="mt-0.5 size-4 shrink-0"
+            />
+            <span class="min-w-0 flex-1">
+              <span class="flex items-center justify-between gap-2">
+                <span class="truncate text-sm font-semibold">{{ item.label }}</span>
+                <span
+                  v-if="item.price"
+                  class="label-mono shrink-0 text-[10px]"
+                >{{ item.price }}</span>
               </span>
-            </template>
-          </UButton>
+              <span
+                v-if="item.description"
+                class="mt-0.5 block text-xs leading-4 opacity-70"
+              >{{ item.description }}</span>
+            </span>
+            <UIcon
+              v-if="activeModel === item.value"
+              name="i-lucide-check"
+              class="mt-0.5 size-4 shrink-0"
+            />
+          </button>
         </div>
-
-        <p class="label-mono mt-3">
-          当前分组 {{ activeGroupId }} · key 自动创建
-        </p>
       </div>
     </template>
   </UPopover>

@@ -15,6 +15,7 @@ const {
   resolution,
   quality,
   videoDuration,
+  videoResolution,
   files,
   canSubmit,
   currentUploadLimit,
@@ -28,6 +29,12 @@ const {
 
 const fileInput = ref<HTMLInputElement | null>(null)
 const durationOptions = [5, 10, 15]
+const videoResolutionOptions = ['480p', '720p'] as const
+
+const costText = computed(() => {
+  if (estimatedCost.value == null) return ''
+  return `$${(+estimatedCost.value).toFixed(3).replace(/\.?0+$/, '')}`
+})
 
 const showEditingChip = computed(() => Boolean(selectedTask.value) && !files.value.length)
 const uploadDisabled = computed(() => files.value.length >= currentUploadLimit.value)
@@ -171,6 +178,18 @@ function onPromptKeydown(event: KeyboardEvent) {
               {{ option }}s
             </button>
           </div>
+          <div class="flex shrink-0 items-center gap-0.5 rounded-full bg-muted p-0.5">
+            <button
+              v-for="option in videoResolutionOptions"
+              :key="option"
+              type="button"
+              class="glass-pill h-7 rounded-full px-2.5 text-xs font-semibold"
+              :data-selected="videoResolution === option"
+              @click="videoResolution = option"
+            >
+              {{ option }}
+            </button>
+          </div>
         </template>
 
         <input
@@ -197,14 +216,14 @@ function onPromptKeydown(event: KeyboardEvent) {
         </UTooltip>
 
         <span
-          v-if="!isVideoMode && estimatedCost"
+          v-if="costText"
           class="label-mono inline-flex shrink-0 items-center gap-1"
         >
           <UIcon
             name="i-lucide-coins"
             class="size-3"
           />
-          ≈ ${{ estimatedCost }}
+          ≈ {{ costText }}
         </span>
       </div>
 

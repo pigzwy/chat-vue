@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer'
 import { defineHandler, HTTPError } from 'nitro'
 import { z } from 'zod'
 import { createVideoJob } from '../../../../utils/videoJobs'
-import { videoDurationSchema, videoModelSchema } from '../../../../../shared/utils/mediaSchemas'
+import { videoDurationSchema, videoModelSchema, videoResolutionSchema } from '../../../../../shared/utils/mediaSchemas'
 
 const videoImageMaxBytes = 10 * 1024 * 1024
 const videoImageTypes = ['image/png', 'image/jpeg', 'image/webp']
@@ -13,12 +13,14 @@ export default defineHandler(async (event) => {
     apiKey: z.string().min(1),
     model: videoModelSchema,
     prompt: z.string().trim().min(1),
-    duration: videoDurationSchema
+    duration: videoDurationSchema,
+    resolution: videoResolutionSchema.optional()
   }).parse({
     apiKey: form.get('apiKey'),
     model: form.get('model'),
     prompt: form.get('prompt'),
-    duration: form.get('duration')
+    duration: form.get('duration'),
+    resolution: form.get('resolution') ?? undefined
   })
 
   const imageEntry = form.get('image')
@@ -41,6 +43,7 @@ export default defineHandler(async (event) => {
     model: payload.model,
     prompt: payload.prompt,
     duration: payload.duration,
+    resolution: payload.resolution,
     image
   })
 

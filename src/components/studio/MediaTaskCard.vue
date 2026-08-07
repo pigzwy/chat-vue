@@ -19,6 +19,7 @@ const metaText = computed(() => {
   const parts: string[] = [props.task.model]
   if (isVideo.value) {
     if (props.task.duration) parts.push(`${props.task.duration}s`)
+    if (props.task.videoResolution) parts.push(props.task.videoResolution)
   } else {
     if (props.task.resolution) parts.push(props.task.resolution)
     if (props.task.ratio) parts.push(props.task.ratio)
@@ -204,6 +205,17 @@ function onVideoLeave(event: MouseEvent) {
               class="size-3.5"
             />
           </span>
+        </div>
+
+        <div
+          v-else
+          class="pointer-events-none absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white backdrop-blur"
+        >
+          <UIcon
+            :name="isVideo ? 'i-lucide-clapperboard' : 'i-lucide-image'"
+            class="size-3"
+          />
+          {{ isVideo ? '视频' : '图片' }}
         </div>
 
         <div
