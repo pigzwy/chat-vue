@@ -55,6 +55,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/studio': RouteRecordInfo<
+      '/studio',
+      '/studio',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -89,6 +96,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/images.vue': {
       routes:
         | '/images'
+      views:
+        | never
+    }
+    'src/pages/studio.vue': {
+      routes:
+        | '/studio'
       views:
         | never
     }

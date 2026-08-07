@@ -66,6 +66,7 @@ function iconForProvider(value?: string) {
   const normalized = value?.toLowerCase() || ''
   if (normalized.includes('anthropic') || normalized.includes('claude')) return 'i-simple-icons:anthropic'
   if (normalized.includes('google') || normalized.includes('gemini')) return 'i-simple-icons:google'
+  if (normalized.includes('grok') || normalized.includes('xai') || normalized.includes('x-ai')) return 'i-simple-icons:xai'
   if (normalized.includes('openai') || normalized.includes('gpt')) return 'i-simple-icons:openai'
   return 'i-lucide-box'
 }
@@ -256,6 +257,35 @@ export const useModels = createSharedComposable(() => {
     }
   }
 
+  /**
+   * 拉取指定分组的模型列表（供创作台等场景使用）。
+   * 只读缓存或按需请求，不改动聊天页的 group/model 选择状态。
+   * 注意：对没有 API Key 的分组会自动创建 key，调用方不要做全分组扫描。
+   */
+  async function getModelsForGroup(groupId: number, keyName = 'chat'): Promise<ModelSelectItem[]> {
+    if (!token.value) return []
+
+    const cacheKey = String(groupId)
+    const cachedModels = cachedModelsByGroup.value[cacheKey]
+    if (cachedModels?.token === token.value && cachedModels.items.length) {
+      return cachedModels.items
+    }
+
+    const groupApiKey = await getApiKeyForGroup(groupId, keyName)
+    const modelsResponse = await sub2apiFetch<unknown>('/v1/models', groupApiKey)
+    const items = getItems<ModelItem>(modelsResponse).map(toModelSelectItem)
+    if (items.length) {
+      cachedModelsByGroup.value = {
+        ...cachedModelsByGroup.value,
+        [cacheKey]: {
+          token: token.value,
+          items
+        }
+      }
+    }
+    return items
+  }
+
   async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
     if (!token.value) {
       throw new Error('缺少 Sub2API token')
@@ -343,6 +373,7 @@ export const useModels = createSharedComposable(() => {
     group,
     groups: groupItems,
     getApiKeyForGroup,
+    getModelsForGroup,
     hasSub2apiToken,
     loading,
     model,
