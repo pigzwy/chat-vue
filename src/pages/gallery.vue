@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useIntersectionObserver } from '@vueuse/core'
 import { galleryCases, galleryMeta, type GalleryCase } from '../data/galleryCases'
+import { useChunkedList } from '../composables/useChunkedList'
 
 const toast = useToast()
 const featuredRotateInterval = 5000
@@ -8,8 +10,10 @@ const search = ref('')
 const activeCategory = ref('全部')
 const activeSource = ref('全部来源')
 const selectedCase = ref<GalleryCase | null>(null)
+const caseModalOpen = ref(false)
 const failedImageIds = ref<string[]>([])
 const featuredCaseIndex = ref(0)
+const loadMoreSentinel = ref<HTMLElement | null>(null)
 let featuredRotateTimer: ReturnType<typeof setInterval> | undefined
 
 interface GalleryCaseSection {
@@ -45,12 +49,23 @@ const filteredCases = computed(() => {
     return matchesCategory && matchesSource && matchesKeyword
   })
 })
+
+const { visible: visibleCases, hasMore, loadMore } = useChunkedList(filteredCases, 24)
+
 const featuredCase = computed(() => filteredCases.value[featuredCaseIndex.value] || filteredCases.value[0] || galleryCases[0])
 
-const filteredCaseSections = computed<GalleryCaseSection[]>(() => {
+const categoryTotals = computed(() => {
+  const totals = new Map<string, number>()
+  for (const item of filteredCases.value) {
+    totals.set(item.category, (totals.get(item.category) || 0) + 1)
+  }
+  return totals
+})
+
+const visibleCaseSections = computed<GalleryCaseSection[]>(() => {
   const groups = new Map<string, GalleryCase[]>()
 
-  for (const item of filteredCases.value) {
+  for (const item of visibleCases.value) {
     const sectionCases = groups.get(item.category) || []
     sectionCases.push(item)
     groups.set(item.category, sectionCases)
@@ -58,6 +73,12 @@ const filteredCaseSections = computed<GalleryCaseSection[]>(() => {
 
   return [...groups.entries()].map(([title, cases]) => ({ title, cases }))
 })
+
+useIntersectionObserver(loadMoreSentinel, ([entry]) => {
+  if (entry?.isIntersecting) {
+    loadMore()
+  }
+}, { rootMargin: '600px 0px' })
 
 function getRandomFeaturedIndex(total: number) {
   if (total <= 1) return 0
@@ -79,10 +100,7 @@ function startFeaturedRotation() {
 
 function openCase(item: GalleryCase) {
   selectedCase.value = item
-}
-
-function closeCase() {
-  selectedCase.value = null
+  caseModalOpen.value = true
 }
 
 function getImageUrl(item: GalleryCase) {
@@ -101,7 +119,7 @@ async function copyPrompt(text: string) {
   await navigator.clipboard.writeText(text)
   toast.add({
     title: '已复制 Prompt',
-    description: '可以回到画图页直接粘贴使用',
+    description: '可以回到创作台直接粘贴使用',
     icon: 'i-lucide-copy'
   })
 }
@@ -120,29 +138,29 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="hero-shell min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-0 sm:px-6">
+  <div class="aurora-shell min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-0 sm:px-6">
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-5">
       <section class="grid gap-5 xl:grid-cols-2">
-        <div class="hero-panel p-6 sm:p-8 lg:p-10">
+        <div class="glass-panel glass-panel--lg p-6 sm:p-8 lg:p-10">
           <UBadge
             label="GPT-Image-2 Gallery"
             color="neutral"
             variant="outline"
-            class="warm-pill rounded-full"
+            class="glass-pill rounded-full"
           />
-          <h1 class="mt-5 text-4xl font-black tracking-tight text-highlighted sm:text-6xl">
+          <h1 class="mt-5 text-4xl font-bold tracking-tight text-highlighted sm:text-6xl">
             案例观摩馆
           </h1>
           <p class="mt-5 max-w-2xl text-sm leading-7 text-muted sm:text-base">
-            参考公开案例库的浏览体验，集中展示图片、分类、作者与 Prompt。先看案例找方向，再复制提示词去画图页生成或改写。
+            参考公开案例库的浏览体验，集中展示图片、分类、作者与 Prompt。先看案例找方向，再复制提示词去创作台生成或改写。
           </p>
           <div class="mt-7 flex flex-wrap gap-3">
             <UButton
-              to="/images"
+              to="/studio"
               icon="i-lucide-wand-sparkles"
-              label="打开画图工具"
+              label="打开创作台"
               color="primary"
-              class="warm-btn rounded-full px-5 font-semibold"
+              class="glass-btn rounded-full px-5 font-semibold"
             />
             <UButton
               href="https://github.com/EvoLinkAI/awesome-gpt-image-2-API-and-Prompts"
@@ -151,32 +169,32 @@ onBeforeUnmount(() => {
               label="原始仓库"
               color="neutral"
               variant="outline"
-              class="warm-pill rounded-full px-5 font-semibold"
+              class="glass-pill rounded-full px-5 font-semibold"
             />
           </div>
 
           <div class="mt-9 grid gap-3 sm:grid-cols-3">
-            <div class="warm-card rounded-3xl p-4">
-              <p class="text-2xl font-black text-highlighted">
+            <div class="glass-panel rounded-3xl p-4">
+              <p class="text-2xl font-bold text-highlighted">
                 {{ galleryMeta.totalCases }}
               </p>
-              <p class="mt-1 text-sm text-muted">
+              <p class="label-mono mt-1">
                 完整案例
               </p>
             </div>
-            <div class="warm-card rounded-3xl p-4">
-              <p class="text-2xl font-black text-highlighted">
+            <div class="glass-panel rounded-3xl p-4">
+              <p class="text-2xl font-bold text-highlighted">
                 {{ galleryMeta.sectionCount }}
               </p>
-              <p class="mt-1 text-sm text-muted">
+              <p class="label-mono mt-1">
                 原站分区
               </p>
             </div>
-            <div class="warm-card rounded-3xl p-4">
-              <p class="text-2xl font-black text-highlighted">
+            <div class="glass-panel rounded-3xl p-4">
+              <p class="text-2xl font-bold text-highlighted">
                 {{ galleryMeta.dataVersion }}
               </p>
-              <p class="mt-1 text-sm text-muted">
+              <p class="label-mono mt-1">
                 数据版本
               </p>
             </div>
@@ -186,10 +204,10 @@ onBeforeUnmount(() => {
         <button
           v-if="featuredCase"
           type="button"
-          class="hero-panel group overflow-hidden p-3 text-left"
+          class="glass-panel glass-panel--lg group overflow-hidden p-3 text-left"
           @click="openCase(featuredCase)"
         >
-          <div class="relative aspect-[3/4] overflow-hidden rounded-[1.25rem] bg-[var(--warm-surface-hover)]">
+          <div class="relative aspect-[3/4] overflow-hidden rounded-2xl bg-muted">
             <img
               :src="getImageUrl(featuredCase)"
               :alt="featuredCase.title"
@@ -203,7 +221,7 @@ onBeforeUnmount(() => {
                 variant="solid"
                 class="rounded-full bg-white/20 text-white backdrop-blur"
               />
-              <h2 class="mt-3 text-2xl font-black">
+              <h2 class="mt-3 text-2xl font-bold">
                 {{ featuredCase.title }}
               </h2>
               <p class="mt-2 line-clamp-2 text-sm leading-6 text-white/75">
@@ -214,10 +232,10 @@ onBeforeUnmount(() => {
         </button>
       </section>
 
-      <section class="hero-panel p-4 sm:p-5">
+      <section class="glass-panel glass-panel--lg p-4 sm:p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h2 class="text-2xl font-black text-highlighted">
+            <h2 class="text-2xl font-bold text-highlighted">
               浏览案例
             </h2>
             <p class="mt-1 text-sm text-muted">
@@ -229,7 +247,7 @@ onBeforeUnmount(() => {
             icon="i-lucide-search"
             placeholder="搜索案例 / Prompt"
             class="w-full lg:w-80"
-            :ui="{ base: 'rounded-full bg-[var(--warm-card)]' }"
+            :ui="{ base: 'rounded-full bg-elevated' }"
           />
         </div>
 
@@ -238,8 +256,8 @@ onBeforeUnmount(() => {
             v-for="category in categories"
             :key="category"
             type="button"
-            class="warm-pill shrink-0 px-4 py-2 text-sm font-semibold"
-            :class="activeCategory === category ? 'warm-btn' : ''"
+            class="glass-pill shrink-0 px-4 py-2 text-sm font-semibold"
+            :data-selected="activeCategory === category"
             @click="activeCategory = category"
           >
             {{ category }}
@@ -251,8 +269,8 @@ onBeforeUnmount(() => {
             v-for="source in sources"
             :key="source"
             type="button"
-            class="warm-pill shrink-0 px-4 py-2 text-sm font-semibold"
-            :class="activeSource === source ? 'warm-btn' : ''"
+            class="glass-pill shrink-0 px-4 py-2 text-sm font-semibold"
+            :data-selected="activeSource === source"
             @click="activeSource = source"
           >
             {{ source }}
@@ -262,21 +280,21 @@ onBeforeUnmount(() => {
 
       <template v-if="filteredCases.length">
         <section
-          v-for="section in filteredCaseSections"
+          v-for="section in visibleCaseSections"
           :key="section.title"
-          class="hero-panel p-4 sm:p-5"
+          class="glass-panel glass-panel--lg p-4 sm:p-5"
         >
           <div class="mb-5 flex items-end justify-between gap-4">
             <div>
-              <p class="text-xs font-bold uppercase tracking-[0.2em] text-muted">
+              <p class="label-mono">
                 Gallery
               </p>
-              <h2 class="mt-2 text-2xl font-black text-highlighted">
+              <h2 class="mt-2 text-2xl font-bold text-highlighted">
                 {{ section.title }}
               </h2>
             </div>
-            <div class="warm-pill shrink-0 px-4 py-2 text-sm font-semibold text-muted">
-              {{ section.cases.length }} 个案例
+            <div class="glass-pill shrink-0 px-4 py-2 text-sm font-semibold text-muted">
+              {{ categoryTotals.get(section.title) || section.cases.length }} 个案例
             </div>
           </div>
 
@@ -284,17 +302,19 @@ onBeforeUnmount(() => {
             <article
               v-for="item in section.cases"
               :key="item.id"
-              class="warm-card-hover flex h-full overflow-hidden rounded-[1.5rem] p-0"
+              class="glass-card-hover flex h-full overflow-hidden rounded-2xl p-0"
             >
               <div class="flex w-full flex-col">
                 <button
                   type="button"
-                  class="group relative aspect-[3/4] shrink-0 overflow-hidden bg-[var(--warm-surface-hover)] text-left"
+                  class="group relative aspect-[3/4] shrink-0 overflow-hidden bg-muted text-left"
                   @click="openCase(item)"
                 >
                   <img
                     :src="getImageUrl(item)"
                     :alt="item.title"
+                    loading="lazy"
+                    decoding="async"
                     class="block size-full object-cover transition duration-500 group-hover:scale-105"
                     @error="onImageError(item)"
                   >
@@ -313,7 +333,7 @@ onBeforeUnmount(() => {
                     />
                     <span class="text-xs text-muted">{{ item.author }}</span>
                   </div>
-                  <h3 class="text-lg font-black text-highlighted">
+                  <h3 class="text-lg font-bold text-highlighted">
                     {{ item.title }}
                   </h3>
                   <p class="line-clamp-3 text-sm leading-6 text-muted">
@@ -337,7 +357,7 @@ onBeforeUnmount(() => {
                       color="neutral"
                       variant="soft"
                       size="sm"
-                      class="warm-pill rounded-full"
+                      class="glass-pill rounded-full"
                       @click="openCase(item)"
                     />
                     <UButton
@@ -347,7 +367,7 @@ onBeforeUnmount(() => {
                       color="neutral"
                       variant="outline"
                       size="sm"
-                      class="warm-pill rounded-full"
+                      class="glass-pill rounded-full"
                       @click="copyPrompt(item.prompt)"
                     />
                   </div>
@@ -356,18 +376,30 @@ onBeforeUnmount(() => {
             </article>
           </div>
         </section>
+
+        <div
+          v-if="hasMore"
+          ref="loadMoreSentinel"
+          class="flex items-center justify-center gap-2 py-6 text-sm text-muted"
+        >
+          <UIcon
+            name="i-lucide-loader-circle"
+            class="size-4 animate-spin"
+          />
+          正在加载更多案例（{{ visibleCases.length }} / {{ filteredCases.length }}）
+        </div>
       </template>
 
       <section
         v-else
-        class="hero-panel grid min-h-80 place-items-center p-8 text-center"
+        class="glass-panel glass-panel--lg grid min-h-80 place-items-center p-8 text-center"
       >
         <div>
           <UIcon
             name="i-lucide-search-x"
             class="mx-auto size-10 text-muted"
           />
-          <h2 class="mt-4 text-xl font-black text-highlighted">
+          <h2 class="mt-4 text-xl font-bold text-highlighted">
             没有找到匹配案例
           </h2>
           <p class="mt-2 text-sm text-muted">
@@ -377,121 +409,125 @@ onBeforeUnmount(() => {
       </section>
     </div>
 
-    <div
-      v-if="selectedCase"
-      class="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur"
-      @click.self="closeCase"
+    <UModal
+      v-model:open="caseModalOpen"
+      :ui="{ content: 'glass-panel glass-panel--lg max-w-6xl overflow-hidden rounded-3xl p-0 divide-y-0' }"
     >
-      <div class="hero-panel grid max-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-[2rem] lg:grid-cols-[0.95fr_0.85fr]">
-        <div class="min-h-0 bg-black">
-          <img
-            :src="getImageUrl(selectedCase)"
-            :alt="selectedCase.title"
-            class="max-h-[45vh] w-full object-contain lg:h-full lg:max-h-[calc(100vh-2rem)]"
-            @error="onImageError(selectedCase)"
-          >
-        </div>
-        <div class="flex min-h-0 flex-col p-5 sm:p-6">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <UBadge
-                :label="selectedCase.category"
+      <template #content>
+        <div
+          v-if="selectedCase"
+          class="grid max-h-[calc(100vh-2rem)] lg:grid-cols-[0.95fr_0.85fr]"
+        >
+          <div class="min-h-0 bg-black">
+            <img
+              :src="getImageUrl(selectedCase)"
+              :alt="selectedCase.title"
+              class="max-h-[45vh] w-full object-contain lg:h-full lg:max-h-[calc(100vh-2rem)]"
+              @error="onImageError(selectedCase)"
+            >
+          </div>
+          <div class="flex min-h-0 flex-col p-5 sm:p-6">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <UBadge
+                  :label="selectedCase.category"
+                  color="neutral"
+                  variant="subtle"
+                  class="rounded-full"
+                />
+                <h2 class="mt-3 text-2xl font-bold text-highlighted sm:text-3xl">
+                  {{ selectedCase.title }}
+                </h2>
+                <p class="mt-2 text-sm text-muted">
+                  {{ selectedCase.author }} · {{ selectedCase.sourceLabel || '未标记来源' }}
+                </p>
+              </div>
+              <UButton
+                type="button"
+                icon="i-lucide-x"
                 color="neutral"
-                variant="subtle"
+                variant="ghost"
+                class="glass-pill rounded-full"
+                aria-label="关闭"
+                @click="caseModalOpen = false"
+              />
+            </div>
+
+            <div class="mt-5 flex flex-wrap gap-2">
+              <UButton
+                v-if="selectedCase.sourceUrl"
+                :href="selectedCase.sourceUrl"
+                target="_blank"
+                icon="i-lucide-external-link"
+                label="原始来源"
+                color="neutral"
+                variant="outline"
+                size="xs"
+                class="glass-pill rounded-full"
+              />
+              <UButton
+                v-if="selectedCase.authorUrl"
+                :href="selectedCase.authorUrl"
+                target="_blank"
+                icon="i-lucide-user"
+                label="作者"
+                color="neutral"
+                variant="outline"
+                size="xs"
+                class="glass-pill rounded-full"
+              />
+              <UBadge
+                v-for="tag in selectedCase.tags"
+                :key="tag"
+                :label="tag"
+                color="neutral"
+                variant="outline"
                 class="rounded-full"
               />
-              <h2 class="mt-3 text-2xl font-black text-highlighted sm:text-3xl">
-                {{ selectedCase.title }}
-              </h2>
-              <p class="mt-2 text-sm text-muted">
-                {{ selectedCase.author }} · {{ selectedCase.sourceLabel || '未标记来源' }}
+            </div>
+
+            <div class="mt-5 flex min-h-0 flex-1 flex-col rounded-2xl border border-default bg-muted p-4">
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <p class="text-sm font-bold text-highlighted">
+                  Prompt
+                </p>
+                <UButton
+                  type="button"
+                  icon="i-lucide-copy"
+                  label="复制"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  class="glass-pill rounded-full"
+                  @click="copyPrompt(selectedCase.prompt)"
+                />
+              </div>
+              <p class="overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-muted">
+                {{ selectedCase.prompt }}
               </p>
             </div>
-            <UButton
-              type="button"
-              icon="i-lucide-x"
-              color="neutral"
-              variant="ghost"
-              class="warm-pill rounded-full"
-              aria-label="关闭"
-              @click="closeCase"
-            />
-          </div>
 
-          <div class="mt-5 flex flex-wrap gap-2">
-            <UButton
-              v-if="selectedCase.sourceUrl"
-              :href="selectedCase.sourceUrl"
-              target="_blank"
-              icon="i-lucide-external-link"
-              label="原始来源"
-              color="neutral"
-              variant="outline"
-              size="xs"
-              class="warm-pill rounded-full"
-            />
-            <UButton
-              v-if="selectedCase.authorUrl"
-              :href="selectedCase.authorUrl"
-              target="_blank"
-              icon="i-lucide-user"
-              label="作者"
-              color="neutral"
-              variant="outline"
-              size="xs"
-              class="warm-pill rounded-full"
-            />
-            <UBadge
-              v-for="tag in selectedCase.tags"
-              :key="tag"
-              :label="tag"
-              color="neutral"
-              variant="outline"
-              class="rounded-full"
-            />
-          </div>
-
-          <div class="mt-5 flex min-h-0 flex-1 flex-col rounded-3xl border border-[var(--warm-border)] bg-[var(--warm-surface-hover)] p-4">
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <p class="text-sm font-bold text-highlighted">
-                Prompt
-              </p>
+            <div class="mt-5 flex flex-wrap justify-end gap-2">
+              <UButton
+                to="/studio"
+                icon="i-lucide-wand-sparkles"
+                label="去创作台"
+                color="primary"
+                class="glass-btn rounded-full"
+              />
               <UButton
                 type="button"
                 icon="i-lucide-copy"
-                label="复制"
+                label="复制 Prompt"
                 color="neutral"
-                variant="ghost"
-                size="xs"
-                class="warm-pill rounded-full"
+                variant="outline"
+                class="glass-pill rounded-full"
                 @click="copyPrompt(selectedCase.prompt)"
               />
             </div>
-            <p class="overflow-y-auto whitespace-pre-wrap text-sm leading-7 text-muted">
-              {{ selectedCase.prompt }}
-            </p>
-          </div>
-
-          <div class="mt-5 flex flex-wrap justify-end gap-2">
-            <UButton
-              to="/images"
-              icon="i-lucide-wand-sparkles"
-              label="去画图"
-              color="primary"
-              class="warm-btn rounded-full"
-            />
-            <UButton
-              type="button"
-              icon="i-lucide-copy"
-              label="复制 Prompt"
-              color="neutral"
-              variant="outline"
-              class="warm-pill rounded-full"
-              @click="copyPrompt(selectedCase.prompt)"
-            />
           </div>
         </div>
-      </div>
-    </div>
+      </template>
+    </UModal>
   </div>
 </template>
