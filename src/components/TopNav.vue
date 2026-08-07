@@ -10,7 +10,7 @@ const isGalleryRoute = computed(() => route.path.startsWith('/gallery'))
 const tabs = computed(() => [
   { label: '对话', icon: 'i-lucide-message-circle', to: '/', selected: !isStudioRoute.value && !isGalleryRoute.value },
   { label: '创作台', icon: 'i-lucide-wand-sparkles', to: '/studio', selected: isStudioRoute.value },
-  { label: '案例', icon: 'i-lucide-images', to: '/gallery', selected: isGalleryRoute.value }
+  { label: '灵感', icon: 'i-lucide-lightbulb', to: '/gallery', selected: isGalleryRoute.value }
 ])
 </script>
 

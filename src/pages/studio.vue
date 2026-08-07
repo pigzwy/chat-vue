@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useStudioTasks } from '../composables/studio/useStudioTasks'
 import { imagePromptPresets, videoPromptPresets } from '../data/promptPresets'
 import PromptPresetRow from '../components/PromptPresetRow.vue'
@@ -27,8 +28,18 @@ function usePreset(presetPrompt: string) {
   prompt.value = current ? `${current}，${presetPrompt}` : presetPrompt
 }
 
+const route = useRoute()
+const router = useRouter()
+
 onMounted(() => {
   tasks.init()
+
+  // 从灵感墙「用它创作」带过来的 prompt
+  const incoming = route.query.prompt
+  if (typeof incoming === 'string' && incoming.trim()) {
+    prompt.value = incoming.trim()
+    void router.replace({ path: '/studio' })
+  }
 })
 
 onBeforeUnmount(() => {
