@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useStudioTasks } from '../../composables/studio/useStudioTasks'
 
 const tasks = useStudioTasks()
 const { previewTask, previewUploadedImage, previewImageUrl, previewVideoUrl, previewRevisedPrompt } = tasks
+
+const videoFailed = ref(false)
+watch(previewVideoUrl, () => {
+  videoFailed.value = false
+})
 
 const open = computed({
   get: () => Boolean(previewTask.value || previewUploadedImage.value),
@@ -46,14 +51,27 @@ const title = computed(() => {
         </div>
 
         <div class="grid min-h-0 flex-1 place-items-center overflow-hidden bg-black/85 p-2">
+          <div
+            v-if="previewVideoUrl && videoFailed"
+            class="flex flex-col items-center gap-2 py-16 text-center text-white/70"
+          >
+            <UIcon
+              name="i-lucide-timer-off"
+              class="size-8"
+            />
+            <p class="text-sm">
+              视频已过期，请重新生成
+            </p>
+          </div>
           <video
-            v-if="previewVideoUrl"
+            v-else-if="previewVideoUrl"
             :src="previewVideoUrl"
             controls
             autoplay
             loop
             playsinline
             class="max-h-[62vh] max-w-full rounded-xl"
+            @error="videoFailed = true"
           />
           <img
             v-else-if="previewImageUrl"

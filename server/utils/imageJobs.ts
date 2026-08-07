@@ -326,6 +326,7 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
   })
   const upstreamPaths = ['/images/generations', '/v1/images/generations']
   let response: Response | null = null
+  let errorText = ''
 
   for (const path of upstreamPaths) {
     const pathStartedAt = performance.now()
@@ -349,8 +350,10 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
       totalElapsedMs: getElapsedMs(startedAt)
     })
 
-    if (response.ok || !isPathFallbackStatus(response.status)) break
-    await response.text().catch(() => '')
+    if (response.ok) break
+    // body 只能读一次：非 ok 先把错误文本拿出来，路径回退时再覆盖
+    errorText = await response.text().catch(() => '')
+    if (!isPathFallbackStatus(response.status)) break
   }
 
   if (!response) {
@@ -358,13 +361,12 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
   }
 
   if (!response.ok) {
-    const text = await response.text()
     logImageJob(job, stream ? 'stream-response-error' : 'sync-response-error', {
       status: response.status,
       elapsedMs: getElapsedMs(startedAt),
-      bodyLength: text.length
+      bodyLength: errorText.length
     })
-    const error = new Error(toErrorMessage(text, response.status, response.statusText)) as RequestError
+    const error = new Error(toErrorMessage(errorText, response.status, response.statusText)) as RequestError
     error.status = response.status
     throw error
   }
@@ -466,6 +468,7 @@ async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal
 
   const upstreamPaths = ['/images/edits', '/v1/images/edits']
   let response: Response | null = null
+  let errorText = ''
 
   for (const path of upstreamPaths) {
     const pathStartedAt = performance.now()
@@ -487,8 +490,10 @@ async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal
       totalElapsedMs: getElapsedMs(startedAt)
     })
 
-    if (response.ok || !isPathFallbackStatus(response.status)) break
-    await response.text().catch(() => '')
+    if (response.ok) break
+    // body 只能读一次：非 ok 先把错误文本拿出来，路径回退时再覆盖
+    errorText = await response.text().catch(() => '')
+    if (!isPathFallbackStatus(response.status)) break
   }
 
   if (!response) {
@@ -496,8 +501,7 @@ async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal
   }
 
   if (!response.ok) {
-    const text = await response.text()
-    const error = new Error(toErrorMessage(text, response.status, response.statusText)) as RequestError
+    const error = new Error(toErrorMessage(errorText, response.status, response.statusText)) as RequestError
     error.status = response.status
     throw error
   }

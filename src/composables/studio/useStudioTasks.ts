@@ -115,18 +115,23 @@ function createMediaTaskId() {
   return crypto.randomUUID()
 }
 
+// useOverlay().create 会向全局 overlays 数组追加且不随 scope 销毁回收，
+// 模块级复用同一个确认弹窗，避免反复进出创作台时条目泄漏
+let deleteConfirmModalHandle: { open: () => { result: Promise<unknown> } } | null = null
+
 export const useStudioTasks = createSharedComposable(() => {
   const toast = useToast()
   const overlay = useOverlay()
   const { getApiKeyForGroup, clearApiKeyForGroup } = useModels()
   const mediaModels = useMediaModels()
 
-  const deleteConfirmModal = overlay.create(ModalConfirm, {
+  deleteConfirmModalHandle ||= overlay.create(ModalConfirm, {
     props: {
       title: '删除记录',
       description: '确定要删除这条生成记录吗？此操作只会从当前浏览器历史中移除。'
     }
   })
+  const deleteConfirmModal = deleteConfirmModalHandle
 
   async function confirmDelete() {
     const instance = deleteConfirmModal.open()
@@ -356,32 +361,47 @@ export const useStudioTasks = createSharedComposable(() => {
   }
 
   async function hydrateStoredImageAssets() {
-    const nextTasks = await Promise.all(queue.value.map(async (task) => {
+    // 按 id 合并回当前队列而不是整体替换：hydrate 期间恢复轮询可能已把任务写成
+    // completed，整体替换会用旧快照把它回滚成 generating（且不再有人更新）
+    const snapshots = [...queue.value]
+    await Promise.all(snapshots.map(async (task) => {
       if (task.imageUrl?.startsWith('data:')) {
         await putImageAsset(task.id, task.imageUrl)
-        return task
+        return
       }
-      if (task.kind === 'video') return task
+      if (task.kind === 'video' || task.imageUrl) return
 
       const imageUrl = await getImageAsset(task.id)
-      return imageUrl ? { ...task, imageUrl } : task
+      if (!imageUrl) return
+
+      const index = queue.value.findIndex(item => item.id === task.id)
+      const current = queue.value[index]
+      if (index !== -1 && current && !current.imageUrl) {
+        queue.value.splice(index, 1, { ...current, imageUrl })
+      }
     }))
 
-    queue.value = nextTasks
     persistTasks(queue.value)
   }
 
   function limitTasksForStorage(tasks: MediaTask[]) {
-    const images: MediaTask[] = []
-    const videos: MediaTask[] = []
-    const next: MediaTask[] = []
+    // 生成中的任务优先保留：被截断会丢 jobId，刷新后无法恢复（服务端仍在跑并扣费）
+    const keep = new Set<MediaTask>()
+    const counts: Record<MediaKind, number> = { image: 0, video: 0 }
+
     for (const task of tasks) {
-      const bucket = task.kind === 'video' ? videos : images
-      if (bucket.length >= perKindStorageLimit) continue
-      bucket.push(task)
-      next.push(task)
+      if (task.status !== 'generating') continue
+      keep.add(task)
+      counts[task.kind]++
     }
-    return next
+    for (const task of tasks) {
+      if (keep.has(task)) continue
+      if (counts[task.kind] >= perKindStorageLimit) continue
+      keep.add(task)
+      counts[task.kind]++
+    }
+
+    return tasks.filter(task => keep.has(task))
   }
 
   function persistTasks(tasks: MediaTask[]) {
@@ -504,25 +524,42 @@ export const useStudioTasks = createSharedComposable(() => {
     appendUploadedImages(imageFiles)
   }
 
-  function onDragOverImages(event: DragEvent) {
-    const hasImage = Array.from(event.dataTransfer?.items || []).some(item => item.type.startsWith('image/'))
-    if (!hasImage) return
+  // dragenter/dragleave 成对计数：拖过子元素时两者都会触发，
+  // 只按 currentTarget 判断会让"拖出窗口"漏掉复位，遮罩永久残留
+  let dragDepth = 0
+
+  function hasDraggedImage(event: DragEvent) {
+    return Array.from(event.dataTransfer?.items || []).some(item => item.type.startsWith('image/'))
+  }
+
+  function onDragEnterImages(event: DragEvent) {
+    if (!hasDraggedImage(event)) return
 
     event.preventDefault()
+    dragDepth++
     isDraggingImages.value = true
   }
 
-  function onDragLeaveImages(event: DragEvent) {
-    if (event.currentTarget !== event.target) return
-    isDraggingImages.value = false
+  function onDragOverImages(event: DragEvent) {
+    if (!hasDraggedImage(event)) return
+    event.preventDefault()
+  }
+
+  function onDragLeaveImages() {
+    dragDepth = Math.max(0, dragDepth - 1)
+    if (dragDepth === 0) {
+      isDraggingImages.value = false
+    }
   }
 
   function onDropImages(event: DragEvent) {
+    dragDepth = 0
+    isDraggingImages.value = false
+
     const imageFiles = getImageFiles(event.dataTransfer?.files || [])
     if (!imageFiles.length) return
 
     event.preventDefault()
-    isDraggingImages.value = false
     appendUploadedImages(imageFiles)
   }
 
@@ -678,9 +715,17 @@ export const useStudioTasks = createSharedComposable(() => {
     const filename = getMediaDownloadFilename(task)
 
     if (task.videoUrl) {
-      // 跨域视频 URL 无法直接 download，先转 blob，失败再退化为新窗口打开
+      // 跨域视频 URL 无法直接 download，先转 blob；404 表示代理已过期，别再开新窗口
       try {
         const response = await fetch(task.videoUrl)
+        if (response.status === 404) {
+          toast.add({
+            description: '视频已过期，无法下载，请重新生成',
+            icon: 'i-lucide-circle-alert',
+            color: 'warning'
+          })
+          return
+        }
         if (!response.ok) throw new Error(String(response.status))
         const blob = await response.blob()
         const objectUrl = URL.createObjectURL(blob)
@@ -876,6 +921,12 @@ export const useStudioTasks = createSharedComposable(() => {
         durationSeconds: getDurationSeconds(task.createdAt),
         completedAt: result.completedAt ? new Date(result.completedAt) : new Date()
       })
+      persistNow()
+      toast.add({
+        title: '视频生成完成',
+        description: '视频链接约 2 小时内有效，请及时下载保存',
+        icon: 'i-lucide-clapperboard'
+      })
       return
     }
 
@@ -892,6 +943,7 @@ export const useStudioTasks = createSharedComposable(() => {
       durationSeconds: getDurationSeconds(task.createdAt),
       completedAt: result.completedAt ? new Date(result.completedAt) : new Date()
     })
+    persistNow()
   }
 
   async function executeMediaTask(
@@ -899,7 +951,8 @@ export const useStudioTasks = createSharedComposable(() => {
     runner: (apiKey: string) => Promise<MediaJobResponse>,
     options: {
       selectOnSuccess?: boolean
-      shouldClearUploadedImages?: () => boolean
+      /** 成功后只清掉本次提交用掉的源图（生成期间用户可能已上传了新源图） */
+      getUploadedIdsToClear?: () => string[]
     } = {}
   ) {
     queue.value.unshift(task)
@@ -926,8 +979,8 @@ export const useStudioTasks = createSharedComposable(() => {
       if (options.selectOnSuccess && task.kind === 'image') {
         selectedTaskId.value = task.id
       }
-      if (options.shouldClearUploadedImages?.()) {
-        clearUploadedImages()
+      for (const id of options.getUploadedIdsToClear?.() || []) {
+        removeUploadedImage(id)
       }
     } catch (error) {
       if (isUnmounted) return
@@ -1011,15 +1064,23 @@ export const useStudioTasks = createSharedComposable(() => {
     }
   }
 
+  // deep watcher 会随 scope 销毁（用户离开页面）而失效，
+  // jobId/完成结果这类"丢了就无法恢复"的状态要显式落盘
+  function persistNow() {
+    persistTasks(queue.value)
+  }
+
   async function runImageTask(apiKey: string, task: MediaTask, editSources: File[]) {
     if (editSources.length) {
       const job = await createImageEditJob(apiKey, imageJobRequest(task), editSources)
       updateTask(task.id, { jobId: job.id })
+      persistNow()
       return pollImageGenerationJob(job.id, () => isUnmounted)
     }
 
     const job = await createImageGenerationJob(apiKey, imageJobRequest(task))
     updateTask(task.id, { jobId: job.id })
+    persistNow()
     return pollImageGenerationJob(job.id, () => isUnmounted)
   }
 
@@ -1032,6 +1093,7 @@ export const useStudioTasks = createSharedComposable(() => {
       image: sourceImage
     })
     updateTask(task.id, { jobId: job.id })
+    persistNow()
     return pollVideoGenerationJob(job.id, () => isUnmounted)
   }
 
@@ -1039,6 +1101,7 @@ export const useStudioTasks = createSharedComposable(() => {
     if (!canSubmit.value) return
 
     const uploadedSources = files.value.map(item => item.file)
+    const uploadedIds = files.value.map(item => item.id)
     const sourceTask = uploadedSources.length ? null : selectedTask.value
     const sourceImageIds = sourceTask ? [sourceTask.id] : undefined
     const trimmedPrompt = prompt.value.trim()
@@ -1066,7 +1129,7 @@ export const useStudioTasks = createSharedComposable(() => {
           return runVideoTask(apiKey, task, sourceImage)
         },
         {
-          shouldClearUploadedImages: () => uploadedSources.length > 0
+          getUploadedIdsToClear: () => uploadedIds
         }
       )
       return
@@ -1107,7 +1170,7 @@ export const useStudioTasks = createSharedComposable(() => {
       },
       {
         selectOnSuccess: Boolean(sourceTask),
-        shouldClearUploadedImages: () => uploadedSources.length > 0
+        getUploadedIdsToClear: () => uploadedIds
       }
     )
   }
@@ -1118,7 +1181,7 @@ export const useStudioTasks = createSharedComposable(() => {
     const sourceImageIds = task.sourceImageIds?.length
       ? task.sourceImageIds
       : task.parentId ? [task.parentId] : undefined
-    let usedUploadedSources = false
+    let usedUploadedIds: string[] = []
     const cachedSources = sourceFilesByTaskId.get(task.id) || []
 
     const retryTask: MediaTask = {
@@ -1154,7 +1217,7 @@ export const useStudioTasks = createSharedComposable(() => {
             } else if (cachedSources.length) {
               sourceImage = cachedSources[0]
             } else if (files.value.length) {
-              usedUploadedSources = true
+              usedUploadedIds = files.value.slice(0, 1).map(item => item.id)
               sourceImage = files.value[0]?.file
             } else {
               throw new Error('找不到源图，请重新上传或选择图片后再试')
@@ -1163,7 +1226,7 @@ export const useStudioTasks = createSharedComposable(() => {
           return runVideoTask(apiKey, retryTask, sourceImage)
         },
         {
-          shouldClearUploadedImages: () => usedUploadedSources
+          getUploadedIdsToClear: () => usedUploadedIds
         }
       )
       return
@@ -1179,7 +1242,7 @@ export const useStudioTasks = createSharedComposable(() => {
           } else if (cachedSources.length) {
             editSources = cachedSources
           } else if (files.value.length) {
-            usedUploadedSources = true
+            usedUploadedIds = files.value.map(item => item.id)
             editSources = files.value.map(item => item.file)
           } else {
             throw new Error('找不到要编辑的图片，请重新上传或选择图片后再试')
@@ -1189,7 +1252,7 @@ export const useStudioTasks = createSharedComposable(() => {
       },
       {
         selectOnSuccess: task.type === 'edit',
-        shouldClearUploadedImages: () => usedUploadedSources
+        getUploadedIdsToClear: () => usedUploadedIds
       }
     )
   }
@@ -1238,6 +1301,8 @@ export const useStudioTasks = createSharedComposable(() => {
 
   function dispose() {
     isUnmounted = true
+    dragDepth = 0
+    isDraggingImages.value = false
     if (durationTimer) {
       clearInterval(durationTimer)
       durationTimer = null
@@ -1287,6 +1352,7 @@ export const useStudioTasks = createSharedComposable(() => {
     removeUploadedImage,
     clearUploadedImages,
     onPasteImages,
+    onDragEnterImages,
     onDragOverImages,
     onDragLeaveImages,
     onDropImages,

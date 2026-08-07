@@ -7,21 +7,31 @@ import { videoDurationSchema, videoModelSchema, videoResolutionSchema } from '..
 const videoImageMaxBytes = 10 * 1024 * 1024
 const videoImageTypes = ['image/png', 'image/jpeg', 'image/webp']
 
+const videoJobSchema = z.object({
+  apiKey: z.string().min(1),
+  model: videoModelSchema,
+  prompt: z.string().trim().min(1),
+  duration: videoDurationSchema,
+  resolution: videoResolutionSchema.optional()
+})
+
 export default defineHandler(async (event) => {
   const form = await event.req.formData()
-  const payload = z.object({
-    apiKey: z.string().min(1),
-    model: videoModelSchema,
-    prompt: z.string().trim().min(1),
-    duration: videoDurationSchema,
-    resolution: videoResolutionSchema.optional()
-  }).parse({
+  const parsed = videoJobSchema.safeParse({
     apiKey: form.get('apiKey'),
     model: form.get('model'),
     prompt: form.get('prompt'),
     duration: form.get('duration'),
     resolution: form.get('resolution') ?? undefined
   })
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw new HTTPError({
+      statusCode: 400,
+      statusMessage: `请求参数不合法: ${issue?.path.join('.') || ''} ${issue?.message || ''}`.trim()
+    })
+  }
+  const payload = parsed.data
 
   const imageEntry = form.get('image')
   let image: { data: string, mediaType: string } | undefined

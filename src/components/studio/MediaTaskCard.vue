@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { useStudioTasks, type MediaTask } from '../../composables/studio/useStudioTasks'
 
@@ -9,6 +9,9 @@ const props = defineProps<{
 
 const tasks = useStudioTasks()
 const { batchMode, selectedTaskId, selectedBatchIds } = tasks
+
+// 视频代理地址随任务过期（2h/服务重启）失效，加载失败时给出明确状态
+const videoFailed = ref(false)
 
 const hasMedia = computed(() => Boolean(props.task.imageUrl || props.task.videoUrl))
 const isVideo = computed(() => props.task.kind === 'video')
@@ -166,7 +169,31 @@ function onVideoLeave(event: MouseEvent) {
       </template>
 
       <template v-else>
+        <div
+          v-if="isVideo && videoFailed"
+          class="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center"
+        >
+          <UIcon
+            name="i-lucide-timer-off"
+            class="size-6 text-muted"
+          />
+          <p class="text-xs text-muted">
+            视频已过期，请重新生成
+          </p>
+          <UButton
+            type="button"
+            icon="i-lucide-rotate-cw"
+            label="重新生成"
+            color="neutral"
+            variant="soft"
+            size="xs"
+            class="glass-pill rounded-full"
+            @click="tasks.retryMediaTask(task)"
+          />
+        </div>
+
         <button
+          v-else
           type="button"
           class="block size-full text-left"
           @click="onMediaClick"
@@ -181,6 +208,7 @@ function onVideoLeave(event: MouseEvent) {
             class="size-full object-cover"
             @mouseenter="onVideoEnter"
             @mouseleave="onVideoLeave"
+            @error="videoFailed = true"
           />
           <img
             v-else-if="task.imageUrl"

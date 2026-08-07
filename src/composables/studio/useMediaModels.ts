@@ -66,8 +66,13 @@ export const useMediaModels = createSharedComposable(() => {
   const imageModel = useStorage<string>('sub2api-media-image-model', defaultImageModelId)
   const videoModel = useStorage<string>('sub2api-media-video-model', defaultVideoModelId)
 
-  /** 两个媒体分组实际可用的模型 id（拉取失败/未登录时为 null，表示未知） */
-  const availableModelIds = ref<Set<string> | null>(null)
+  /**
+   * 按 provider 分开记录可用模型 id。null = 未知（未登录或该分组拉取失败）。
+   * 某个分组瞬时失败时不能把它的模型判为"不可用"——否则会静默改写用户
+   * 已选的模型（计费/能力随之全变），恢复后也不会切回。
+   */
+  const openaiAvailableIds = ref<Set<string> | null>(null)
+  const grokAvailableIds = ref<Set<string> | null>(null)
   const loadingModels = ref(false)
 
   function groupForModel(modelId: string) {
@@ -78,10 +83,11 @@ export const useMediaModels = createSharedComposable(() => {
 
   function curatedOptions(kind: MediaKind): MediaModelOption[] {
     const specs = mediaModelCatalog.filter(spec => spec.kind === kind)
-    if (!availableModelIds.value) return specs.map(toOption)
-
-    const available = specs.filter(spec => availableModelIds.value!.has(spec.id))
-    return (available.length ? available : specs).map(toOption)
+    const filtered = specs.filter((spec) => {
+      const available = spec.provider === 'grok' ? grokAvailableIds.value : openaiAvailableIds.value
+      return !available || available.has(spec.id)
+    })
+    return (filtered.length ? filtered : specs).map(toOption)
   }
 
   const imageModels = computed(() => curatedOptions('image'))
@@ -98,19 +104,24 @@ export const useMediaModels = createSharedComposable(() => {
 
   async function refreshGroupModels() {
     if (!hasSub2apiToken.value) {
-      availableModelIds.value = null
+      openaiAvailableIds.value = null
+      grokAvailableIds.value = null
       return
     }
 
     loadingModels.value = true
     try {
       // 只拉两个默认媒体分组（会按需为各分组自动创建 key），不做全分组扫描
-      const [openaiModels, grokModels] = await Promise.all([
-        getModelsForGroup(openaiGroupId.value, mediaApiKeyName).catch(() => []),
-        getModelsForGroup(grokGroupId.value, mediaApiKeyName).catch(() => [])
+      const [openaiResult, grokResult] = await Promise.allSettled([
+        getModelsForGroup(openaiGroupId.value, mediaApiKeyName),
+        getModelsForGroup(grokGroupId.value, mediaApiKeyName)
       ])
-      const ids = [...openaiModels, ...grokModels].map(item => item.value)
-      availableModelIds.value = ids.length ? new Set(ids) : null
+      openaiAvailableIds.value = openaiResult.status === 'fulfilled' && openaiResult.value.length
+        ? new Set(openaiResult.value.map(item => item.value))
+        : null
+      grokAvailableIds.value = grokResult.status === 'fulfilled' && grokResult.value.length
+        ? new Set(grokResult.value.map(item => item.value))
+        : null
     } finally {
       loadingModels.value = false
     }

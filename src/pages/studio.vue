@@ -50,6 +50,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="aurora-shell relative flex min-h-0 flex-1 flex-col overflow-hidden"
+    @dragenter="tasks.onDragEnterImages"
     @dragover="tasks.onDragOverImages"
     @dragleave="tasks.onDragLeaveImages"
     @drop="tasks.onDropImages"
@@ -77,7 +78,7 @@ onBeforeUnmount(() => {
           v-else
           class="flex flex-col items-center justify-center gap-4 py-24 text-center"
         >
-          <div class="glass-orb flex size-14 items-center justify-center rounded-3xl text-white">
+          <div class="glass-orb flex size-14 items-center justify-center rounded-3xl">
             <UIcon
               :name="isVideoMode ? 'i-lucide-clapperboard' : 'i-lucide-wand-sparkles'"
               class="size-6"

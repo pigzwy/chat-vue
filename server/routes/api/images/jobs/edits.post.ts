@@ -6,6 +6,18 @@ import { resolveMediaModelSpec } from '../../../../../shared/utils/mediaModels'
 import { imageModelSchema, imageQualitySchema, imageRatioSchema, imageResolutionSchema } from '../../../../../shared/utils/mediaSchemas'
 
 const imageInputLimit = 8
+const imageMaxBytes = 10 * 1024 * 1024
+const imageInputTypes = ['image/png', 'image/jpeg', 'image/webp']
+
+const imageEditSchema = z.object({
+  apiKey: z.string().min(1),
+  prompt: z.string().trim().min(1),
+  model: imageModelSchema.optional(),
+  ratio: imageRatioSchema,
+  resolution: imageResolutionSchema,
+  quality: imageQualitySchema.optional(),
+  size: z.string().trim().min(1).optional()
+})
 
 function parseOptionalFormBoolean(value: unknown) {
   if (typeof value !== 'string') return undefined
@@ -14,15 +26,7 @@ function parseOptionalFormBoolean(value: unknown) {
 
 export default defineHandler(async (event) => {
   const form = await event.req.formData()
-  const payload = z.object({
-    apiKey: z.string().min(1),
-    prompt: z.string().trim().min(1),
-    model: imageModelSchema.optional(),
-    ratio: imageRatioSchema,
-    resolution: imageResolutionSchema,
-    quality: imageQualitySchema.optional(),
-    size: z.string().trim().min(1).optional()
-  }).parse({
+  const parsed = imageEditSchema.safeParse({
     apiKey: form.get('apiKey'),
     prompt: form.get('prompt'),
     model: form.get('model') ?? undefined,
@@ -31,6 +35,14 @@ export default defineHandler(async (event) => {
     quality: form.get('quality') ?? undefined,
     size: form.get('size') ?? undefined
   })
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw new HTTPError({
+      statusCode: 400,
+      statusMessage: `请求参数不合法: ${issue?.path.join('.') || ''} ${issue?.message || ''}`.trim()
+    })
+  }
+  const payload = parsed.data
   if (payload.model && !resolveMediaModelSpec(payload.model).supportsEdit) {
     throw new HTTPError({ statusCode: 400, statusMessage: '该模型不支持图片编辑，请切换到 GPT Image 2' })
   }
@@ -41,6 +53,14 @@ export default defineHandler(async (event) => {
   }
   if (images.length > imageInputLimit) {
     throw new HTTPError({ statusCode: 400, statusMessage: `Too many images. Maximum is ${imageInputLimit}` })
+  }
+  for (const image of images) {
+    if (!imageInputTypes.includes(image.type)) {
+      throw new HTTPError({ statusCode: 400, statusMessage: '参考图仅支持 PNG/JPG/WebP 格式' })
+    }
+    if (image.size > imageMaxBytes) {
+      throw new HTTPError({ statusCode: 400, statusMessage: '单张参考图不能超过 10MB' })
+    }
   }
 
   const expectedSize = imageSizeMap[payload.resolution][payload.ratio]

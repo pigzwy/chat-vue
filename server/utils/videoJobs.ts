@@ -146,18 +146,24 @@ function extractCostTicks(payload: Record<string, any> | null | undefined) {
 
 type VideoPollState = { state: 'pending' } | { state: 'done', video: GeneratedVideo, costTicks?: number } | { state: 'error', message: string }
 
+function extractFailedStatusMessage(payload: Record<string, any> | null | undefined) {
+  const rawStatus = payload?.status ?? payload?.state
+  const status = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : ''
+  if (!['failed', 'error', 'cancelled', 'canceled', 'expired'].includes(status)) return null
+
+  return String(payload?.error?.message || payload?.message || `视频生成失败（${status}）`)
+}
+
 function parseVideoStatusResponse(payload: Record<string, any> | null): VideoPollState {
+  // 先判终态失败再提取 URL：失败响应里可能回显 url 字段，不能当成功
+  const failedMessage = extractFailedStatusMessage(payload)
+  if (failedMessage) return { state: 'error', message: failedMessage }
+
   const video = extractVideoResult(payload)
   if (video) return { state: 'done', video, costTicks: extractCostTicks(payload) }
 
   const rawStatus = payload?.status ?? payload?.state
   const status = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : ''
-
-  if (['failed', 'error', 'cancelled', 'canceled', 'expired'].includes(status)) {
-    const message = payload?.error?.message || payload?.message || `视频生成失败（${status}）`
-    return { state: 'error', message }
-  }
-
   if (['done', 'completed', 'succeeded', 'success', 'finished'].includes(status)) {
     // 声称完成却没有可用 URL
     return { state: 'error', message: '视频接口未返回视频地址，请重试' }
@@ -168,6 +174,7 @@ function parseVideoStatusResponse(payload: Record<string, any> | null): VideoPol
 
 async function fetchUpstream(job: VideoJob, paths: string[], init: RequestInit, signal: AbortSignal, logEvent: string) {
   let response: Response | null = null
+  let errorText = ''
 
   for (const path of paths) {
     const pathStartedAt = performance.now()
@@ -180,8 +187,10 @@ async function fetchUpstream(job: VideoJob, paths: string[], init: RequestInit, 
       elapsedMs: getElapsedMs(pathStartedAt)
     })
 
-    if (response.ok || !isPathFallbackStatus(response.status)) break
-    await response.text().catch(() => '')
+    if (response.ok) break
+    // body 只能读一次：非 ok 先把错误文本拿出来，路径回退时再覆盖
+    errorText = await response.text().catch(() => '')
+    if (!isPathFallbackStatus(response.status)) break
   }
 
   if (!response) {
@@ -189,8 +198,7 @@ async function fetchUpstream(job: VideoJob, paths: string[], init: RequestInit, 
   }
 
   if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    const error = new Error(toVideoErrorMessage(text, response.status, response.statusText)) as RequestError
+    const error = new Error(toVideoErrorMessage(errorText, response.status, response.statusText)) as RequestError
     error.status = response.status
     throw error
   }
@@ -226,6 +234,11 @@ async function submitVideoGeneration(job: VideoJob, signal: AbortSignal) {
 
   const payload = parseJson<Record<string, any>>(await response.text())
 
+  const failedMessage = extractFailedStatusMessage(payload)
+  if (failedMessage) {
+    throw new Error(failedMessage)
+  }
+
   // 兼容两种上游形态：直接返回视频 URL，或返回 request_id 走异步轮询
   const video = extractVideoResult(payload)
   if (video) return { video, costTicks: extractCostTicks(payload) }
@@ -252,29 +265,51 @@ function abortableDelay(ms: number, signal: AbortSignal) {
   })
 }
 
+// 单次轮询请求失败（超时/5xx/网络抖动）不终止任务：上游任务仍在跑且照常计费，
+// 直接判死会诱导用户重复提交造成重复扣费。连续多次失败才放弃。
+const maxConsecutivePollFailures = 6
+
 async function pollVideoResult(job: VideoJob, requestId: string, signal: AbortSignal) {
   const paths = [`/videos/${requestId}`, `/v1/videos/${requestId}`]
   let pollCount = 0
+  let consecutiveFailures = 0
 
   while (true) {
     if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
 
-    const response = await fetchUpstream(
-      job,
-      paths,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${job.apiKey}`,
-          Accept: 'application/json'
-        }
-      },
-      AbortSignal.any([signal, AbortSignal.timeout(videoPollRequestTimeoutMs)]),
-      'poll-response'
-    )
+    let payload: Record<string, any> | null = null
+    try {
+      const response = await fetchUpstream(
+        job,
+        paths,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${job.apiKey}`,
+            Accept: 'application/json'
+          }
+        },
+        AbortSignal.any([signal, AbortSignal.timeout(videoPollRequestTimeoutMs)]),
+        'poll-response'
+      )
+      payload = parseJson<Record<string, any>>(await response.text())
+      consecutiveFailures = 0
+    } catch (error) {
+      if (signal.aborted) throw error
+
+      consecutiveFailures++
+      logVideoJob(job, 'poll-transient-error', {
+        consecutiveFailures,
+        error: toSafeError(error)
+      })
+      if (consecutiveFailures >= maxConsecutivePollFailures) {
+        throw error
+      }
+      await abortableDelay(videoPollIntervalMs, signal)
+      continue
+    }
 
     pollCount++
-    const payload = parseJson<Record<string, any>>(await response.text())
     const result = parseVideoStatusResponse(payload)
 
     if (result.state === 'done') {
