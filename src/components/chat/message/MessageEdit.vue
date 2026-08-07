@@ -32,12 +32,12 @@ const editingText = ref(props.text)
         size="sm"
         variant="soft"
         color="neutral"
-        label="Cancel"
+        label="取消"
         @click="emit('cancel')"
       />
       <UButton
         size="sm"
-        label="Save"
+        label="保存"
         :disabled="!editingText.trim() || editingText === text"
         @click="emit('save', message, editingText)"
       />

@@ -17,7 +17,7 @@ const emit = defineEmits<{
     <div
       v-for="attachment in attachments"
       :key="attachment.id"
-      class="warm-card-hover group relative flex h-20 w-20 shrink-0 overflow-hidden rounded-2xl"
+      class="glass-card-hover group relative flex h-20 w-20 shrink-0 overflow-hidden rounded-2xl"
       :title="attachment.name"
     >
       <img
@@ -45,7 +45,7 @@ const emit = defineEmits<{
         variant="solid"
         size="xs"
         class="absolute right-1 top-1 rounded-full opacity-0 transition group-hover:opacity-100"
-        aria-label="Remove attachment"
+        aria-label="移除附件"
         :disabled="disabled"
         @click="emit('remove', attachment.id)"
       />

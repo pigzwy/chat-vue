@@ -5,17 +5,16 @@ import { useRouter } from 'vue-router'
 import { useChats } from '../composables/useChats'
 import { useChatAttachments } from '../composables/useChatAttachments'
 import { useModels } from '../composables/useModels'
-import { chatAttachmentAccept, chatAttachmentLimit } from '../utils/chatAttachments'
-import ChatAttachmentPreviewList from '../components/chat/AttachmentPreviewList.vue'
+import ChatComposer from '../components/chat/ChatComposer.vue'
 import Navbar from '../components/Navbar.vue'
-import ReasoningEffortSelect from '../components/ReasoningEffortSelect.vue'
+import PromptPresetRow from '../components/PromptPresetRow.vue'
+import { homeQuickPrompts } from '../data/promptPresets'
 
 const { fetchChats, createChat: createLocalChat } = useChats()
 const { model } = useModels()
 const toast = useToast()
 const input = ref('')
 const loading = ref(false)
-const attachmentInput = ref<HTMLInputElement | null>(null)
 const attachmentPending = ref(false)
 const router = useRouter()
 const {
@@ -45,15 +44,8 @@ function buildInitialParts(text: string, attachmentParts: UIMessage['parts']): U
   ]
 }
 
-function pickAttachmentFiles() {
-  if (loading.value || attachmentPending.value) return
-  attachmentInput.value?.click()
-}
-
-function onAttachmentFilesChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  addFiles(Array.from(target.files || []), model.value)
-  target.value = ''
+function onAttachmentFiles(files: File[]) {
+  addFiles(files, model.value)
 }
 
 async function createChat(prompt: string, includeAttachments = false) {
@@ -81,7 +73,7 @@ async function createChat(prompt: string, includeAttachments = false) {
   } catch (error) {
     loading.value = false
     toast.add({
-      description: error instanceof Error ? error.message : 'Failed to create chat',
+      description: error instanceof Error ? error.message : '创建对话失败',
       icon: 'i-lucide-alert-circle',
       color: 'error'
     })
@@ -99,19 +91,6 @@ function useQuickChatPrompt(prompt: string) {
   if (loading.value) return
   input.value = prompt
 }
-
-const quickChats = [
-  { label: '帮我总结这份资料', icon: 'i-lucide-file-text', color: 'text-blue-500' },
-  { label: '写一份产品方案', icon: 'i-lucide-clipboard-list', color: 'text-amber-500' },
-  { label: '优化这段提示词', icon: 'i-lucide-sparkles', color: 'text-violet-500' },
-  { label: '生成一周学习计划', icon: 'i-lucide-calendar-check', color: 'text-emerald-500' },
-  { label: '帮我分析图片内容', icon: 'i-lucide-image', color: 'text-pink-500' },
-  { label: '写一封商务邮件', icon: 'i-lucide-mail', color: 'text-blue-500' },
-  { label: '整理成表格对比', icon: 'i-lucide-table', color: 'text-amber-500' },
-  { label: '把内容翻译成英文', icon: 'i-lucide-languages', color: 'text-violet-500' },
-  { label: '生成会议纪要', icon: 'i-lucide-notebook-pen', color: 'text-emerald-500' },
-  { label: '提炼行动清单', icon: 'i-lucide-check-square', color: 'text-pink-500' }
-]
 </script>
 
 <template>
@@ -129,13 +108,13 @@ const quickChats = [
         <div class="pointer-events-none absolute left-1/2 top-16 size-52 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
 
         <div class="relative mx-auto max-w-2xl text-center">
-          <div class="hero-orb mx-auto mb-5 flex size-13 items-center justify-center rounded-3xl text-white shadow-xl">
+          <div class="glass-orb mx-auto mb-5 flex size-14 items-center justify-center rounded-3xl text-white">
             <UIcon
               name="i-lucide-sparkles"
               class="size-6"
             />
           </div>
-          <h1 class="text-3xl font-black tracking-tight text-highlighted sm:text-5xl">
+          <h1 class="text-3xl font-bold tracking-tight text-highlighted sm:text-5xl">
             {{ greeting }}
           </h1>
           <p class="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted sm:text-base">
@@ -143,87 +122,25 @@ const quickChats = [
           </p>
         </div>
 
-        <UChatPrompt
+        <ChatComposer
           v-model="input"
-          :status="loading ? 'streaming' : 'ready'"
-          class="warm-input mx-auto w-full max-w-3xl animate-fadeIn [view-transition-name:chat-prompt]"
-          variant="subtle"
-          :ui="{ base: 'px-4 py-3 text-base', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
+          class="mx-auto w-full max-w-3xl animate-fade-scale"
+          large
+          :attachments="attachments"
+          :attachment-pending="attachmentPending || loading"
+          :can-submit="canSubmitChat && !loading"
           @submit="onSubmit"
-        >
-          <template
-            v-if="attachments.length"
-            #header
-          >
-            <ChatAttachmentPreviewList
-              :attachments="attachments"
-              :disabled="loading || attachmentPending"
-              @remove="removeAttachment"
-            />
-          </template>
+          @files="onAttachmentFiles"
+          @remove-attachment="removeAttachment"
+        />
 
-          <template #footer>
-            <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <ModelSelect />
-
-              <ReasoningEffortSelect />
-
-              <input
-                ref="attachmentInput"
-                type="file"
-                multiple
-                :accept="chatAttachmentAccept"
-                class="hidden"
-                @change="onAttachmentFilesChange"
-              >
-              <UTooltip text="Add attachments">
-                <UButton
-                  type="button"
-                  icon="i-lucide-paperclip"
-                  color="neutral"
-                  variant="ghost"
-                  size="sm"
-                  class="warm-pill shrink-0 rounded-full"
-                  :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
-                  :disabled="loading || attachmentPending || attachments.length >= chatAttachmentLimit"
-                  aria-label="Add attachments"
-                  @click="pickAttachmentFiles"
-                />
-              </UTooltip>
-            </div>
-
-            <div class="flex shrink-0 items-center">
-              <UChatPromptSubmit
-                icon="i-lucide-arrow-up"
-                color="primary"
-                size="sm"
-                class="warm-btn shrink-0"
-                :type="hasAttachments ? 'button' : undefined"
-                :disabled="attachmentPending || !canSubmitChat"
-                @click="hasAttachments ? onSubmit($event) : undefined"
-              />
-            </div>
-          </template>
-        </UChatPrompt>
-
-        <div class="mx-auto flex w-full max-w-3xl flex-wrap justify-center gap-2.5">
-          <button
-            v-for="quickChat in quickChats"
-            :key="quickChat.label"
-            type="button"
-            class="warm-pill inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold"
-            @click="useQuickChatPrompt(quickChat.label)"
-          >
-            <UIcon
-              :name="quickChat.icon"
-              class="size-3.5"
-              :class="quickChat.color"
-            />
-            <span class="whitespace-nowrap">
-              {{ quickChat.label }}
-            </span>
-          </button>
-        </div>
+        <PromptPresetRow
+          class="mx-auto max-w-3xl"
+          :presets="homeQuickPrompts"
+          :disabled="loading"
+          align="center"
+          @select="useQuickChatPrompt"
+        />
       </UContainer>
     </template>
   </UDashboardPanel>

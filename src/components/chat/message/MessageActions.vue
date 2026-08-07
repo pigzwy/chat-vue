@@ -49,50 +49,50 @@ function copy() {
 
 <template>
   <template v-if="message.role === 'assistant' && !streaming">
-    <UTooltip text="Copy response">
+    <UTooltip text="复制回答">
       <UButton
         size="sm"
         :color="copied ? 'primary' : 'neutral'"
         variant="ghost"
         :icon="copied ? 'i-lucide-copy-check' : 'i-lucide-copy'"
         class="rounded-full"
-        aria-label="Copy response"
+        aria-label="复制回答"
         @click="copy"
       />
     </UTooltip>
 
-    <UTooltip text="Good response">
+    <UTooltip text="回答不错">
       <UButton
         size="sm"
         :color="vote === true ? 'success' : 'neutral'"
         variant="ghost"
         icon="i-lucide-thumbs-up"
         class="rounded-full"
-        aria-label="Good response"
+        aria-label="回答不错"
         @click="emit('vote', message, true)"
       />
     </UTooltip>
 
-    <UTooltip text="Bad response">
+    <UTooltip text="回答欠佳">
       <UButton
         size="sm"
         :color="vote === false ? 'error' : 'neutral'"
         variant="ghost"
         icon="i-lucide-thumbs-down"
         class="rounded-full"
-        aria-label="Bad response"
+        aria-label="回答欠佳"
         @click="emit('vote', message, false)"
       />
     </UTooltip>
 
-    <UTooltip text="Regenerate response">
+    <UTooltip text="重新生成">
       <UButton
         size="sm"
         color="neutral"
         variant="ghost"
         icon="i-lucide-rotate-cw"
         class="rounded-full"
-        aria-label="Regenerate response"
+        aria-label="重新生成"
         @click="emit('regenerate', message)"
       />
     </UTooltip>
@@ -113,7 +113,7 @@ function copy() {
 
     <UTooltip
       v-if="!hasFiles"
-      text="Edit message"
+      text="编辑消息"
     >
       <UButton
         size="sm"
@@ -121,7 +121,7 @@ function copy() {
         variant="ghost"
         icon="i-lucide-pencil"
         class="rounded-full"
-        aria-label="Edit message"
+        aria-label="编辑消息"
         @click="emit('edit', message)"
       />
     </UTooltip>

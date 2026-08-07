@@ -39,7 +39,7 @@ function onGroupChange(value?: number) {
       color="neutral"
       variant="soft"
       value-key="value"
-      class="warm-pill shrink-0 rounded-full"
+      class="glass-pill shrink-0 rounded-full"
       :ui="{
         base: 'rounded-full whitespace-nowrap font-medium',
         trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'
@@ -49,7 +49,7 @@ function onGroupChange(value?: number) {
 
     <div
       v-if="groups.length"
-      class="hidden h-6 w-px shrink-0 bg-[var(--warm-border)] sm:block"
+      class="hidden h-6 w-px shrink-0 bg-border sm:block"
     />
 
     <USelectMenu
@@ -60,7 +60,7 @@ function onGroupChange(value?: number) {
       color="neutral"
       variant="soft"
       value-key="value"
-      class="warm-pill shrink-0 rounded-full"
+      class="glass-pill shrink-0 rounded-full"
       :ui="{
         base: 'rounded-full whitespace-nowrap font-medium',
         trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200'

@@ -10,10 +10,10 @@ import { useRoute } from 'vue-router'
 import ChatMessageContent from '../../components/chat/message/MessageContent.vue'
 import ChatMessageActions from '../../components/chat/message/MessageActions.vue'
 import ChatIndicator from '../../components/chat/Indicator.vue'
-import ChatAttachmentPreviewList from '../../components/chat/AttachmentPreviewList.vue'
+import ChatComposer from '../../components/chat/ChatComposer.vue'
 import Navbar from '../../components/Navbar.vue'
-import ReasoningEffortSelect from '../../components/ReasoningEffortSelect.vue'
-import { chatAttachmentAccept, chatAttachmentLimit } from '../../utils/chatAttachments'
+import PromptPresetRow from '../../components/PromptPresetRow.vue'
+import { chatFollowupPresets } from '../../data/promptPresets'
 import { useChatAttachments } from '../../composables/useChatAttachments'
 
 const route = useRoute<'/chat/[id]'>()
@@ -29,7 +29,6 @@ const isOwner = computed(() => data.value?.isOwner ?? false)
 const votes = ref<LocalVote[]>(data.value?.votes ?? [])
 
 const input = ref('')
-const attachmentInput = ref<HTMLInputElement | null>(null)
 const attachmentPending = ref(false)
 const {
   attachments,
@@ -40,13 +39,6 @@ const {
   validateAttachments,
   toMessageParts
 } = useChatAttachments()
-
-const chatPromptPresets = [
-  { label: '总结重点', icon: 'i-lucide-list-check', color: 'text-blue-500', prompt: '请帮我总结上面的重点，并按条目列出可执行建议。' },
-  { label: '润色表达', icon: 'i-lucide-pen-line', color: 'text-amber-500', prompt: '请帮我把这段内容润色得更专业、更清晰。' },
-  { label: '深入分析', icon: 'i-lucide-brain', color: 'text-violet-500', prompt: '请从背景、问题、原因、风险和下一步建议几个角度深入分析。' },
-  { label: '生成表格', icon: 'i-lucide-table', color: 'text-emerald-500', prompt: '请把这些信息整理成对比表格，并补充简短结论。' }
-]
 
 const chat = new Chat({
   id: data.value?.id,
@@ -101,15 +93,8 @@ function persistMessages(messages = chat.messages) {
   void fetchChats()
 }
 
-function pickAttachmentFiles() {
-  if (chat.status !== 'ready') return
-  attachmentInput.value?.click()
-}
-
-function onAttachmentFilesChange(event: Event) {
-  const target = event.target as HTMLInputElement
-  addFiles(Array.from(target.files || []), model.value)
-  target.value = ''
+function onAttachmentFiles(files: File[]) {
+  addFiles(files, model.value)
 }
 
 function useChatPromptPreset(prompt: string) {
@@ -142,7 +127,7 @@ async function handleSubmit(e?: Event) {
     clearAttachments()
   } catch (error) {
     toast.add({
-      description: error instanceof Error ? error.message : 'Failed to read attachments',
+      description: error instanceof Error ? error.message : '附件读取失败',
       icon: 'i-lucide-alert-circle',
       color: 'error'
     })
@@ -230,7 +215,7 @@ onMounted(() => {
               <ChatIndicator />
 
               <UChatShimmer
-                text="Thinking..."
+                text="思考中..."
                 class="text-sm"
               />
             </div>
@@ -267,94 +252,27 @@ onMounted(() => {
           v-if="isOwner"
           class="sticky bottom-4 z-10 space-y-2"
         >
-          <div
+          <PromptPresetRow
             v-if="!attachments.length && !input.trim()"
-            class="mx-auto flex w-full max-w-3xl flex-wrap gap-2 px-2"
-          >
-            <button
-              v-for="preset in chatPromptPresets"
-              :key="preset.label"
-              type="button"
-              class="warm-pill inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
-              :disabled="chat.status !== 'ready'"
-              @click="useChatPromptPreset(preset.prompt)"
-            >
-              <UIcon
-                :name="preset.icon"
-                class="size-3.5"
-                :class="preset.color"
-              />
-              <span class="whitespace-nowrap">
-                {{ preset.label }}
-              </span>
-            </button>
-          </div>
+            class="mx-auto max-w-3xl px-2"
+            :presets="chatFollowupPresets"
+            :disabled="chat.status !== 'ready'"
+            @select="useChatPromptPreset"
+          />
 
-          <UChatPrompt
+          <ChatComposer
             v-model="input"
+            :status="chat.status"
             :error="chat.error"
-            variant="subtle"
-            class="warm-input [view-transition-name:chat-prompt]"
-            :ui="{ base: 'px-4 py-3', footer: 'flex flex-wrap items-center justify-between gap-3 pt-3 warm-divider border-t' }"
+            :attachments="attachments"
+            :attachment-pending="attachmentPending"
+            :can-submit="canSendMessage"
             @submit="handleSubmit"
-          >
-            <template
-              v-if="attachments.length"
-              #header
-            >
-              <ChatAttachmentPreviewList
-                :attachments="attachments"
-                :disabled="chat.status !== 'ready' || attachmentPending"
-                @remove="removeAttachment"
-              />
-            </template>
-
-            <template #footer>
-              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                <ModelSelect />
-
-                <ReasoningEffortSelect />
-
-                <input
-                  ref="attachmentInput"
-                  type="file"
-                  multiple
-                  :accept="chatAttachmentAccept"
-                  class="hidden"
-                  @change="onAttachmentFilesChange"
-                >
-                <UTooltip text="Add attachments">
-                  <UButton
-                    type="button"
-                    icon="i-lucide-paperclip"
-                    color="neutral"
-                    variant="ghost"
-                    size="sm"
-                    class="warm-pill shrink-0 rounded-full"
-                    :label="attachments.length ? `${attachments.length}/${chatAttachmentLimit}` : undefined"
-                    :disabled="chat.status !== 'ready' || attachmentPending || attachments.length >= chatAttachmentLimit"
-                    aria-label="Add attachments"
-                    @click="pickAttachmentFiles"
-                  />
-                </UTooltip>
-              </div>
-
-              <div class="flex shrink-0 items-center">
-                <UChatPromptSubmit
-                  :status="chat.status"
-                  icon="i-lucide-arrow-up"
-                  color="primary"
-                  size="sm"
-                  class="warm-btn shrink-0"
-                  :type="hasAttachments ? 'button' : undefined"
-                  :disabled="chat.status === 'ready' && (attachmentPending || !canSendMessage)"
-                  @click="chat.status === 'ready' && hasAttachments ? handleSubmit($event) : undefined"
-                  @stop="chat.stop()"
-                  @reload="chat.regenerate()"
-                />
-              </div>
-            </template>
-          </UChatPrompt>
+            @stop="chat.stop()"
+            @reload="chat.regenerate()"
+            @files="onAttachmentFiles"
+            @remove-attachment="removeAttachment"
+          />
         </div>
       </UContainer>
     </template>
@@ -365,14 +283,14 @@ onMounted(() => {
     class="flex-1 flex flex-col gap-4 sm:gap-6"
   >
     <UError
-      :error="{ statusMessage: 'Chat not found', statusCode: 404 }"
+      :error="{ statusMessage: '对话不存在', statusCode: 404 }"
       class="min-h-full"
     >
       <template #links>
         <UButton
           to="/"
           size="lg"
-          label="Back to home"
+          label="返回首页"
         />
       </template>
     </UError>

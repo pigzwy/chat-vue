@@ -7,7 +7,7 @@ const props = defineProps<{
 }>()
 
 function fileLabel(file: FileUIPart) {
-  return file.filename || file.mediaType || 'Attachment'
+  return file.filename || file.mediaType || '附件'
 }
 
 function dataUrlSize(url: string) {

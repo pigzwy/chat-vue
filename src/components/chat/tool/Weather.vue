@@ -22,9 +22,9 @@ const icon = computed(() => {
 
 const message = computed(() => {
   return ({
-    'input-available': 'Loading weather data...',
-    'output-error': 'Can\'t get weather data, please try again later'
-  })[props.invocation.state as string] || 'Loading weather data...'
+    'input-available': '正在获取天气数据...',
+    'output-error': '天气数据获取失败，请稍后再试'
+  })[props.invocation.state as string] || '正在获取天气数据...'
 })
 </script>
 
@@ -111,7 +111,7 @@ const message = computed(() => {
         class="flex items-center justify-center py-3"
       >
         <div class="text-xs">
-          No forecast available
+          暂无预报数据
         </div>
       </div>
     </template>

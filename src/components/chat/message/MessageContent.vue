@@ -39,16 +39,16 @@ function getFileParts(parts: UIMessage['parts']) {
   >
     <div
       v-if="message.role === 'assistant'"
-      class="hero-orb mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl p-0.5"
+      class="glass-orb mt-1 flex size-9 shrink-0 items-center justify-center rounded-2xl p-0.5"
     >
       <img
         src="/logo-mark.jpg"
         alt="pigcoder"
-        class="size-full rounded-[0.85rem] object-cover ring-1 ring-white/70 dark:ring-white/10"
+        class="size-full rounded-lg object-cover ring-1 ring-white/70 dark:ring-white/10"
       >
     </div>
 
-    <div :class="message.role === 'assistant' ? 'warm-card min-w-0 max-w-full px-4 py-3.5' : undefined">
+    <div :class="message.role === 'assistant' ? 'glass-panel min-w-0 max-w-full px-4 py-3.5' : undefined">
       <template
         v-for="(part, index) in getMergedParts(message.parts)"
         :key="`${message.id}-${part.type}-${index}`"
@@ -77,7 +77,7 @@ function getFileParts(parts: UIMessage['parts']) {
           />
           <UChatTool
             v-else-if="getToolName(part) === 'web_search' || getToolName(part) === 'google_search'"
-            :text="isToolStreaming(part) ? 'Searching the web...' : 'Searched the web'"
+            :text="isToolStreaming(part) ? '正在搜索网页...' : '已搜索网页'"
             :suffix="getSearchQuery(part)"
             :streaming="isToolStreaming(part)"
             chevron="leading"

@@ -15,8 +15,8 @@
         variant="ghost"
         icon="i-lucide-plus"
         to="/"
-        class="warm-chip rounded-full lg:hidden"
-        aria-label="New chat"
+        class="glass-chip rounded-full lg:hidden"
+        aria-label="新建对话"
       />
     </template>
   </UDashboardNavbar>
