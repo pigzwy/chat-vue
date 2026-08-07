@@ -13,10 +13,16 @@ interface GeneratedImage {
   b64_json?: string
   url?: string
   revised_prompt?: string
+  mime_type?: string
+}
+
+interface MediaUsage {
+  cost_in_usd_ticks?: number
 }
 
 interface ImageGenerationResponse {
   data?: GeneratedImage[]
+  usage?: MediaUsage
   error?: {
     message?: string
   }
@@ -30,6 +36,7 @@ interface ImageStreamEvent extends GeneratedImage {
     message?: string
   }
   data?: GeneratedImage[]
+  usage?: MediaUsage
 }
 
 export interface ImageJobInput {
@@ -58,6 +65,8 @@ export interface ImageJob extends ImageJobInput {
   errorStatus?: number
   images?: File[]
   data?: GeneratedImage[]
+  /** 上游返回的本次实际扣费（美元） */
+  costUsd?: number
   mode?: 'stream' | 'sync'
   streamAttempts?: number
 }
@@ -205,7 +214,8 @@ function toStreamImage(event: ImageStreamEvent): GeneratedImage | null {
   return {
     b64_json: image.b64_json,
     url: image.url,
-    revised_prompt: image.revised_prompt
+    revised_prompt: image.revised_prompt,
+    mime_type: image.mime_type
   }
 }
 
@@ -234,6 +244,7 @@ async function readImageGenerationStream(response: Response, job: ImageJob, star
   const decoder = new TextDecoder()
   let buffer = ''
   let completedImage: GeneratedImage | null = null
+  let usage: MediaUsage | undefined
   let eventCount = 0
   let chunkCount = 0
   let firstChunkMs: number | null = null
@@ -253,6 +264,7 @@ async function readImageGenerationStream(response: Response, job: ImageJob, star
         if (!event) continue
 
         eventCount++
+        if (event.usage) usage = event.usage
         const image = toStreamImage(event)
         if (image) {
           completedImage = image
@@ -268,6 +280,7 @@ async function readImageGenerationStream(response: Response, job: ImageJob, star
   const tail = parseStreamEvent(extractStreamData(buffer))
   const tailImage = tail ? toStreamImage(tail) : null
   if (tail) eventCount++
+  if (tail?.usage) usage = tail.usage
   if (tailImage) {
     completedImage = tailImage
     finalImageMs = getElapsedMs(startedAt)
@@ -288,7 +301,8 @@ async function readImageGenerationStream(response: Response, job: ImageJob, star
   }
 
   return {
-    data: [completedImage]
+    data: [completedImage],
+    usage
   } satisfies ImageGenerationResponse
 }
 
@@ -388,7 +402,8 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
   })
 
   return {
-    data: result.data
+    data: result.data,
+    usage: result.usage
   } satisfies ImageGenerationResponse
 }
 
@@ -520,7 +535,8 @@ async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal
   })
 
   return {
-    data: result.data
+    data: result.data,
+    usage: result.usage
   } satisfies ImageGenerationResponse
 }
 
@@ -627,9 +643,14 @@ export async function runImageJob(id: string) {
       throw new Error('图片接口未返回图片数据')
     }
 
+    const costTicks = result.usage?.cost_in_usd_ticks
     job.status = 'completed'
     job.completedAt = new Date().toISOString()
     job.data = result.data
+    if (typeof costTicks === 'number' && costTicks > 0) {
+      // Sub2API 计费单位：1e10 ticks = 1 USD（实测）
+      job.costUsd = costTicks / 1e10
+    }
     job.images = undefined
     logImageJob(job, 'job-completed', {
       elapsedMs: getElapsedMs(startedAt),

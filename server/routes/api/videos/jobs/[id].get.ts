@@ -20,6 +20,7 @@ export default defineHandler((event) => {
     startedAt: job.startedAt,
     completedAt: job.completedAt,
     requestId: job.requestId,
+    costUsd: job.costUsd,
     jobError: job.error,
     jobErrorStatus: job.errorStatus,
     data: job.data

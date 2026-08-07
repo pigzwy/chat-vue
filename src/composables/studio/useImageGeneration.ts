@@ -6,6 +6,7 @@ export interface GeneratedMediaPayload {
   b64_json?: string
   url?: string
   revised_prompt?: string
+  mime_type?: string
 }
 
 export interface MediaJobResponse {
@@ -16,6 +17,8 @@ export interface MediaJobResponse {
   completedAt?: string
   mode?: 'stream' | 'sync'
   streamAttempts?: number
+  /** 上游返回的本次实际扣费（美元） */
+  costUsd?: number
   jobError?: string
   jobErrorStatus?: number
   data?: GeneratedMediaPayload[]

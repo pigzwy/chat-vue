@@ -59,6 +59,8 @@ export interface MediaTask {
   error?: string
   /** 实际生成耗时（秒） */
   durationSeconds?: number
+  /** 本次实际扣费（美元，来自上游账单） */
+  costUsd?: number
   jobId?: string
   mode?: 'stream' | 'sync'
   streamAttempts?: number
@@ -565,8 +567,9 @@ export const useStudioTasks = createSharedComposable(() => {
     if (image.url) return image.url
     if (!image.b64_json) return ''
     if (image.b64_json.startsWith('data:')) return image.b64_json
+    if (image.mime_type) return `data:${image.mime_type};base64,${image.b64_json}`
 
-    // 按 base64 魔数探测格式（Grok 返回 JPEG，gpt-image 返回 PNG）
+    // 上游未标注格式时按 base64 魔数探测（Grok 返回 JPEG，gpt-image 返回 PNG）
     const mime = image.b64_json.startsWith('/9j/')
       ? 'image/jpeg'
       : image.b64_json.startsWith('R0lGOD')
@@ -869,6 +872,7 @@ export const useStudioTasks = createSharedComposable(() => {
         status: 'completed',
         videoUrl: payload.url,
         revisedPrompt: payload.revised_prompt,
+        costUsd: result.costUsd,
         durationSeconds: getDurationSeconds(task.createdAt),
         completedAt: result.completedAt ? new Date(result.completedAt) : new Date()
       })
@@ -884,6 +888,7 @@ export const useStudioTasks = createSharedComposable(() => {
       revisedPrompt: payload.revised_prompt,
       mode: result.mode,
       streamAttempts: result.streamAttempts,
+      costUsd: result.costUsd,
       durationSeconds: getDurationSeconds(task.createdAt),
       completedAt: result.completedAt ? new Date(result.completedAt) : new Date()
     })

@@ -27,6 +27,8 @@ export interface GeneratedVideo {
 export interface VideoJob extends VideoJobInput, BaseJob {
   requestId?: string
   data?: GeneratedVideo[]
+  /** 上游返回的本次实际扣费（美元） */
+  costUsd?: number
   /** 上游返回相对路径时的原始 content 路径（需带 API key 访问，走本服务代理） */
   contentPath?: string
 }
@@ -137,11 +139,16 @@ function extractRequestId(payload: Record<string, any> | null | undefined) {
   return undefined
 }
 
-type VideoPollState = { state: 'pending' } | { state: 'done', video: GeneratedVideo } | { state: 'error', message: string }
+function extractCostTicks(payload: Record<string, any> | null | undefined) {
+  const ticks = payload?.usage?.cost_in_usd_ticks
+  return typeof ticks === 'number' && ticks > 0 ? ticks : undefined
+}
+
+type VideoPollState = { state: 'pending' } | { state: 'done', video: GeneratedVideo, costTicks?: number } | { state: 'error', message: string }
 
 function parseVideoStatusResponse(payload: Record<string, any> | null): VideoPollState {
   const video = extractVideoResult(payload)
-  if (video) return { state: 'done', video }
+  if (video) return { state: 'done', video, costTicks: extractCostTicks(payload) }
 
   const rawStatus = payload?.status ?? payload?.state
   const status = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : ''
@@ -221,7 +228,7 @@ async function submitVideoGeneration(job: VideoJob, signal: AbortSignal) {
 
   // 兼容两种上游形态：直接返回视频 URL，或返回 request_id 走异步轮询
   const video = extractVideoResult(payload)
-  if (video) return { video }
+  if (video) return { video, costTicks: extractCostTicks(payload) }
 
   const requestId = extractRequestId(payload)
   if (!requestId) {
@@ -272,6 +279,10 @@ async function pollVideoResult(job: VideoJob, requestId: string, signal: AbortSi
 
     if (result.state === 'done') {
       logVideoJob(job, 'poll-done', { pollCount })
+      if (result.costTicks) {
+        // Sub2API 计费单位：1e10 ticks = 1 USD（实测）
+        job.costUsd = result.costTicks / 1e10
+      }
       return result.video
     }
     if (result.state === 'error') {
@@ -317,7 +328,12 @@ export async function runVideoJob(id: string) {
     let result = await withImageRequestTimeout(
       async (signal) => {
         const submitted = await submitVideoGeneration(job, signal)
-        if (submitted.video) return submitted.video
+        if (submitted.video) {
+          if (submitted.costTicks) {
+            job.costUsd = submitted.costTicks / 1e10
+          }
+          return submitted.video
+        }
 
         job.requestId = submitted.requestId
         logVideoJob(job, 'poll-start', { requestId: submitted.requestId })

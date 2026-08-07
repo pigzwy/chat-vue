@@ -21,6 +21,7 @@ export default defineHandler((event) => {
     completedAt: job.completedAt,
     mode: job.mode,
     streamAttempts: job.streamAttempts,
+    costUsd: job.costUsd,
     jobError: job.error,
     jobErrorStatus: job.errorStatus,
     data: job.data

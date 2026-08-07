@@ -264,6 +264,9 @@ function onVideoLeave(event: MouseEvent) {
           <template v-if="task.durationSeconds">
             · 耗时 {{ task.durationSeconds }}s
           </template>
+          <template v-if="task.costUsd">
+            · ${{ task.costUsd.toFixed(3).replace(/\.?0+$/, '') }}
+          </template>
         </p>
       </div>
       <UBadge
