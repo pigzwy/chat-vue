@@ -26,7 +26,6 @@ import {
   defaultVideoResolution,
   mediaApiKeyName,
   resolveMediaModelSpec,
-  videoCostPerSecondByResolution,
   type MediaKind,
   type VideoResolution
 } from '../../../shared/utils/mediaModels'
@@ -166,7 +165,8 @@ export const useStudioTasks = createSharedComposable(() => {
   const imageSize = computed(() => imageSizeMap[resolution.value][ratio.value])
   const estimatedCost = computed(() => {
     if (isVideoMode.value) {
-      return videoCostPerSecondByResolution[videoResolution.value] * videoDuration.value
+      const rate = resolveMediaModelSpec(mediaModels.videoModel.value).costPerSecondByResolution?.[videoResolution.value]
+      return rate ? rate * videoDuration.value : undefined
     }
     const spec = resolveMediaModelSpec(mediaModels.imageModel.value)
     if (spec.costPerImage) return spec.costPerImage

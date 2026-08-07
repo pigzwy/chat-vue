@@ -207,13 +207,17 @@ async function fetchUpstream(job: VideoJob, paths: string[], init: RequestInit, 
 }
 
 async function submitVideoGeneration(job: VideoJob, signal: AbortSignal) {
-  // 图生视频源图字段名为 image_url（用 `image` 会被 xAI 上游 422 拒绝，实测确认）
+  // 源图必须用 `image: {url}` 对象形式（实测确认）：
+  // - Sub2API 只从 image/images/reference_images 字段识别输入图，识别不到会把
+  //   grok-imagine-video-1.5 降级成标准版（顶层 image_url 就是这么被降级的）
+  // - 裸 `image: "<dataURL>"` 字符串会被 xAI 上游 422
+  // - 对象 {url} 形式网关能识别（保住 1.5）、上游也接受
   const body = JSON.stringify({
     model: job.model,
     prompt: job.prompt,
     duration: job.duration,
     ...(job.resolution && { resolution: job.resolution }),
-    ...(job.image && { image_url: `data:${job.image.mediaType};base64,${job.image.data}` })
+    ...(job.image && { image: { url: `data:${job.image.mediaType};base64,${job.image.data}` } })
   })
 
   const response = await fetchUpstream(

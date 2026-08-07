@@ -6,12 +6,6 @@ export const videoResolutions = ['480p', '720p'] as const
 export type VideoResolution = typeof videoResolutions[number]
 export const defaultVideoResolution: VideoResolution = '480p'
 
-/** 网关实测计费：视频按秒计价，与模型无关，只随分辨率变化 */
-export const videoCostPerSecondByResolution: Record<VideoResolution, number> = {
-  '480p': 0.05,
-  '720p': 0.07
-}
-
 export interface MediaModelSpec {
   id: string
   label: string
@@ -33,6 +27,8 @@ export interface MediaModelSpec {
   costByResolution?: Partial<Record<ImageResolution, number>>
   /** 每张图片费用（美元） */
   costPerImage?: number
+  /** 视频每秒费用（美元，按分辨率，网关实测） */
+  costPerSecondByResolution?: Record<VideoResolution, number>
   /** 该模型默认使用的 Sub2API 分组 */
   defaultGroupId?: number
 }
@@ -82,17 +78,19 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     supportsSourceImage: true,
     supportsVideoResolution: true,
     maxDurationSeconds: 15,
+    costPerSecondByResolution: { '480p': 0.05, '720p': 0.07 },
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
     id: 'grok-imagine-video-1.5',
     label: 'Grok 视频 · 1.5',
-    description: '图生视频用新版模型；纯文生视频网关会自动使用标准版',
+    description: '新版模型画质更好、计费更高；纯文生视频会自动用标准版',
     kind: 'video',
     provider: 'grok',
     supportsSourceImage: true,
     supportsVideoResolution: true,
     maxDurationSeconds: 15,
+    costPerSecondByResolution: { '480p': 0.082, '720p': 0.142 },
     defaultGroupId: defaultGrokMediaGroupId
   }
 ]
@@ -114,7 +112,7 @@ export function resolveMediaModelSpec(id: string): MediaModelSpec {
     return { id, label: id, kind: 'image', provider: 'openai', supportsEdit: true, supportsSizeQuality: true, supportsStream: true, defaultGroupId: defaultOpenaiMediaGroupId }
   }
   if (isVideoMediaModelId(id)) {
-    return { id, label: id, kind: 'video', provider: 'grok', supportsSourceImage: true, maxDurationSeconds: 15, defaultGroupId: defaultGrokMediaGroupId }
+    return { id, label: id, kind: 'video', provider: 'grok', supportsSourceImage: true, maxDurationSeconds: 15, costPerSecondByResolution: { '480p': 0.05, '720p': 0.07 }, defaultGroupId: defaultGrokMediaGroupId }
   }
   if (isGrokMediaModelId(id)) {
     return { id, label: id, kind: 'image', provider: 'grok', defaultGroupId: defaultGrokMediaGroupId }

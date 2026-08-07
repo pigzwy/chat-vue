@@ -9,7 +9,6 @@ import {
   mediaApiKeyName,
   mediaModelCatalog,
   resolveMediaModelSpec,
-  videoCostPerSecondByResolution,
   type MediaKind,
   type MediaModelSpec
 } from '../../../shared/utils/mediaModels'
@@ -30,7 +29,8 @@ function iconForMediaModel(id: string) {
 
 function priceTextForSpec(spec: MediaModelSpec) {
   if (spec.kind === 'video') {
-    const rates = Object.values(videoCostPerSecondByResolution)
+    const rates = spec.costPerSecondByResolution ? Object.values(spec.costPerSecondByResolution) : []
+    if (!rates.length) return undefined
     return `$${Math.min(...rates)}~${Math.max(...rates)}/秒`
   }
   if (spec.costPerImage) return `$${spec.costPerImage}/张`
