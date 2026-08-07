@@ -106,7 +106,10 @@ async function copyPrompt(text: string) {
           />
         </div>
 
-        <div class="mt-4 flex gap-2 overflow-x-auto pb-1">
+        <div
+          v-if="categories.length > 2"
+          class="mt-4 flex gap-2 overflow-x-auto pb-1"
+        >
           <button
             v-for="category in categories"
             :key="category"

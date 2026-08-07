@@ -10,7 +10,7 @@
   - 图片：GPT Image 2（文生图 / 以图生图 / 编辑链），Grok Imagine 系列（`grok-imagine-image` / `grok-imagine-image-quality`）
   - 视频：Grok Imagine 视频（`grok-imagine-video` / `grok-imagine-video-1.5`），文生视频与图生视频，时长 5/10/15 秒
   - 任务队列：刷新恢复、批量下载/删除、编辑历史链、IndexedDB 本地持久化（图片）
-- 案例观摩馆 `/gallery`：532 个公开案例，滚动渐进加载
+- 灵感墙 `/gallery`：公开案例库（jamez-bondos/awesome-gpt4o-images，CC-BY-4.0），滚动渐进加载，Prompt 一键带入创作台；图片经 `/api/gallery-image/*` 本站代理；数据用 `node scripts/sync-gallery.mjs` 重新同步
 - 聊天记录 localStorage 本地存储，按浏览器隔离
 
 ## 架构说明
