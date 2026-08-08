@@ -80,7 +80,19 @@ function initialState(): MediaModelsState {
   }
 }
 
-export const mediaModelsStore = createStore<MediaModelsState>(initialState())
+export const mediaModelsStore = createStore<MediaModelsState>(initialState(), {
+  // 与服务端渲染分支（无 localStorage）一致的快照，避免 /studio 直连水合不匹配
+  serverSnapshot: {
+    mediaMode: 'image',
+    openaiGroupId: defaultOpenaiMediaGroupId,
+    grokGroupId: defaultGrokMediaGroupId,
+    imageModel: defaultImageModelId,
+    videoModel: defaultVideoModelId,
+    openaiAvailableIds: null,
+    grokAvailableIds: null,
+    loadingModels: false
+  }
+})
 
 function priceTextForSpec(spec: MediaModelSpec) {
   if (spec.kind === 'video') {

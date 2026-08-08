@@ -3,6 +3,9 @@
 import { use, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Tooltip } from '@heroui/react'
+import { ArrowDown, Sparkles } from 'lucide-react'
+import { useHydrated } from '@/hooks/use-hydrated'
+import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom'
 import { useChat } from '@ai-sdk/react'
 import { Chat as ChatClass } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
@@ -58,7 +61,24 @@ function MessageAction({
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const data = useMemo(() => getChat(id), [id])
+  // 会话存在 localStorage,服务端渲染读不到:水合前渲染骨架,水合后再取数
+  const hydrated = useHydrated()
+  const data = useMemo(() => (hydrated ? getChat(id) : undefined), [hydrated, id])
+
+  if (data === undefined) {
+    return (
+      <div className="flex min-h-0 flex-1">
+        <ChatSidebar />
+        <div className="glass-panel glass-panel--lg aurora-shell mx-4 mb-4 flex min-w-0 flex-1 flex-col p-4 lg:ml-0">
+          <div className="shimmer-block h-9 w-40 rounded-full" />
+          <div className="mx-auto mt-10 flex w-full max-w-3xl flex-col gap-4">
+            <div className="shimmer-block ml-auto h-10 w-1/2 rounded-3xl" />
+            <div className="shimmer-block h-24 w-full rounded-2xl" />
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!data) {
     return (
@@ -77,7 +97,7 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
   const [votes, setVotes] = useState<LocalVote[]>(data.votes ?? [])
   const [copiedId, setCopiedId] = useState('')
   const [editingId, setEditingId] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const { containerRef, isAtBottom, scrollToBottom } = useScrollToBottom()
   const { attachments, addFiles, removeAttachment, clearAttachments, validateAttachments, toMessageParts } = useChatAttachments()
   const { model } = modelsStore.useStore()
 
@@ -128,10 +148,6 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
       void regenerate().catch(() => {})
     }
   }, [data, regenerate])
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
 
   const canSubmit = input.trim().length > 0 || attachments.length > 0
 
@@ -202,8 +218,9 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
           <ModelMenu />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-8">
-          <div className="mx-auto flex max-w-3xl flex-col gap-6 pb-6">
+        <div className="relative min-h-0 flex-1">
+          <div ref={containerRef} className="absolute inset-0 touch-pan-y overflow-y-auto px-4 sm:px-8">
+            <div className="mx-auto flex min-h-full max-w-3xl flex-col gap-6 pb-6">
             {messages.map((message) => {
               const isLast = message.id === messages[messages.length - 1]?.id
               const isStreamingThis = streaming && isLast
@@ -245,11 +262,26 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
                 </div>
               )
             })}
-            {streaming && messages[messages.length - 1]?.role === 'user' && (
-              <p className="label-mono animate-pulse">思考中...</p>
-            )}
-            <div ref={bottomRef} />
+              {streaming && messages[messages.length - 1]?.role === 'user' && (
+                <div className="flex items-center gap-2 text-sm opacity-70">
+                  <Sparkles className="size-4 animate-pulse" />
+                  <span className="label-mono animate-pulse">思考中...</span>
+                </div>
+              )}
+              <div className="min-h-6 shrink-0" />
+            </div>
           </div>
+
+          <button
+            type="button"
+            aria-label="回到底部"
+            className={`glass-chip absolute bottom-3 left-1/2 z-10 flex size-9 -translate-x-1/2 items-center justify-center transition-all duration-200 ${
+              isAtBottom ? 'pointer-events-none scale-90 opacity-0' : 'scale-100 opacity-100'
+            }`}
+            onClick={() => scrollToBottom()}
+          >
+            <ArrowDown className="size-4" />
+          </button>
         </div>
 
         <div className="p-4">

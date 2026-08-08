@@ -381,7 +381,27 @@ function initialState(): StudioState {
   }
 }
 
-export const studioStore = createStore<StudioState>(initialState())
+export const studioStore = createStore<StudioState>(initialState(), {
+  // 与服务端渲染分支（无 localStorage）一致的快照，避免 /studio 直连水合不匹配
+  serverSnapshot: {
+    prompt: '',
+    ratio: '16:9',
+    resolution: '2K',
+    quality: defaultImageQuality,
+    videoDuration: 10,
+    videoResolution: defaultVideoResolution,
+    files: [],
+    queue: [],
+    previewTask: null,
+    previewUploadedImage: null,
+    selectedTaskId: '',
+    batchMode: false,
+    selectedBatchIds: [],
+    isDraggingImages: false,
+    historyPanelOpen: false,
+    timerNow: 0
+  }
+})
 
 let durationTimer: ReturnType<typeof setInterval> | null = null
 let isUnmounted = false
