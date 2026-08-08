@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Popover } from '@heroui/react'
 import { Bot, Check, ChevronDown, CircleAlert, Loader2, Sparkles } from 'lucide-react'
+import { brandIconForModel } from '@/components/brand-icons'
 import { modelsStore, selectGroup, setModel, setReasoningEffort } from '@/lib/models-store'
 import { isReasoningEffort, reasoningEffortItems } from '@/lib/shared/reasoning'
 
@@ -73,18 +74,22 @@ export function ModelMenu() {
           <div>
             <p className="label-mono mb-1.5">模型</p>
             <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-              {state.models.map(item => (
-                <button
-                  key={item.value}
-                  type="button"
-                  data-selected={state.model === item.value}
-                  className="glass-pill flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-sm font-medium"
-                  onClick={() => setModel(item.value)}
-                >
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                  {state.model === item.value && <Check className="size-4 shrink-0" />}
-                </button>
-              ))}
+              {state.models.map((item) => {
+                const BrandIcon = brandIconForModel(item.value)
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    data-selected={state.model === item.value}
+                    className="glass-pill flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-sm font-medium"
+                    onClick={() => setModel(item.value)}
+                  >
+                    {BrandIcon && <BrandIcon className="size-4 shrink-0 opacity-70" />}
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {state.model === item.value && <Check className="size-4 shrink-0" />}
+                  </button>
+                )
+              })}
             </div>
           </div>
 

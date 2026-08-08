@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { Popover } from '@heroui/react'
-import { Check, ChevronUp, LoaderCircle, Sparkles, Zap } from 'lucide-react'
+import { Check, ChevronUp, LoaderCircle } from 'lucide-react'
+import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import {
   activeMediaModel,
   curatedMediaOptions,
@@ -11,14 +12,13 @@ import {
 } from '@/lib/studio/media-models-store'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
 
-/** lucide 没有品牌图标，按 provider 映射（grok → Zap，openai → Sparkles） */
-const providerIcons: Record<'openai' | 'grok', typeof Sparkles> = {
-  openai: Sparkles,
-  grok: Zap
+const providerIcons: Record<'openai' | 'grok', typeof OpenaiIcon> = {
+  openai: OpenaiIcon,
+  grok: GrokIcon
 }
 
-/** 创作台模型菜单（含价格 / 说明，向上弹出） */
-export function MediaModelMenu() {
+/** 创作台模型菜单（含价格 / 说明，向上弹出）；className 供左轨形态拉伸触发器 */
+export function MediaModelMenu({ className }: { className?: string }) {
   const state = mediaModelsStore.useStore()
   const [open, setOpen] = useState(false)
 
@@ -29,9 +29,9 @@ export function MediaModelMenu() {
 
   return (
     <Popover.Root isOpen={open} onOpenChange={setOpen}>
-      <Popover.Trigger className="glass-pill flex h-8 max-w-48 shrink-0 cursor-pointer items-center gap-1.5 px-2.5 text-sm font-medium">
+      <Popover.Trigger className={`glass-pill flex h-8 shrink-0 cursor-pointer items-center gap-1.5 px-2.5 text-sm font-medium ${className || 'max-w-48'}`}>
         <ActiveIcon className="size-4 shrink-0" />
-        <span className="truncate">{activeLabel}</span>
+        <span className="min-w-0 flex-1 truncate text-left">{activeLabel}</span>
         <ChevronUp className="size-4 shrink-0 opacity-60" />
       </Popover.Trigger>
 

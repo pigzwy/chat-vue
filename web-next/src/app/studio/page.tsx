@@ -4,6 +4,8 @@ import { useEffect } from 'react'
 import { Clapperboard, ImagePlus, WandSparkles } from 'lucide-react'
 import { PresetRow } from '@/components/chat/preset-row'
 import { ComposerBar } from '@/components/studio/composer-bar'
+import { ComposerPanel } from '@/components/studio/composer-panel'
+import { appendPresetPrompt } from '@/components/studio/composer-parts'
 import { ConfirmDialog } from '@/components/studio/confirm-dialog'
 import { EditHistoryPanel } from '@/components/studio/edit-history-panel'
 import { MediaPreviewOverlay } from '@/components/studio/media-preview-overlay'
@@ -24,7 +26,28 @@ import {
   trimUploadedImagesToLimit
 } from '@/lib/studio/tasks-store'
 
-/** 创作台：任务流 + 底部创作栏 + 拖拽遮罩 + 预览浮层 + 历史面板 */
+/** 无任务时的空态引导（桌面工作台与移动布局共用） */
+function StudioEmptyState({ isVideo }: { isVideo: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+      <div className="glass-orb flex size-14 items-center justify-center rounded-3xl">
+        {isVideo ? <Clapperboard className="size-6" /> : <WandSparkles className="size-6" />}
+      </div>
+      <div>
+        <h2 className="text-lg font-bold">
+          {isVideo ? '生成你的第一个视频' : '生成你的第一张图片'}
+        </h2>
+        <p className="mx-auto mt-1.5 max-w-md text-sm opacity-60">
+          {isVideo
+            ? '描述画面与镜头即可开始，或上传一张图片让它动起来。'
+            : '描述你想要的画面即可开始，也可以上传参考图以图生图。'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/** 创作台：lg+ 为「参数左轨 + 生成流」工作台，lg 以下保持底部创作栏；共用 store 与浮层 */
 export default function StudioPage() {
   const state = studioStore.useStore()
   const models = mediaModelsStore.useStore()
@@ -60,61 +83,60 @@ export default function StudioPage() {
   const presets = isVideo ? videoPromptPresets : imagePromptPresets
   const showPresets = !state.prompt.trim() && !state.files.length
 
-  function applyPreset(presetPrompt: string) {
-    const current = studioStore.get().prompt.trim()
-    setPrompt(current ? `${current}，${presetPrompt}` : presetPrompt)
-  }
-
   return (
     <div
-      className="aurora-shell relative flex min-h-0 flex-1 flex-col overflow-hidden"
+      className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
       onDragEnter={onDragEnterImages}
       onDragOver={onDragOverImages}
       onDragLeave={onDragLeaveImages}
       onDrop={onDropImages}
       onPaste={onPasteImages}
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-72 sm:px-6">
-        <div className="mx-auto w-full max-w-7xl">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">创作台</h1>
-              <p className="label-mono mt-1">{statsText}</p>
-            </div>
+      {/* lg+：参数左轨 + 中间生成流（InvokeAI 式工作台） */}
+      <div className="glass-panel glass-panel--lg aurora-shell mx-4 mb-4 hidden min-h-0 flex-1 grid-cols-[340px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] overflow-hidden lg:grid">
+        <ComposerPanel />
+
+        <section className="flex min-h-0 flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 px-5 pt-4 pb-3 dark:border-white/10">
+            <p className="label-mono">{statsText}</p>
             <TaskBatchToolbar />
           </div>
-
-          {state.queue.length
-            ? <MediaTaskGrid tasks={state.queue} />
-            : (
-                <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-                  <div className="glass-orb flex size-14 items-center justify-center rounded-3xl">
-                    {isVideo ? <Clapperboard className="size-6" /> : <WandSparkles className="size-6" />}
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold">
-                      {isVideo ? '生成你的第一个视频' : '生成你的第一张图片'}
-                    </h2>
-                    <p className="mx-auto mt-1.5 max-w-md text-sm opacity-60">
-                      {isVideo
-                        ? '在下方描述画面与镜头，或上传一张图片让它动起来。'
-                        : '在下方描述你想要的画面，也可以上传参考图以图生图。'}
-                    </p>
-                  </div>
-                </div>
-              )}
-        </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+            {state.queue.length
+              ? <MediaTaskGrid tasks={state.queue} />
+              : <StudioEmptyState isVideo={isVideo} />}
+          </div>
+        </section>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
-          {showPresets && (
-            <div className="pointer-events-auto">
-              <PresetRow presets={presets} onSelect={applyPreset} />
+      {/* lg 以下：保持原有「任务流 + 底部创作栏」形态 */}
+      <div className="aurora-shell relative flex min-h-0 flex-1 flex-col overflow-hidden lg:hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-72 sm:px-6">
+          <div className="mx-auto w-full max-w-7xl">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">创作台</h1>
+                <p className="label-mono mt-1">{statsText}</p>
+              </div>
+              <TaskBatchToolbar />
             </div>
-          )}
-          <div className="pointer-events-auto">
-            <ComposerBar />
+
+            {state.queue.length
+              ? <MediaTaskGrid tasks={state.queue} />
+              : <StudioEmptyState isVideo={isVideo} />}
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 sm:px-6">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
+            {showPresets && (
+              <div className="pointer-events-auto">
+                <PresetRow presets={presets} onSelect={appendPresetPrompt} />
+              </div>
+            )}
+            <div className="pointer-events-auto">
+              <ComposerBar />
+            </div>
           </div>
         </div>
       </div>
