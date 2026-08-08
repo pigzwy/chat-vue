@@ -6,8 +6,10 @@ import { useChat } from '@ai-sdk/react'
 import { Chat as ChatClass } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
 import type { UIMessage } from 'ai'
-import { Check, Copy, RotateCw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { isFileUIPart } from 'ai'
+import { Check, Copy, Pencil, RotateCw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import { ChatMessage } from '@/components/chat/message'
+import { MessageEditBox } from '@/components/chat/message-edit'
 import { Composer } from '@/components/chat/composer'
 import { ModelMenu } from '@/components/chat/model-menu'
 import { ChatSidebar } from '@/components/chat/chat-sidebar'
@@ -44,6 +46,7 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
   const [input, setInput] = useState('')
   const [votes, setVotes] = useState<LocalVote[]>(data.votes ?? [])
   const [copiedId, setCopiedId] = useState('')
+  const [editingId, setEditingId] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const { attachments, addFiles, removeAttachment, clearAttachments, validateAttachments, toMessageParts } = useChatAttachments()
   const { model } = modelsStore.useStore()
@@ -152,6 +155,13 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
     void request.catch(() => persist())
   }
 
+  function onSaveEdit(message: UIMessage, text: string) {
+    setEditingId('')
+    const request = sendMessage({ text, messageId: message.id })
+    persist()
+    void request.catch(() => persist())
+  }
+
   const streaming = status === 'streaming' || status === 'submitted'
 
   return (
@@ -167,9 +177,25 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
             {messages.map((message) => {
               const isLast = message.id === messages[messages.length - 1]?.id
               const isStreamingThis = streaming && isLast
+              const isEditing = editingId === message.id && message.role === 'user'
               return (
                 <div key={message.id} className="group/message">
-                  <ChatMessage message={message} />
+                  {isEditing
+                    ? (
+                        <MessageEditBox
+                          text={getMessageText(message)}
+                          onSave={text => onSaveEdit(message, text)}
+                          onCancel={() => setEditingId('')}
+                        />
+                      )
+                    : <ChatMessage message={message} />}
+                  {message.role === 'user' && !isEditing && !streaming && !message.parts.some(isFileUIPart) && (
+                    <div className="mt-1 flex justify-end opacity-0 transition group-hover/message:opacity-100">
+                      <button type="button" aria-label="编辑消息" className="glass-pill p-1.5" onClick={() => setEditingId(message.id)}>
+                        <Pencil className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
                   {message.role === 'assistant' && !isStreamingThis && (
                     <div className="mt-1 flex gap-1 opacity-0 transition group-hover/message:opacity-100">
                       <button type="button" aria-label="复制回答" className="glass-pill p-1.5" onClick={() => onCopy(message)}>
