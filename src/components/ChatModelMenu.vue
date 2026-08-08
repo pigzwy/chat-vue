@@ -1,11 +1,31 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useModels } from '../composables/useModels'
-import { reasoningEffortItems } from '../../shared/utils/reasoning'
+import { isReasoningEffort, reasoningEffortItems } from '../../shared/utils/reasoning'
 
 const { error, group, groups, loading, model, models, reasoningEffort, selectGroup } = useModels()
 
 const activeModel = computed(() => models.value.find(item => item.value === model.value))
+
+// 思考强度档位按模型元数据动态渲染（如 GPT-5.6 的 Max）；
+// 模型声明不支持则隐藏区块，元数据缺失回退老四档
+const effortOptions = computed(() => {
+  const reasoning = activeModel.value?.reasoning
+  if (reasoning?.supported === false) return []
+
+  const declared = (reasoning?.efforts || []).filter(effort => isReasoningEffort(effort.value))
+  if (declared.length) {
+    return [{ value: 'auto' as const, label: '默认' }, ...declared]
+  }
+  return reasoningEffortItems.map(item => ({ value: item.value, label: item.label }))
+})
+
+// 切换模型后当前档位不在支持集合里 → 回退默认
+watch(effortOptions, (options) => {
+  if (options.length && !options.some(option => option.value === reasoningEffort.value)) {
+    reasoningEffort.value = 'auto'
+  }
+})
 
 function onGroupChange(value?: number) {
   if (value == null) return
@@ -82,18 +102,18 @@ function onGroupChange(value?: number) {
           </div>
         </div>
 
-        <div>
+        <div v-if="effortOptions.length">
           <p class="label-mono mb-1.5">
             思考强度
           </p>
-          <div class="flex items-center gap-0.5 rounded-full bg-muted p-0.5">
+          <div class="flex flex-wrap items-center gap-0.5 rounded-2xl bg-muted p-0.5">
             <button
-              v-for="item in reasoningEffortItems"
+              v-for="item in effortOptions"
               :key="item.value"
               type="button"
-              class="glass-pill h-7 flex-1 rounded-full text-xs font-semibold"
+              class="glass-pill h-7 min-w-14 flex-1 rounded-full px-2 text-xs font-semibold"
               :data-selected="reasoningEffort === item.value"
-              @click="reasoningEffort = item.value"
+              @click="reasoningEffort = (item.value as typeof reasoningEffort)"
             >
               {{ item.label }}
             </button>

@@ -25,13 +25,27 @@ interface ApiKeyCacheItem {
   key: string
 }
 
+interface ModelReasoningEffortItem {
+  value: string
+  label?: string
+}
+
 interface ModelItem {
   id: string
   display_name?: string
+  supportsReasoningEffort?: boolean
+  reasoningEffort?: string
+  reasoningEfforts?: ModelReasoningEffortItem[]
+}
+
+export interface ModelReasoningMeta {
+  supported: boolean
+  default?: string
+  efforts: Array<{ value: string, label: string }>
 }
 
 type GroupSelectItem = { label: string, value: number, icon: string }
-type ModelSelectItem = { label: string, value: string, icon: string }
+export type ModelSelectItem = { label: string, value: string, icon: string, reasoning?: ModelReasoningMeta }
 
 interface GroupCache {
   token: string
@@ -87,10 +101,22 @@ function toGroupSelectItem(item: GroupItem): GroupSelectItem {
 }
 
 function toModelSelectItem(item: ModelItem): ModelSelectItem {
+  const efforts = (item.reasoningEfforts || [])
+    .filter(effort => typeof effort?.value === 'string' && effort.value)
+    .map(effort => ({ value: effort.value, label: effort.label || capitalizeFirst(effort.value) }))
+
   return {
     label: capitalizeFirst(item.display_name || item.id),
     value: item.id,
-    icon: iconForProvider(item.id)
+    icon: iconForProvider(item.id),
+    // 网关按模型声明思考强度能力，UI 据此动态渲染档位
+    reasoning: item.supportsReasoningEffort != null || efforts.length
+      ? {
+          supported: item.supportsReasoningEffort ?? efforts.length > 0,
+          default: item.reasoningEffort,
+          efforts
+        }
+      : undefined
   }
 }
 
@@ -145,9 +171,9 @@ export const useModels = createSharedComposable(() => {
   const apiKey = useStorage('sub2api-api-key', '')
   const apiKeysByGroup = useStorage<Record<string, ApiKeyCacheValue>>('sub2api-api-keys', {})
   const cachedGroups = useStorage<GroupCache | null>('sub2api-groups-cache', null)
-  const cachedModelsByGroup = useStorage<Record<string, ModelsCacheItem>>('sub2api-models-cache', {})
+  const cachedModelsByGroup = useStorage<Record<string, ModelsCacheItem>>('sub2api-models-cache-v2', {})
   const groupItems = ref<GroupSelectItem[]>([])
-  const modelItems = ref(MODELS)
+  const modelItems = ref<ModelSelectItem[]>([...MODELS])
   const loading = ref(false)
   const error = ref('')
   const { csrf, headerName } = useCsrf()

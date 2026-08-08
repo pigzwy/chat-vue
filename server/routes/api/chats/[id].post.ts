@@ -40,6 +40,14 @@ type ThinkStreamState = {
   buffer: string
 }
 
+// anthropic/google 的思考档位只有三档，扩展档（minimal/xhigh/max）就近收窄；
+// openai/sub2api 路径原样透传，由上游模型自行裁决（如 GPT-5.6 的 Max）
+function clampReasoningEffort(effort: Exclude<ReasoningEffort, 'auto'>): 'low' | 'medium' | 'high' {
+  if (effort === 'minimal') return 'low'
+  if (effort === 'xhigh' || effort === 'max') return 'high'
+  return effort
+}
+
 function buildProviderOptions(
   model: string,
   usesSub2api: boolean,
@@ -51,7 +59,7 @@ function buildProviderOptions(
     return {
       providerOptions: {
         anthropic: {
-          effort: reasoningEffort
+          effort: clampReasoningEffort(reasoningEffort)
         } satisfies AnthropicLanguageModelOptions
       }
     }
@@ -61,7 +69,7 @@ function buildProviderOptions(
     return {
       providerOptions: {
         openai: {
-          reasoningEffort,
+          reasoningEffort: reasoningEffort as OpenAILanguageModelResponsesOptions['reasoningEffort'],
           reasoningSummary: 'detailed'
         } satisfies OpenAILanguageModelResponsesOptions
       }
@@ -74,7 +82,7 @@ function buildProviderOptions(
         google: {
           thinkingConfig: {
             includeThoughts: true,
-            thinkingLevel: reasoningEffort
+            thinkingLevel: clampReasoningEffort(reasoningEffort)
           }
         } satisfies GoogleLanguageModelOptions
       }
