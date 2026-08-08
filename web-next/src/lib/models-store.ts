@@ -361,6 +361,31 @@ export async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
   return key
 }
 
+export function hasSub2apiToken() {
+  return Boolean(modelsStore.get().token)
+}
+
+/** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用 */
+export async function getModelsForGroup(groupId: number, keyName = 'chat'): Promise<ModelSelectItem[]> {
+  const { token } = modelsStore.get()
+  if (!token) return []
+
+  const cacheKey = String(groupId)
+  const cache = readJson<Record<string, ModelsCacheItem>>(MODELS_CACHE_KEY, {})
+  const cached = cache[cacheKey]
+  if (cached?.token === token && cached.items.length) {
+    return cached.items
+  }
+
+  const groupApiKey = await getApiKeyForGroup(groupId, keyName)
+  const response = await sub2apiFetch<unknown>('/v1/models', groupApiKey)
+  const items = getItems<ModelItem>(response).map(toModelSelectItem)
+  if (items.length) {
+    writeJson(MODELS_CACHE_KEY, { ...cache, [cacheKey]: { token, items } })
+  }
+  return items
+}
+
 export function clearApiKeyForGroup(groupId: number) {
   const cache = readJson<Record<string, string | ApiKeyCacheItem>>(API_KEYS_KEY, {})
   const cacheKey = String(groupId)
