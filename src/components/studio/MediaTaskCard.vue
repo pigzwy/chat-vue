@@ -46,6 +46,10 @@ const menuItems = computed<DropdownMenuItem[][]>(() => {
 
   if (!isVideo.value) {
     main.splice(1, 0, {
+      label: '用它生成视频',
+      icon: 'i-lucide-clapperboard',
+      onSelect: () => tasks.startVideoFromTask(props.task)
+    }, {
       label: '设为当前编辑',
       icon: 'i-lucide-pencil',
       disabled: isSelectedForEdit.value,

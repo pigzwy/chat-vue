@@ -120,6 +120,17 @@ const title = computed(() => {
             <UButton
               v-if="previewTask.kind === 'image'"
               type="button"
+              icon="i-lucide-clapperboard"
+              label="生成视频"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              class="glass-pill rounded-full"
+              @click="tasks.startVideoFromTask(previewTask)"
+            />
+            <UButton
+              v-if="previewTask.kind === 'image'"
+              type="button"
               icon="i-lucide-paperclip"
               label="加入参考图"
               color="neutral"

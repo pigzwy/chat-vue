@@ -5,6 +5,7 @@ import { withImageRequestTimeout } from './imageUpstreamRequest'
 import { buildImagePrompt, type ImageQuality, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
 import { defaultImageModelId, resolveMediaModelSpec } from '../../shared/utils/mediaModels'
 import { createJobStore, getElapsedMs, parseJson, toSafeError } from './mediaJobStore'
+import { recordMediaError } from './mediaErrorLog'
 import type { RequestError } from '../../shared/utils/errors'
 
 type ImageJobStatus = 'queued' | 'running' | 'completed' | 'error'
@@ -714,6 +715,15 @@ export async function runImageJob(id: string) {
       elapsedMs: getElapsedMs(startedAt),
       errorStatus: job.errorStatus,
       error: job.error
+    })
+    recordMediaError({
+      kind: 'image',
+      jobId: job.id,
+      model: jobModel(job),
+      status: job.errorStatus,
+      error: job.error || '未知错误',
+      promptExcerpt: job.prompt.slice(0, 120),
+      extra: { taskKind: job.kind, ratio: job.ratio, resolution: job.resolution }
     })
   }
 }

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { sub2apiBaseURL } from './sub2api'
 import { withImageRequestTimeout } from './imageUpstreamRequest'
 import { createJobStore, getElapsedMs, parseJson, toSafeError, type BaseJob } from './mediaJobStore'
+import { recordMediaError } from './mediaErrorLog'
 import type { RequestError } from '../../shared/utils/errors'
 
 export interface VideoJobInput {
@@ -415,6 +416,16 @@ export async function runVideoJob(id: string) {
       elapsedMs: getElapsedMs(startedAt),
       errorStatus: job.errorStatus,
       error: toSafeError(error)
+    })
+    recordMediaError({
+      kind: 'video',
+      jobId: job.id,
+      model: job.model,
+      status: job.errorStatus,
+      error: job.error || '未知错误',
+      requestId: job.requestId,
+      promptExcerpt: job.prompt.slice(0, 120),
+      extra: { duration: job.duration, resolution: job.resolution, hadImage: Boolean(job.image) }
     })
   }
 }

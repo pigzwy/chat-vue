@@ -705,6 +705,14 @@ export const useStudioTasks = createSharedComposable(() => {
     selectedTaskId.value = task.id
   }
 
+  /** 一键图生视频：选中该图并切到视频模式 */
+  function startVideoFromTask(task: MediaTask) {
+    if (task.kind !== 'image' || !task.imageUrl) return
+    selectedTaskId.value = task.id
+    mediaModels.mediaMode.value = 'video'
+    closePreview()
+  }
+
   function clearSelectedTask() {
     selectedTaskId.value = ''
   }
@@ -1408,6 +1416,7 @@ export const useStudioTasks = createSharedComposable(() => {
     reusePrompt,
     selectMediaTask,
     setCurrentTask,
+    startVideoFromTask,
     clearSelectedTask,
     toggleBatchMode,
     toggleBatchTask,
