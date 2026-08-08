@@ -1,0 +1,40 @@
+# React(next 分支)本机部署:backend(复用生产 Nitro 镜像,server 代码与 main 一致)
+#   + web-next(Next 生产)。Caddy 的 studio.pigvibe.com 反代到 web-next(127.0.0.1:3400)。
+#
+# 两容器用 network_mode: host —— 本机 docker 网桥出网被封,backend 需直连
+# sub2.pigcoder.com,故共享宿主网络栈;各服务绑定到 127.0.0.1,仅经 Caddy 对外。
+#
+# 用法(web-next 镜像先单独构建,compose 构建阶段无 DNS):
+#   DOCKER_BUILDKIT=1 docker build --network=host \
+#     --secret id=heroui_env,src=./web-next/.env -t studio-web-next:latest ./web-next
+#   docker compose -f docker-compose.next.yml up -d --no-build
+services:
+  backend:
+    image: llpig/chat-vue:latest
+    container_name: studio-backend
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 127.0.0.1
+      PORT: 3009
+    volumes:
+      - studio-backend-data:/app/.data
+
+  web-next:
+    image: studio-web-next:latest
+    container_name: studio-web-next
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 127.0.0.1
+      PORT: 3400
+      BACKEND_ORIGIN: http://127.0.0.1:3009
+
+volumes:
+  studio-backend-data:
