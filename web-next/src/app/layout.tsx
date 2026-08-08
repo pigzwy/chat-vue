@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import Script from 'next/script'
-import { TopNav } from '@/components/top-nav'
 import { Toaster } from '@/components/toaster'
 import { AppInit } from '@/components/app-init'
+import { AppShell } from '@/components/app-shell'
 import './globals.css'
 
 const inter = Inter({
@@ -38,11 +38,8 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <AppInit />
-        <TopNav />
         <Toaster />
-        <main className="flex h-screen flex-col overflow-hidden pt-16">
-          {children}
-        </main>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   )

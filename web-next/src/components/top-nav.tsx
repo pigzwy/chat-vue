@@ -4,6 +4,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useCallback, useState } from 'react'
+import { LogOut } from 'lucide-react'
+import { logout } from '@/lib/models-store'
 
 const tabs = [
   { label: '对话', href: '/', icon: '💬' },
@@ -80,7 +82,16 @@ export function TopNav() {
         </div>
       </nav>
 
-      <div className="pointer-events-none fixed right-4 top-3 z-50">
+      <div className="pointer-events-none fixed right-4 top-3 z-50 flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="退出登录"
+          title="退出登录"
+          className="glass-chip pointer-events-auto flex size-9 items-center justify-center"
+          onClick={() => logout()}
+        >
+          <LogOut className="size-4" />
+        </button>
         <ColorModeButton />
       </div>
     </>

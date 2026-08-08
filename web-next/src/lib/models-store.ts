@@ -71,6 +71,8 @@ export interface ModelsState {
   apiKey: string
   loading: boolean
   error: string
+  /** 是否已完成初始 token 校验（用于登录门:false=校验中显示骨架,true=可判定登录态） */
+  authChecked: boolean
 }
 
 const TOKEN_KEY = 'sub2api-token'
@@ -193,7 +195,8 @@ export const modelsStore = createStore<ModelsState>({
   models: MODELS,
   apiKey: '',
   loading: false,
-  error: ''
+  error: '',
+  authChecked: false
 })
 
 function patch(partial: Partial<ModelsState>) {
@@ -242,7 +245,19 @@ export async function initModels() {
     apiKey: readString(API_KEY_KEY, '')
   })
 
-  if (!token) return
+  if (!token) {
+    patch({ authChecked: true })
+    return
+  }
+
+  // 校验已存 token:失效则清掉,让登录门回落到登录页(而不是带着死 token 进应用)
+  const result = await validateToken(token)
+  if (!result.ok) {
+    logout()
+    patch({ authChecked: true, error: result.message })
+    return
+  }
+  patch({ authChecked: true })
   await loadGroups()
 }
 
@@ -363,6 +378,52 @@ export async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
 
 export function hasSub2apiToken() {
   return Boolean(modelsStore.get().token)
+}
+
+/** 校验 sub2.pigcoder.com 会话 JWT：能拉到分组即视为有效 */
+async function validateToken(token: string) {
+  const response = await fetch('/sub2api/api/v1/groups/available', {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  if (response.ok) return { ok: true as const }
+  const text = await response.text().catch(() => '')
+  let message = `校验失败（${response.status}）`
+  try {
+    const parsed = JSON.parse(text)
+    message = parsed.message || parsed.error?.message || message
+  } catch { /* 保留默认 */ }
+  return { ok: false as const, status: response.status, message: toErrorMessage(message) }
+}
+
+/** 登录：校验 JWT 有效后写入 token 并加载分组/模型；失败抛出可读错误，不落盘 */
+export async function login(rawToken: string) {
+  const token = rawToken.trim().replace(/^Bearer\s+/i, '')
+  if (!token) throw new Error('请输入 sub2.pigcoder.com 的登录 Token')
+
+  const result = await validateToken(token)
+  if (!result.ok) throw new Error(result.message)
+
+  // 换号登录清掉上一个账号的分组/模型/key 缓存
+  if (token !== modelsStore.get().token) {
+    writeJson(GROUPS_CACHE_KEY, null)
+    writeJson(MODELS_CACHE_KEY, {})
+    writeJson(API_KEYS_KEY, {})
+    writeString(API_KEY_KEY, '')
+  }
+  writeString(TOKEN_KEY, token)
+  patch({ token, error: '' })
+  await loadGroups()
+}
+
+/** 退出登录：清 token 与全部账号相关缓存，回到登录页 */
+export function logout() {
+  writeString(TOKEN_KEY, '')
+  writeJson(GROUPS_CACHE_KEY, null)
+  writeJson(MODELS_CACHE_KEY, {})
+  writeJson(API_KEYS_KEY, {})
+  writeString(API_KEY_KEY, '')
+  writeJson(GROUP_KEY, null)
+  patch({ token: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
 }
 
 /** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用 */
