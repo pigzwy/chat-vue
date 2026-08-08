@@ -1,15 +1,6 @@
 import type { NextConfig } from 'next'
 
-// 迁移期后端桥接：API 仍由现有 Nitro 服务提供（本地 pnpm dev 起在 3000）
-const backendOrigin = process.env.BACKEND_ORIGIN || 'http://localhost:3000'
-
-const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      { source: '/api/:path*', destination: `${backendOrigin}/api/:path*` },
-      { source: '/sub2api/:path*', destination: `${backendOrigin}/sub2api/:path*` }
-    ]
-  }
-}
+// 后端桥接见 src/lib/backend-proxy.ts（rewrites 不透传 Set-Cookie，改用手写代理路由）
+const nextConfig: NextConfig = {}
 
 export default nextConfig

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 const tabs = [
   { label: '对话', href: '/', icon: '💬' },
@@ -19,11 +19,10 @@ function isTabActive(pathname: string, href: string) {
 }
 
 function ColorModeButton() {
-  const [dark, setDark] = useState(false)
-
-  useEffect(() => {
-    setDark(document.documentElement.classList.contains('dark'))
-  }, [])
+  // 惰性读取 DOM 初始主题；SSR 时为 false，配合 suppressHydrationWarning 消除水合差异
+  const [dark, setDark] = useState(() =>
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  )
 
   const toggle = useCallback(() => {
     const next = !document.documentElement.classList.contains('dark')
@@ -37,6 +36,7 @@ function ColorModeButton() {
       type="button"
       aria-label="切换深浅色"
       className="glass-chip pointer-events-auto flex size-9 items-center justify-center"
+      suppressHydrationWarning
       onClick={toggle}
     >
       {dark ? '🌙' : '☀️'}
