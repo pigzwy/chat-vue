@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Popover } from '@heroui/react'
 import { Bot, Check, ChevronDown, CircleAlert, Loader2, Sparkles } from 'lucide-react'
 import { modelsStore, selectGroup, setModel, setReasoningEffort } from '@/lib/models-store'
 import { isReasoningEffort, reasoningEffortItems } from '@/lib/shared/reasoning'
@@ -9,7 +10,6 @@ import { isReasoningEffort, reasoningEffortItems } from '@/lib/shared/reasoning'
 export function ModelMenu() {
   const state = modelsStore.useStore()
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const activeModel = state.models.find(item => item.value === state.model)
 
@@ -29,38 +29,19 @@ export function ModelMenu() {
     }
   }, [effortOptions, state.reasoningEffort])
 
-  useEffect(() => {
-    if (!open) return
-    function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open])
-
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        className="glass-pill flex h-9 max-w-56 items-center gap-1.5 px-3 text-sm font-medium"
-        onClick={() => setOpen(value => !value)}
-      >
+    <Popover.Root isOpen={open} onOpenChange={setOpen}>
+      <Popover.Trigger className="glass-pill flex h-9 max-w-56 cursor-pointer items-center gap-1.5 px-3 text-sm font-medium">
         {state.loading
           ? <Loader2 className="size-4 shrink-0 animate-spin" />
           : <Sparkles className="size-4 shrink-0" />}
         <span className="truncate">{activeModel?.label || state.model}</span>
         <ChevronDown className="size-4 shrink-0 opacity-60" />
-      </button>
+      </Popover.Trigger>
 
-      {open && (
-        <div className="glass-panel absolute left-0 top-11 z-50 w-80 space-y-3 p-3 animate-fade-scale">
+      {/* 只叠 glass-panel + 尺寸类:utilities 层的 bg/border 清除类会反压 components 层的玻璃底 */}
+      <Popover.Content placement="bottom start" offset={6} className="glass-panel w-80">
+        <Popover.Dialog className="space-y-3 p-3 outline-none">
           {state.error && (
             <div className="flex items-start gap-2 rounded-xl bg-red-500/10 px-2.5 py-2 text-xs text-red-500">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" />
@@ -127,8 +108,8 @@ export function ModelMenu() {
               </div>
             </div>
           )}
-        </div>
-      )}
-    </div>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover.Root>
   )
 }

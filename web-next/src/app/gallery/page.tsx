@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Modal } from '@heroui/react'
 import { Copy, ExternalLink, Eye, LoaderCircle, Search, SearchX, WandSparkles, X } from 'lucide-react'
 import { galleryCases, type GalleryCase } from '@/data/gallery-cases'
 import { toast } from '@/lib/toast'
@@ -49,6 +50,12 @@ export default function GalleryPage() {
   if (filterKey !== lastFilterKey) {
     setLastFilterKey(filterKey)
     setVisibleCount(chunkSize)
+  }
+
+  // 弹窗关闭动画期间保留最后展示的案例内容（渲染期状态调整）
+  const [displayCase, setDisplayCase] = useState<GalleryCase | null>(null)
+  if (selectedCase && selectedCase !== displayCase) {
+    setDisplayCase(selectedCase)
   }
 
   const visibleCases = filteredCases.slice(0, visibleCount)
@@ -221,91 +228,96 @@ export default function GalleryPage() {
             )}
       </div>
 
-      {selectedCase && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-label={selectedCase.title}>
-          <button
-            type="button"
-            aria-label="关闭"
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setSelectedCase(null)}
-          />
-          <div className="glass-panel glass-panel--lg relative grid max-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl lg:grid-cols-[0.95fr_0.85fr]">
-            <div className="min-h-0 bg-black">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={getImageUrl(selectedCase)}
-                alt={selectedCase.title}
-                className="max-h-[45vh] w-full object-contain lg:h-full lg:max-h-[calc(100vh-2rem)]"
-                onError={() => onImageError(selectedCase)}
-              />
-            </div>
-            <div className="flex min-h-0 flex-col p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <span className="glass-chip inline-block px-2.5 py-1 text-xs font-semibold">{selectedCase.category}</span>
-                  <h2 className="mt-3 text-2xl font-bold">{selectedCase.title}</h2>
-                  <p className="mt-2 text-sm opacity-60">
-                    {selectedCase.author} · {selectedCase.sourceLabel || '未标记来源'}
-                  </p>
+      <Modal.Backdrop
+        isOpen={selectedCase !== null}
+        onOpenChange={isOpen => { if (!isOpen) setSelectedCase(null) }}
+        className="bg-black/40 backdrop-blur-sm"
+      >
+        <Modal.Container placement="center" className="sm:w-full sm:p-4">
+          <Modal.Dialog
+            aria-label={displayCase?.title}
+            className="glass-panel glass-panel--lg grid max-h-[calc(100vh-2rem)] w-full max-w-6xl overflow-hidden rounded-3xl p-0 lg:grid-cols-[0.95fr_0.85fr]"
+          >
+            {displayCase && (
+              <>
+                <div className="min-h-0 bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getImageUrl(displayCase)}
+                    alt={displayCase.title}
+                    className="max-h-[45vh] w-full object-contain lg:h-full lg:max-h-[calc(100vh-2rem)]"
+                    onError={() => onImageError(displayCase)}
+                  />
                 </div>
-                <button
-                  type="button"
-                  aria-label="关闭"
-                  className="glass-pill p-2"
-                  onClick={() => setSelectedCase(null)}
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
+                <div className="flex min-h-0 flex-col p-5 sm:p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="glass-chip inline-block px-2.5 py-1 text-xs font-semibold">{displayCase.category}</span>
+                      <h2 className="mt-3 text-2xl font-bold">{displayCase.title}</h2>
+                      <p className="mt-2 text-sm opacity-60">
+                        {displayCase.author} · {displayCase.sourceLabel || '未标记来源'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="关闭"
+                      className="glass-pill p-2"
+                      onClick={() => setSelectedCase(null)}
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {selectedCase.sourceUrl && (
-                  <a
-                    href={selectedCase.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
-                  >
-                    <ExternalLink className="size-3.5" />
-                    原始来源
-                  </a>
-                )}
-                {selectedCase.tags.map(tag => (
-                  <span key={tag} className="glass-pill px-3 py-1.5 text-xs">{tag}</span>
-                ))}
-              </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {displayCase.sourceUrl && (
+                      <a
+                        href={displayCase.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
+                      >
+                        <ExternalLink className="size-3.5" />
+                        原始来源
+                      </a>
+                    )}
+                    {displayCase.tags.map(tag => (
+                      <span key={tag} className="glass-pill px-3 py-1.5 text-xs">{tag}</span>
+                    ))}
+                  </div>
 
-              <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-2xl border border-black/5 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.04]">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="label-mono">Prompt</p>
-                  <button
-                    type="button"
-                    className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
-                    onClick={() => { void copyPrompt(selectedCase.prompt) }}
-                  >
-                    <Copy className="size-3.5" />
-                    复制
-                  </button>
+                  <div className="mt-4 flex min-h-0 flex-1 flex-col rounded-2xl border border-black/5 bg-black/[0.03] p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="label-mono">Prompt</p>
+                      <button
+                        type="button"
+                        className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
+                        onClick={() => { void copyPrompt(displayCase.prompt) }}
+                      >
+                        <Copy className="size-3.5" />
+                        复制
+                      </button>
+                    </div>
+                    <p className="overflow-y-auto whitespace-pre-wrap text-sm leading-7 opacity-70">
+                      {displayCase.prompt}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      className="glass-btn flex items-center gap-1.5 px-4 py-2 text-sm font-semibold"
+                      onClick={() => createWithPrompt(displayCase)}
+                    >
+                      <WandSparkles className="size-4" />
+                      用它创作
+                    </button>
+                  </div>
                 </div>
-                <p className="overflow-y-auto whitespace-pre-wrap text-sm leading-7 opacity-70">
-                  {selectedCase.prompt}
-                </p>
-              </div>
-
-              <div className="mt-4 flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  className="glass-btn flex items-center gap-1.5 px-4 py-2 text-sm font-semibold"
-                  onClick={() => createWithPrompt(selectedCase)}
-                >
-                  <WandSparkles className="size-4" />
-                  用它创作
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+              </>
+            )}
+          </Modal.Dialog>
+        </Modal.Container>
+      </Modal.Backdrop>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import { Popover } from '@heroui/react'
 import { Proportions, WandSparkles } from 'lucide-react'
 import { imageResolutions, type ImageRatio } from '@/lib/shared/images'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
@@ -23,7 +24,6 @@ export function RatioResolutionPopover() {
   const state = studioStore.useStore()
   const models = mediaModelsStore.useStore()
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const spec = resolveMediaModelSpec(models.imageModel)
   const showResolution = Boolean(spec.supportsSizeQuality)
@@ -34,35 +34,15 @@ export function RatioResolutionPopover() {
   const triggerLabel = showResolution ? `${state.ratio} · ${state.resolution}` : `比例 ${state.ratio}`
   const size = selectImageSize(state)
 
-  useEffect(() => {
-    if (!open) return
-    function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open])
-
   return (
-    <div ref={rootRef} className="relative shrink-0">
-      <button
-        type="button"
-        className="glass-pill flex h-8 items-center gap-1.5 px-2.5 text-sm font-medium"
-        onClick={() => setOpen(value => !value)}
-      >
+    <Popover.Root isOpen={open} onOpenChange={setOpen}>
+      <Popover.Trigger className="glass-pill flex h-8 shrink-0 cursor-pointer items-center gap-1.5 px-2.5 text-sm font-medium">
         <Proportions className="size-4 shrink-0" />
         {triggerLabel}
-      </button>
+      </Popover.Trigger>
 
-      {open && (
-        <div className="glass-panel absolute bottom-full left-0 z-50 mb-2 w-72 p-3 animate-fade-scale">
+      <Popover.Content placement="top start" offset={8} className="glass-panel w-72">
+        <Popover.Dialog className="p-3 outline-none">
           <p className="label-mono mb-2">画面比例</p>
           <div className="grid grid-cols-4 gap-1.5">
             {ratioOptions.map(option => (
@@ -108,8 +88,8 @@ export function RatioResolutionPopover() {
                 </>
               )
             : <p className="label-mono mt-3">该模型不支持指定分辨率</p>}
-        </div>
-      )}
-    </div>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover.Root>
   )
 }

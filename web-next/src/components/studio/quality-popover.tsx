@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import { Popover } from '@heroui/react'
 import { Gauge, Gem, Sparkles } from 'lucide-react'
 import { getImageQualityLabel, imageQualityItems, type ImageQuality } from '@/lib/shared/images'
 import { setQuality, studioStore } from '@/lib/studio/tasks-store'
@@ -16,39 +17,18 @@ const qualityIcons: Record<ImageQuality, typeof Gem> = {
 export function QualityPopover() {
   const state = studioStore.useStore()
   const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
 
   const ActiveIcon = qualityIcons[state.quality] || Gem
 
-  useEffect(() => {
-    if (!open) return
-    function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [open])
-
   return (
-    <div ref={rootRef} className="relative shrink-0">
-      <button
-        type="button"
-        className="glass-pill flex h-8 items-center gap-1.5 px-2.5 text-sm font-medium"
-        onClick={() => setOpen(value => !value)}
-      >
+    <Popover.Root isOpen={open} onOpenChange={setOpen}>
+      <Popover.Trigger className="glass-pill flex h-8 shrink-0 cursor-pointer items-center gap-1.5 px-2.5 text-sm font-medium">
         <ActiveIcon className="size-4 shrink-0" />
         质量: {getImageQualityLabel(state.quality)}
-      </button>
+      </Popover.Trigger>
 
-      {open && (
-        <div className="glass-panel absolute bottom-full left-0 z-50 mb-2 w-60 p-1.5 animate-fade-scale">
+      <Popover.Content placement="top start" offset={8} className="glass-panel w-60">
+        <Popover.Dialog className="p-1.5 outline-none">
           {imageQualityItems.map((item) => {
             const ItemIcon = qualityIcons[item.value]
             return (
@@ -67,8 +47,8 @@ export function QualityPopover() {
               </button>
             )
           })}
-        </div>
-      )}
-    </div>
+        </Popover.Dialog>
+      </Popover.Content>
+    </Popover.Root>
   )
 }

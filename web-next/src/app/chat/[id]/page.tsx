@@ -1,7 +1,8 @@
 'use client'
 
-import { use, useEffect, useMemo, useRef, useState } from 'react'
+import { use, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { Tooltip } from '@heroui/react'
 import { useChat } from '@ai-sdk/react'
 import { Chat as ChatClass } from '@ai-sdk/react'
 import { DefaultChatTransport } from 'ai'
@@ -24,6 +25,35 @@ function getMessageText(message: UIMessage) {
     .filter(part => part.type === 'text')
     .map(part => ('text' in part ? part.text : ''))
     .join('')
+}
+
+/** 消息操作按钮：真实 button 经 Tooltip.Trigger 的 render 透传，文案与 aria-label 一致 */
+function MessageAction({
+  label,
+  selected,
+  onClick,
+  children
+}: {
+  label: string
+  selected?: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger<'button'>
+        aria-label={label}
+        className="glass-pill p-1.5"
+        onClick={onClick}
+        render={props => <button {...props} data-selected={selected} type="button" />}
+      >
+        {children}
+      </Tooltip.Trigger>
+      <Tooltip.Content className="glass-chip px-2.5 py-1.5 text-xs font-medium">
+        {label}
+      </Tooltip.Content>
+    </Tooltip.Root>
+  )
 }
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
@@ -191,37 +221,25 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
                     : <ChatMessage message={message} />}
                   {message.role === 'user' && !isEditing && !streaming && !message.parts.some(isFileUIPart) && (
                     <div className="mt-1 flex justify-end opacity-0 transition group-hover/message:opacity-100">
-                      <button type="button" aria-label="编辑消息" className="glass-pill p-1.5" onClick={() => setEditingId(message.id)}>
+                      <MessageAction label="编辑消息" onClick={() => setEditingId(message.id)}>
                         <Pencil className="size-3.5" />
-                      </button>
+                      </MessageAction>
                     </div>
                   )}
                   {message.role === 'assistant' && !isStreamingThis && (
                     <div className="mt-1 flex gap-1 opacity-0 transition group-hover/message:opacity-100">
-                      <button type="button" aria-label="复制回答" className="glass-pill p-1.5" onClick={() => onCopy(message)}>
+                      <MessageAction label="复制回答" onClick={() => onCopy(message)}>
                         {copiedId === message.id ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="回答不错"
-                        data-selected={getVote(message.id) === true}
-                        className="glass-pill p-1.5"
-                        onClick={() => onVote(message, true)}
-                      >
+                      </MessageAction>
+                      <MessageAction label="回答不错" selected={getVote(message.id) === true} onClick={() => onVote(message, true)}>
                         <ThumbsUp className="size-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="回答欠佳"
-                        data-selected={getVote(message.id) === false}
-                        className="glass-pill p-1.5"
-                        onClick={() => onVote(message, false)}
-                      >
+                      </MessageAction>
+                      <MessageAction label="回答欠佳" selected={getVote(message.id) === false} onClick={() => onVote(message, false)}>
                         <ThumbsDown className="size-3.5" />
-                      </button>
-                      <button type="button" aria-label="重新生成" className="glass-pill p-1.5" onClick={() => onRegenerate(message)}>
+                      </MessageAction>
+                      <MessageAction label="重新生成" onClick={() => onRegenerate(message)}>
                         <RotateCw className="size-3.5" />
-                      </button>
+                      </MessageAction>
                     </div>
                   )}
                 </div>

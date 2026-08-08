@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
+import { Drawer } from '@heroui/react'
 import { MessagesSquare, Plus, Search, X } from 'lucide-react'
 import { chatsStore, deleteChat, groupChats } from '@/lib/chats-store'
 import { toast } from '@/lib/toast'
@@ -101,28 +102,25 @@ export function ChatSidebar() {
         <SidebarContent />
       </aside>
 
-      <button
-        type="button"
-        aria-label="会话列表"
-        className="glass-chip fixed bottom-5 left-4 z-50 flex size-11 items-center justify-center lg:hidden"
-        onClick={() => setOpen(true)}
-      >
-        <MessagesSquare className="size-5" />
-      </button>
+      <Drawer.Root isOpen={open} onOpenChange={setOpen}>
+        <Drawer.Trigger
+          aria-label="会话列表"
+          className="glass-chip fixed bottom-5 left-4 z-50 flex size-11 items-center justify-center lg:hidden"
+        >
+          <MessagesSquare className="size-5" />
+        </Drawer.Trigger>
 
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="会话列表">
-          <button
-            type="button"
-            aria-label="关闭会话列表"
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setOpen(false)}
-          />
-          <div className="glass-panel glass-panel--lg absolute inset-y-3 left-3 flex w-72 max-w-[85vw] flex-col gap-3 rounded-2xl p-3 pt-4">
-            <SidebarContent onNavigate={() => setOpen(false)} />
-          </div>
-        </div>
-      )}
+        <Drawer.Backdrop className="bg-black/30 backdrop-blur-sm lg:hidden">
+          <Drawer.Content placement="left" className="p-3">
+            <Drawer.Dialog
+              aria-label="会话列表"
+              className="glass-panel glass-panel--lg flex w-72 max-w-[85vw] flex-col gap-3 rounded-2xl p-3 pt-4"
+            >
+              <SidebarContent onNavigate={() => setOpen(false)} />
+            </Drawer.Dialog>
+          </Drawer.Content>
+        </Drawer.Backdrop>
+      </Drawer.Root>
     </>
   )
 }

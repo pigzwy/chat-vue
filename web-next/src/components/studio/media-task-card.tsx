@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import { Dropdown, Separator, Tooltip } from '@heroui/react'
 import {
   Check,
   CircleAlert,
@@ -43,13 +44,15 @@ interface MenuItem {
   onSelect: () => void
 }
 
+const overlayBtnClass = 'flex size-7 cursor-pointer items-center justify-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/70'
+const tooltipClass = 'glass-panel rounded-full px-2.5 py-1 text-xs font-medium'
+
 /** 单条生成任务卡片：生成中 / 失败 / 完成三态 + 操作菜单 + 批量选择 */
 export function MediaTaskCard({ task }: { task: MediaTask }) {
   const state = studioStore.useStore()
   // 视频代理地址随任务过期（2h/服务重启）失效，加载失败时给出明确状态
   const [videoFailed, setVideoFailed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
 
   const hasMedia = Boolean(task.imageUrl || task.videoUrl)
   const isVideo = task.kind === 'video'
@@ -85,22 +88,6 @@ export function MediaTaskCard({ task }: { task: MediaTask }) {
     { label: '删除', Icon: Trash, danger: true, onSelect: () => { void deleteMediaTask(task) } }
   ]
   const menuGroups = [mainItems, shareItems, dangerItems]
-
-  useEffect(() => {
-    if (!menuOpen) return
-    function onPointerDown(event: PointerEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
-    }
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setMenuOpen(false)
-    }
-    document.addEventListener('pointerdown', onPointerDown)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [menuOpen])
 
   function onMediaClick() {
     if (!hasMedia) return
@@ -239,55 +226,52 @@ export function MediaTaskCard({ task }: { task: MediaTask }) {
 
             {!state.batchMode && (
               <div
-                ref={menuRef}
                 className={`absolute top-2 right-2 flex gap-1 transition ${menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
               >
-                <button
-                  type="button"
-                  aria-label="预览"
-                  className="flex size-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/70"
-                  onClick={() => previewMediaTask(task)}
-                >
-                  <Eye className="size-3.5" />
-                </button>
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-label="更多操作"
-                    className="flex size-7 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/70"
-                    onClick={() => setMenuOpen(value => !value)}
+                <Tooltip.Root>
+                  <Tooltip.Trigger<'button'>
+                    aria-label="预览"
+                    className={overlayBtnClass}
+                    onClick={() => previewMediaTask(task)}
+                    render={props => <button type="button" {...props} />}
                   >
-                    <Ellipsis className="size-3.5" />
-                  </button>
-                  {menuOpen && (
-                    <div className="glass-panel absolute top-8 right-0 z-30 w-44 p-1 animate-fade-scale">
-                      {menuGroups.map((group, groupIndex) => (
-                        <div
-                          key={groupIndex}
-                          className={groupIndex > 0 ? 'mt-1 border-t border-black/5 pt-1 dark:border-white/10' : ''}
-                        >
-                          {group.map(item => (
-                            <button
-                              key={item.label}
-                              type="button"
-                              disabled={item.disabled}
-                              className={`glass-pill flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
-                                item.danger ? 'text-red-500 hover:text-red-600' : ''
-                              }`}
-                              onClick={() => {
-                                setMenuOpen(false)
-                                item.onSelect()
-                              }}
-                            >
-                              <item.Icon className="size-3.5 shrink-0" />
-                              {item.label}
-                            </button>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    <Eye className="size-3.5" />
+                  </Tooltip.Trigger>
+                  <Tooltip.Content placement="top" className={tooltipClass}>预览</Tooltip.Content>
+                </Tooltip.Root>
+
+                <Dropdown.Root isOpen={menuOpen} onOpenChange={setMenuOpen}>
+                  <Tooltip.Root>
+                    <Dropdown.Trigger aria-label="更多操作" className={overlayBtnClass}>
+                      <Ellipsis className="size-3.5" />
+                    </Dropdown.Trigger>
+                    <Tooltip.Content placement="top" className={tooltipClass}>更多操作</Tooltip.Content>
+                  </Tooltip.Root>
+
+                  <Dropdown.Popover placement="bottom end" offset={4} className="glass-panel w-44 min-w-0">
+                    <Dropdown.Menu aria-label="任务操作" className="p-1">
+                      {menuGroups.flatMap((group, groupIndex) => [
+                        ...(groupIndex > 0
+                          ? [<Separator key={`sep-${groupIndex}`} className="my-1 ms-0 w-full bg-black/5 dark:bg-white/10" />]
+                          : []),
+                        ...group.map(item => (
+                          <Dropdown.Item
+                            key={item.label}
+                            textValue={item.label}
+                            isDisabled={item.disabled}
+                            onAction={item.onSelect}
+                            className={`glass-pill flex min-h-0 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium data-disabled:cursor-not-allowed data-disabled:opacity-40 ${
+                              item.danger ? 'text-red-500 hover:text-red-600' : ''
+                            }`}
+                          >
+                            <item.Icon className="size-3.5 shrink-0" />
+                            {item.label}
+                          </Dropdown.Item>
+                        ))
+                      ])}
+                    </Dropdown.Menu>
+                  </Dropdown.Popover>
+                </Dropdown.Root>
               </div>
             )}
 
