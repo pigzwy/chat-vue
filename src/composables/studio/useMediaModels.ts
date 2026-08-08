@@ -33,7 +33,11 @@ function priceTextForSpec(spec: MediaModelSpec) {
     if (!rates.length) return undefined
     return `$${Math.min(...rates)}~${Math.max(...rates)}/秒`
   }
-  if (spec.costPerImage) return `$${spec.costPerImage}/张`
+  if (spec.costPerImage) {
+    return spec.costPerImageMax && spec.costPerImageMax !== spec.costPerImage
+      ? `$${spec.costPerImage}~${spec.costPerImageMax}/张`
+      : `$${spec.costPerImage}/张`
+  }
   if (spec.costByResolution) {
     const rates = Object.values(spec.costByResolution)
     return `$${Math.min(...rates)}~${Math.max(...rates)}/张`

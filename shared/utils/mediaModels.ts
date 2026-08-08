@@ -27,6 +27,8 @@ export interface MediaModelSpec {
   costByResolution?: Partial<Record<ImageResolution, number>>
   /** 每张图片费用（美元） */
   costPerImage?: number
+  /** 每张图片费用上限（输出尺寸更大时的档位，美元） */
+  costPerImageMax?: number
   /** 视频每秒费用（美元，按分辨率，网关实测） */
   costPerSecondByResolution?: Record<VideoResolution, number>
   /** 该模型默认使用的 Sub2API 分组 */
@@ -63,10 +65,11 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'grok-imagine-image-quality',
     label: 'Grok 画图 · 高清',
-    description: '更高质量输出，适合出成品',
+    description: '更高质量输出，适合出成品（1K $0.05 / 2K $0.07）',
     kind: 'image',
     provider: 'grok',
     costPerImage: 0.05,
+    costPerImageMax: 0.07,
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
@@ -90,7 +93,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     supportsSourceImage: true,
     supportsVideoResolution: true,
     maxDurationSeconds: 15,
-    costPerSecondByResolution: { '480p': 0.082, '720p': 0.142 },
+    costPerSecondByResolution: { '480p': 0.08, '720p': 0.14 },
     defaultGroupId: defaultGrokMediaGroupId
   }
 ]

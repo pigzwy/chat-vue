@@ -400,6 +400,12 @@ export async function runVideoJob(id: string) {
     logVideoJob(job, 'job-completed', { elapsedMs: getElapsedMs(startedAt), proxied: Boolean(job.contentPath) })
   } catch (error) {
     const requestError = toVideoRequestError(error) as RequestError
+    // 网关的错误包装只剩一句 "xAI upstream returned status 400"，按失败阶段翻译成可行动的提示
+    if (requestError.message.includes('upstream returned status 400')) {
+      requestError.message = job.requestId
+        ? '上游终止了本次生成，常见原因是源图未通过内容审核（如包含真人）。请换一张图片重试'
+        : '上游拒绝了请求参数（400），请调整时长/分辨率或更换源图后重试'
+    }
     job.status = 'error'
     job.completedAt = new Date().toISOString()
     job.errorStatus = requestError.status
