@@ -10,12 +10,13 @@ import { logout } from '@/lib/models-store'
 const tabs = [
   { label: '对话', href: '/', icon: '💬' },
   { label: '创作台', href: '/studio', icon: '✨' },
+  { label: '语音', href: '/voice', icon: '🎙️' },
   { label: '灵感', href: '/gallery', icon: '💡' }
 ] as const
 
 function isTabActive(pathname: string, href: string) {
   if (href === '/') {
-    return !pathname.startsWith('/studio') && !pathname.startsWith('/gallery')
+    return !pathname.startsWith('/studio') && !pathname.startsWith('/gallery') && !pathname.startsWith('/voice')
   }
   return pathname.startsWith(href)
 }
