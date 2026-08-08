@@ -89,6 +89,8 @@ const imageDatabaseStoreName = 'images'
 const perKindStorageLimit = 12
 export const uploadedImageLimit = 8
 export const videoSourceImageLimit = 1
+/** Grok 图生图上游最多 3 张参考图 */
+export const grokEditSourceLimit = 3
 export const promptLimit = 5000
 
 function isImageRatio(value: unknown): value is ImageRatio {
@@ -159,7 +161,10 @@ export const useStudioTasks = createSharedComposable(() => {
   const sourceFilesByTaskId = new Map<string, File[]>()
 
   const isVideoMode = computed(() => mediaModels.mediaMode.value === 'video')
-  const currentUploadLimit = computed(() => isVideoMode.value ? videoSourceImageLimit : uploadedImageLimit)
+  const currentUploadLimit = computed(() => {
+    if (isVideoMode.value) return videoSourceImageLimit
+    return resolveMediaModelSpec(mediaModels.imageModel.value).provider === 'grok' ? grokEditSourceLimit : uploadedImageLimit
+  })
   const canSubmit = computed(() => prompt.value.trim().length > 0)
   const hasUploadedImages = computed(() => files.value.length > 0)
   const imageSize = computed(() => imageSizeMap[resolution.value][ratio.value])
@@ -429,13 +434,13 @@ export const useStudioTasks = createSharedComposable(() => {
     window.localStorage.setItem(imageQualityStorageKey, value)
   })
 
-  // 切到视频模式时源图上限降为 1，超出部分裁剪
-  watch(isVideoMode, (video) => {
-    if (video && files.value.length > videoSourceImageLimit) {
-      files.value.slice(videoSourceImageLimit).forEach(revokeUploadedImage)
-      files.value = files.value.slice(0, videoSourceImageLimit)
+  // 模式/模型切换导致源图上限收紧时裁剪超出部分
+  watch(currentUploadLimit, (limit) => {
+    if (files.value.length > limit) {
+      files.value.slice(limit).forEach(revokeUploadedImage)
+      files.value = files.value.slice(0, limit)
       toast.add({
-        description: '视频模式最多使用 1 张源图，已保留第一张',
+        description: `当前模式最多使用 ${limit} 张源图，已保留前 ${limit} 张`,
         icon: 'i-lucide-circle-alert',
         color: 'warning'
       })

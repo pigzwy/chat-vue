@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { sub2apiBaseURL } from './sub2api'
 import { withImageRequestTimeout } from './imageUpstreamRequest'
@@ -568,6 +569,31 @@ async function requestImageJob(job: ImageJob, signal: AbortSignal) {
   return requestImageGeneration(job, signal)
 }
 
+const maxRemoteImageBytes = 20 * 1024 * 1024
+
+// Grok 编辑等接口返回的是 xAI 临时直链（会过期），服务端拉下来转成 base64，
+// 让前端与其他图片一致地本地持久化
+async function materializeRemoteImages(job: ImageJob, result: ImageGenerationResponse, signal: AbortSignal) {
+  for (const image of result.data || []) {
+    if (image.b64_json || !image.url || !/^https?:\/\//.test(image.url)) continue
+
+    try {
+      const response = await fetch(image.url, { signal })
+      if (!response.ok) continue
+      const buffer = Buffer.from(await response.arrayBuffer())
+      if (buffer.byteLength === 0 || buffer.byteLength > maxRemoteImageBytes) continue
+
+      image.b64_json = buffer.toString('base64')
+      image.mime_type = response.headers.get('content-type')?.split(';')[0] || image.mime_type || 'image/jpeg'
+      image.url = undefined
+      logImageJob(job, 'remote-image-materialized', { bytes: buffer.byteLength })
+    } catch (error) {
+      // 拉取失败保留原始 URL，前端仍可短期展示
+      logImageJob(job, 'remote-image-materialize-failed', { error: toSafeError(error) })
+    }
+  }
+}
+
 // 不支持流式的模型（grok-imagine 等）强制走同步请求，跳过 SSE 尝试与降级重试
 function resolveStreamOption(input: ImageJobInput) {
   const supportsStream = resolveMediaModelSpec(input.model || defaultImageModelId).supportsStream ?? false
@@ -639,7 +665,11 @@ export async function runImageJob(id: string) {
       ? 'API 图片编辑超时，建议降低分辨率或稍后重试'
       : 'API 图片生成超时，建议降低分辨率或稍后重试'
     const result = await withImageRequestTimeout(
-      signal => requestImageJob(job, signal),
+      async (signal) => {
+        const response = await requestImageJob(job, signal)
+        await materializeRemoteImages(job, response, signal)
+        return response
+      },
       timeoutMessage
     )
     const image = result.data?.[0]

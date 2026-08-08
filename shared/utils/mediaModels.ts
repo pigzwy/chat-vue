@@ -56,18 +56,20 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'grok-imagine-image',
     label: 'Grok 画图 · 快速',
-    description: '出图快、成本低，适合起稿和批量尝试',
+    description: '出图快、成本低，支持以图生图（参考图最多 3 张）',
     kind: 'image',
     provider: 'grok',
+    supportsEdit: true,
     costPerImage: 0.02,
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
     id: 'grok-imagine-image-quality',
     label: 'Grok 画图 · 高清',
-    description: '更高质量输出，适合出成品（1K $0.05 / 2K $0.07）',
+    description: '更高质量输出，支持以图生图（1K $0.05 / 2K $0.07）',
     kind: 'image',
     provider: 'grok',
+    supportsEdit: true,
     costPerImage: 0.05,
     costPerImageMax: 0.07,
     defaultGroupId: defaultGrokMediaGroupId
