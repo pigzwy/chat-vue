@@ -1,4 +1,4 @@
-import type { ImageResolution } from './images'
+import type { ImageRatio, ImageResolution } from './images'
 
 export type MediaKind = 'image' | 'video'
 
@@ -23,6 +23,8 @@ export interface MediaModelSpec {
   supportsSourceImage?: boolean
   /** 支持视频 resolution 参数（480p/720p） */
   supportsVideoResolution?: boolean
+  /** 支持的画面比例（不设 = 全部支持；grok 系上游是有限集合，越界会 422） */
+  supportedAspectRatios?: ImageRatio[]
   maxDurationSeconds?: number
   costByResolution?: Partial<Record<ImageResolution, number>>
   /** 每张图片费用（美元） */
@@ -60,6 +62,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     kind: 'image',
     provider: 'grok',
     supportsEdit: true,
+    supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'],
     costPerImage: 0.02,
     defaultGroupId: defaultGrokMediaGroupId
   },
@@ -70,6 +73,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     kind: 'image',
     provider: 'grok',
     supportsEdit: true,
+    supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'],
     costPerImage: 0.05,
     costPerImageMax: 0.07,
     defaultGroupId: defaultGrokMediaGroupId
@@ -120,7 +124,7 @@ export function resolveMediaModelSpec(id: string): MediaModelSpec {
     return { id, label: id, kind: 'video', provider: 'grok', supportsSourceImage: true, maxDurationSeconds: 15, costPerSecondByResolution: { '480p': 0.05, '720p': 0.07 }, defaultGroupId: defaultGrokMediaGroupId }
   }
   if (isGrokMediaModelId(id)) {
-    return { id, label: id, kind: 'image', provider: 'grok', defaultGroupId: defaultGrokMediaGroupId }
+    return { id, label: id, kind: 'image', provider: 'grok', supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'], defaultGroupId: defaultGrokMediaGroupId }
   }
   return { id, label: id, kind: 'image', provider: 'openai', defaultGroupId: defaultOpenaiMediaGroupId }
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { resolveMediaModelSpec } from '../../../shared/utils/mediaModels'
 import { useMediaModels } from '../../composables/studio/useMediaModels'
 import { promptLimit, useStudioTasks } from '../../composables/studio/useStudioTasks'
 import ModeTabs from './ModeTabs.vue'
@@ -35,6 +36,16 @@ const costText = computed(() => {
   if (estimatedCost.value == null) return ''
   return `$${(+estimatedCost.value).toFixed(3).replace(/\.?0+$/, '')}`
 })
+
+const imageSpec = computed(() => resolveMediaModelSpec(mediaModels.imageModel.value))
+
+// 切到比例集合更小的模型（grok）时，把越界的已选比例回退到 Auto，避免上游 422
+watch(imageSpec, (spec) => {
+  const allowed = spec.supportedAspectRatios
+  if (allowed && ratio.value !== 'Auto' && !allowed.includes(ratio.value)) {
+    ratio.value = 'Auto'
+  }
+}, { immediate: true })
 
 const showEditingChip = computed(() => Boolean(selectedTask.value) && !files.value.length)
 const uploadDisabled = computed(() => files.value.length >= currentUploadLimit.value)
@@ -161,8 +172,13 @@ function onPromptKeydown(event: KeyboardEvent) {
             v-model:ratio="ratio"
             v-model:resolution="resolution"
             :size="imageSize"
+            :show-resolution="imageSpec.supportsSizeQuality"
+            :allowed-ratios="imageSpec.supportedAspectRatios"
           />
-          <QualityPopover v-model="quality" />
+          <QualityPopover
+            v-if="imageSpec.supportsSizeQuality"
+            v-model="quality"
+          />
         </template>
 
         <template v-else>

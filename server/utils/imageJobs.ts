@@ -95,15 +95,22 @@ function supportsSizeQuality(job: ImageJob) {
 }
 
 // gpt-image 系通过 size/quality 参数 + 提示词注入控制画幅；
-// 其他模型（grok-imagine 等）只吃纯提示词，画幅以文字提示尽力约束。
+// grok 系走 aspect_ratio 参数（见 jobAspectRatio），提示词保持原样。
 function buildJobPrompt(job: ImageJob) {
   if (supportsSizeQuality(job)) {
     return buildImagePrompt(job.prompt, job.size, job.quality)
   }
-  if (job.ratio && job.ratio !== 'Auto') {
-    return `${job.prompt}\n\nAspect ratio: ${job.ratio}.`
-  }
   return job.prompt
+}
+
+// grok 上游的 aspect_ratio 是有限集合，越界值会被 422，越界/Auto 时不带参数
+function jobAspectRatio(job: ImageJob) {
+  if (supportsSizeQuality(job)) return undefined
+  if (!job.ratio || job.ratio === 'Auto') return undefined
+
+  const allowed = resolveMediaModelSpec(jobModel(job)).supportedAspectRatios
+  if (allowed && !allowed.includes(job.ratio)) return undefined
+  return job.ratio
 }
 
 function toErrorMessage(text: string, status: number, statusText: string) {
@@ -316,10 +323,12 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
     ratio: job.ratio
   })
 
+  const aspectRatio = jobAspectRatio(job)
   const requestBody = JSON.stringify({
     model: jobModel(job),
     prompt: buildJobPrompt(job),
     ...(supportsSizeQuality(job) && { size: job.size, quality: job.quality }),
+    ...(aspectRatio && { aspect_ratio: aspectRatio }),
     response_format: 'b64_json',
     n: 1,
     stream,
@@ -456,6 +465,10 @@ async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal
   if (supportsSizeQuality(job)) {
     upstreamForm.set('size', job.size)
     upstreamForm.set('quality', job.quality)
+  }
+  const editAspectRatio = jobAspectRatio(job)
+  if (editAspectRatio) {
+    upstreamForm.set('aspect_ratio', editAspectRatio)
   }
   upstreamForm.set('response_format', 'b64_json')
   upstreamForm.set('n', '1')
