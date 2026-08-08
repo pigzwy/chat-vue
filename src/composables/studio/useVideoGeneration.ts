@@ -1,6 +1,6 @@
 import { useCsrf } from '../useCsrf'
 import type { RequestError } from '../../../shared/utils/errors'
-import { fetchWithTimeout, parseJson, wait, type MediaJobResponse } from './useImageGeneration'
+import { fetchWithTimeout, readMediaJobResponse, wait } from './useImageGeneration'
 
 export interface VideoJobRequest {
   prompt: string
@@ -14,24 +14,6 @@ export interface VideoJobRequest {
 
 const videoJobPollIntervalMs = 5000
 const videoJobPollMaxMs = 20 * 60 * 1000
-
-async function readVideoJobResponse(response: Response, fallbackMessage: string) {
-  let resultText = await response.text()
-  const result = parseJson<MediaJobResponse>(resultText) || ({} as MediaJobResponse)
-  if (!result?.error?.message && resultText.trim().startsWith('<')) {
-    resultText = ''
-  }
-  if (!response.ok) {
-    const error = new Error(result?.error?.message || resultText || `${fallbackMessage}: ${response.status}`) as RequestError
-    error.status = response.status
-    throw error
-  }
-  if (!result?.id) {
-    throw new Error(fallbackMessage)
-  }
-
-  return result
-}
 
 export async function createVideoGenerationJob(apiKey: string, task: VideoJobRequest) {
   const { csrf, headerName } = useCsrf()
@@ -55,7 +37,7 @@ export async function createVideoGenerationJob(apiKey: string, task: VideoJobReq
     body: formData
   })
 
-  return readVideoJobResponse(response, '视频任务创建失败')
+  return readMediaJobResponse(response, '视频任务创建失败')
 }
 
 export async function getVideoGenerationJob(jobId: string) {
@@ -65,7 +47,7 @@ export async function getVideoGenerationJob(jobId: string) {
     }
   })
 
-  return readVideoJobResponse(response, '视频任务查询失败')
+  return readMediaJobResponse(response, '视频任务查询失败')
 }
 
 export async function pollVideoGenerationJob(jobId: string, shouldStop?: () => boolean) {

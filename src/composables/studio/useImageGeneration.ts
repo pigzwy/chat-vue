@@ -22,9 +22,10 @@ export interface MediaJobResponse {
   jobError?: string
   jobErrorStatus?: number
   data?: GeneratedMediaPayload[]
-  error?: {
-    message?: string
-  }
+  /** 开发模式是 {message} 对象；生产模式 Nitro 输出 error: true + 顶层 message */
+  error?: { message?: string } | boolean
+  message?: string
+  statusMessage?: string
 }
 
 export interface ImageJobRequest {
@@ -73,14 +74,20 @@ export async function fetchWithTimeout(input: RequestInfo | URL, init: RequestIn
   }
 }
 
-async function readJobResponse(response: Response, fallbackMessage: string) {
+function extractJobErrorMessage(result: MediaJobResponse | null) {
+  if (result && typeof result.error === 'object' && result.error?.message) return result.error.message
+  return result?.message || result?.statusMessage || ''
+}
+
+export async function readMediaJobResponse(response: Response, fallbackMessage: string) {
   let resultText = await response.text()
   const result = parseJson<MediaJobResponse>(resultText) || ({} as MediaJobResponse)
-  if (!result?.error?.message && resultText.trim().startsWith('<')) {
+  const errorMessage = extractJobErrorMessage(result)
+  if (!errorMessage && resultText.trim().startsWith('<')) {
     resultText = ''
   }
   if (!response.ok) {
-    const error = new Error(result?.error?.message || resultText || `${fallbackMessage}: ${response.status}`) as RequestError
+    const error = new Error(errorMessage || resultText || `${fallbackMessage}: ${response.status}`) as RequestError
     error.status = response.status
     throw error
   }
@@ -110,7 +117,7 @@ export async function createImageGenerationJob(apiKey: string, task: ImageJobReq
     })
   })
 
-  return readJobResponse(response, '图片任务创建失败')
+  return readMediaJobResponse(response, '图片任务创建失败')
 }
 
 export async function createImageEditJob(apiKey: string, task: ImageJobRequest, sources: File[]) {
@@ -139,7 +146,7 @@ export async function createImageEditJob(apiKey: string, task: ImageJobRequest, 
     body: formData
   })
 
-  return readJobResponse(response, '图片编辑任务创建失败')
+  return readMediaJobResponse(response, '图片编辑任务创建失败')
 }
 
 export async function getImageGenerationJob(jobId: string) {
@@ -149,7 +156,7 @@ export async function getImageGenerationJob(jobId: string) {
     }
   })
 
-  return readJobResponse(response, '图片任务查询失败')
+  return readMediaJobResponse(response, '图片任务查询失败')
 }
 
 export async function pollImageGenerationJob(jobId: string, shouldStop?: () => boolean) {

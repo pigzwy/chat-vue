@@ -490,10 +490,42 @@ export const useStudioTasks = createSharedComposable(() => {
   }
 
   function getImageFiles(filesLike: FileList | File[]) {
-    return Array.from(filesLike).filter(file => file.type.startsWith('image/'))
+    // 部分手机拍摄/分享的文件 type 为空，也放进来尝试转码
+    return Array.from(filesLike).filter(file => file.type.startsWith('image/') || file.type === '')
   }
 
-  function appendUploadedImages(imageFiles: File[]) {
+  const supportedSourceTypes = ['image/png', 'image/jpeg', 'image/webp']
+  const normalizedMaxDimension = 2560
+
+  // 手机相册常见 HEIC 等服务端不收的格式：浏览器能解码就转成 JPEG（顺带压尺寸）
+  async function normalizeSourceImage(file: File): Promise<File> {
+    if (supportedSourceTypes.includes(file.type)) return file
+
+    const objectUrl = URL.createObjectURL(file)
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const el = new Image()
+        el.onload = () => resolve(el)
+        el.onerror = () => reject(new Error('decode failed'))
+        el.src = objectUrl
+      })
+      const scale = Math.min(1, normalizedMaxDimension / Math.max(image.naturalWidth, image.naturalHeight, 1))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+      canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+      if (!blob) return file
+      return new File([blob], `${file.name.replace(/\.[^.]*$/, '') || 'image'}.jpg`, { type: 'image/jpeg' })
+    } catch {
+      // 解码失败原样提交，由服务端返回明确的格式错误
+      return file
+    } finally {
+      URL.revokeObjectURL(objectUrl)
+    }
+  }
+
+  async function appendUploadedImages(imageFiles: File[]) {
     const limit = currentUploadLimit.value
     const remaining = limit - files.value.length
     if (remaining <= 0) {
@@ -505,7 +537,7 @@ export const useStudioTasks = createSharedComposable(() => {
       return
     }
 
-    const accepted = imageFiles.slice(0, remaining)
+    const accepted = await Promise.all(imageFiles.slice(0, remaining).map(normalizeSourceImage))
     files.value = [...files.value, ...accepted.map(createUploadedImage)]
     if (imageFiles.length > remaining) {
       toast.add({
@@ -560,7 +592,7 @@ export const useStudioTasks = createSharedComposable(() => {
     if (!imageFiles.length) return
 
     event.preventDefault()
-    appendUploadedImages(imageFiles)
+    void appendUploadedImages(imageFiles)
   }
 
   // ---------------------------------------------------------------------------
