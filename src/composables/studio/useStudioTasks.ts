@@ -496,10 +496,12 @@ export const useStudioTasks = createSharedComposable(() => {
 
   const supportedSourceTypes = ['image/png', 'image/jpeg', 'image/webp']
   const normalizedMaxDimension = 2560
+  // 手机原图动辄 8-15MB，超过它就压一轮，避免撞服务端 10MB 限制/上游体积限制
+  const normalizeSizeThreshold = 3 * 1024 * 1024
 
-  // 手机相册常见 HEIC 等服务端不收的格式：浏览器能解码就转成 JPEG（顺带压尺寸）
+  // 服务端不收的格式（HEIC 等）或过大的图：浏览器能解码就转成 JPEG 并压尺寸
   async function normalizeSourceImage(file: File): Promise<File> {
-    if (supportedSourceTypes.includes(file.type)) return file
+    if (supportedSourceTypes.includes(file.type) && file.size <= normalizeSizeThreshold) return file
 
     const objectUrl = URL.createObjectURL(file)
     try {
