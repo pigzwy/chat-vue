@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "@heroui/react/styles";
+@import "./heroui-pro-chat.css";
+
+/* Pro 组件类名参与 Tailwind 扫描(工具类编译进其 JS) */
+@source "../../node_modules/@heroui-pro/react/dist";
 
 @custom-variant dark (&:is(.dark *));
 

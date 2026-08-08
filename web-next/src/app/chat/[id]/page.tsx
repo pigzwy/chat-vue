@@ -2,7 +2,7 @@
 
 import { use, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Tooltip } from '@heroui/react'
+import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
 import { ArrowDown, Sparkles } from 'lucide-react'
 import { useHydrated } from '@/hooks/use-hydrated'
 import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom'
@@ -30,7 +30,7 @@ function getMessageText(message: UIMessage) {
     .join('')
 }
 
-/** 消息操作按钮：真实 button 经 Tooltip.Trigger 的 render 透传，文案与 aria-label 一致 */
+/** 消息操作按钮：Pro ChatMessage.Action(自带 tooltip / 按压反馈)，选中态用玻璃高亮 */
 function MessageAction({
   label,
   selected,
@@ -43,19 +43,15 @@ function MessageAction({
   children: ReactNode
 }) {
   return (
-    <Tooltip.Root>
-      <Tooltip.Trigger<'button'>
-        aria-label={label}
-        className="glass-pill p-1.5"
-        onClick={onClick}
-        render={props => <button {...props} data-selected={selected} type="button" />}
-      >
-        {children}
-      </Tooltip.Trigger>
-      <Tooltip.Content className="glass-chip px-2.5 py-1.5 text-xs font-medium">
-        {label}
-      </Tooltip.Content>
-    </Tooltip.Root>
+    <ProChatMessage.Action
+      aria-label={label}
+      tooltip={label}
+      data-selected={selected}
+      className="glass-pill"
+      onPress={onClick}
+    >
+      {children}
+    </ProChatMessage.Action>
   )
 }
 
@@ -237,14 +233,14 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
                       )
                     : <ChatMessage message={message} />}
                   {message.role === 'user' && !isEditing && !streaming && !message.parts.some(isFileUIPart) && (
-                    <div className="mt-1 flex justify-end opacity-0 transition group-hover/message:opacity-100">
+                    <ProChatMessage.Actions className="mt-1 flex justify-end opacity-0 transition group-hover/message:opacity-100">
                       <MessageAction label="编辑消息" onClick={() => setEditingId(message.id)}>
                         <Pencil className="size-3.5" />
                       </MessageAction>
-                    </div>
+                    </ProChatMessage.Actions>
                   )}
                   {message.role === 'assistant' && !isStreamingThis && (
-                    <div className="mt-1 flex gap-1 opacity-0 transition group-hover/message:opacity-100">
+                    <ProChatMessage.Actions className="mt-1 flex gap-1 opacity-0 transition group-hover/message:opacity-100">
                       <MessageAction label="复制回答" onClick={() => onCopy(message)}>
                         {copiedId === message.id ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                       </MessageAction>
@@ -257,7 +253,7 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
                       <MessageAction label="重新生成" onClick={() => onRegenerate(message)}>
                         <RotateCw className="size-3.5" />
                       </MessageAction>
-                    </div>
+                    </ProChatMessage.Actions>
                   )}
                 </div>
               )

@@ -1,48 +1,60 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { UIMessage } from 'ai'
 import { isFileUIPart, isReasoningUIPart, isTextUIPart, isToolUIPart, getToolName } from 'ai'
-import { Brain, ChevronDown, Wrench } from 'lucide-react'
+import { ChainOfThought } from '@heroui-pro/react/chain-of-thought'
+import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
+import { ChatTool } from '@heroui-pro/react/chat-tool'
 import { Streamdown } from 'streamdown'
 import { getMergedParts } from '@/lib/message-parts'
 import { isImageMediaType } from '@/lib/attachments'
 
-function ReasoningBlock({ text, streaming }: { text: string, streaming: boolean }) {
-  const [open, setOpen] = useState(false)
-  const expanded = open || streaming
-
-  return (
-    <div className="glass-panel my-2 overflow-hidden rounded-xl text-sm">
-      <button
-        type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold opacity-70"
-        onClick={() => setOpen(value => !value)}
-      >
-        <Brain className={`size-3.5 ${streaming ? 'animate-pulse' : ''}`} />
-        {streaming ? '思考中...' : '思考过程'}
-        <ChevronDown className={`ml-auto size-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-      </button>
-      {expanded && (
-        <div className="border-t border-black/5 px-3 py-2 text-xs leading-5 opacity-70 dark:border-white/5">
-          <Streamdown>{text}</Streamdown>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function ToolBlock({ name, streaming }: { name: string, streaming: boolean }) {
-  return (
-    <div className="glass-panel my-2 flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold opacity-70">
-      <Wrench className={`size-3.5 ${streaming ? 'animate-pulse' : ''}`} />
-      {streaming ? `正在调用工具 ${name}...` : `已调用工具 ${name}`}
-    </div>
-  )
-}
-
 function isPartStreaming(part: { state?: string }) {
   return part.state === 'streaming'
+}
+
+/** 推理块:Pro ChainOfThought(流式时触发器闪烁,内容折叠) */
+function ReasoningBlock({ text, streaming }: { text: string, streaming: boolean }) {
+  return (
+    <ChainOfThought isStreaming={streaming} defaultExpanded={streaming} className="my-2">
+      <ChainOfThought.Trigger>{streaming ? '思考中...' : '思考过程'}</ChainOfThought.Trigger>
+      <ChainOfThought.Content>
+        <div className="prose-chat text-xs leading-5 opacity-80">
+          <Streamdown>{text}</Streamdown>
+        </div>
+      </ChainOfThought.Content>
+    </ChainOfThought>
+  )
+}
+
+// AI SDK 的 tool state → Pro ChatTool 的 ToolPartState(审批类中间态归并到进行中/完成)
+type ProToolState = 'input-streaming' | 'input-available' | 'output-available' | 'output-error' | 'requires-action'
+function toProToolState(state: string): ProToolState {
+  switch (state) {
+    case 'input-streaming': return 'input-streaming'
+    case 'output-available': return 'output-available'
+    case 'output-error':
+    case 'output-denied': return 'output-error'
+    case 'approval-requested': return 'requires-action'
+    default: return 'input-available'
+  }
+}
+
+/** 工具调用块:Pro ChatTool preset(按 state 自动渲染状态图标与折叠) */
+function ToolBlock({ part }: { part: UIMessage['parts'][number] & { type: string } }) {
+  if (!isToolUIPart(part)) return null
+  return (
+    <ChatTool
+      className="my-2"
+      state={toProToolState(part.state)}
+      toolName={getToolName(part)}
+      toolCallId={part.toolCallId}
+      input={'input' in part ? part.input : undefined}
+      output={'output' in part ? part.output : undefined}
+      errorText={part.state === 'output-error' ? part.errorText : undefined}
+    />
+  )
 }
 
 export function ChatMessage({ message }: { message: UIMessage }) {
@@ -56,9 +68,9 @@ export function ChatMessage({ message }: { message: UIMessage }) {
 
   if (isUser) {
     return (
-      <div className="flex flex-col items-end gap-2">
+      <ProChatMessage.User>
         {fileParts.length > 0 && (
-          <div className="flex flex-wrap justify-end gap-2">
+          <ProChatMessage.Media className="flex flex-wrap justify-end gap-2">
             {fileParts.map((file, index) => (
               isImageMediaType(file.mediaType)
                 ? (
@@ -76,33 +88,35 @@ export function ChatMessage({ message }: { message: UIMessage }) {
                     </div>
                   )
             ))}
-          </div>
+          </ProChatMessage.Media>
         )}
-        <div className="glass-panel max-w-[75%] rounded-3xl px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap">
+        <ProChatMessage.Bubble className="glass-panel max-w-[75%] rounded-3xl px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap">
           {parts.filter(isTextUIPart).map(part => part.text).join('')}
-        </div>
-      </div>
+        </ProChatMessage.Bubble>
+      </ProChatMessage.User>
     )
   }
 
   return (
-    <div className="min-w-0 text-sm leading-7">
-      {parts.map((part, index) => {
-        if (isReasoningUIPart(part)) {
-          return <ReasoningBlock key={index} text={part.text} streaming={isPartStreaming(part)} />
-        }
-        if (isToolUIPart(part)) {
-          return <ToolBlock key={index} name={getToolName(part)} streaming={part.state !== 'output-available' && part.state !== 'output-error'} />
-        }
-        if (isTextUIPart(part)) {
-          return (
-            <div key={index} className="prose-chat">
-              <Streamdown>{part.text}</Streamdown>
-            </div>
-          )
-        }
-        return null
-      })}
-    </div>
+    <ProChatMessage.Assistant>
+      <ProChatMessage.Body className="min-w-0 text-sm leading-7">
+        {parts.map((part, index) => {
+          if (isReasoningUIPart(part)) {
+            return <ReasoningBlock key={index} text={part.text} streaming={isPartStreaming(part)} />
+          }
+          if (isToolUIPart(part)) {
+            return <ToolBlock key={index} part={part} />
+          }
+          if (isTextUIPart(part)) {
+            return (
+              <div key={index} className="prose-chat">
+                <Streamdown>{part.text}</Streamdown>
+              </div>
+            )
+          }
+          return null
+        })}
+      </ProChatMessage.Body>
+    </ProChatMessage.Assistant>
   )
 }
