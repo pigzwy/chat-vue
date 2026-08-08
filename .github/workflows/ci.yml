@@ -46,6 +46,10 @@ jobs:
       run:
         working-directory: web-next
 
+    env:
+      # @heroui-pro/react 的 postinstall 需要它拉取 Pro 组件源码(仓库 Secrets 配置)
+      HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
