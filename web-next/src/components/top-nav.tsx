@@ -4,7 +4,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useCallback, useState } from 'react'
-import { LogOut } from 'lucide-react'
+import { Dropdown } from '@heroui/react'
+import { LogOut, Moon, Sun } from 'lucide-react'
 import { logout } from '@/lib/models-store'
 
 const tabs = [
@@ -21,13 +22,15 @@ function isTabActive(pathname: string, href: string) {
   return pathname.startsWith(href)
 }
 
-function ColorModeButton() {
-  // 惰性读取 DOM 初始主题；SSR 时为 false，配合 suppressHydrationWarning 消除水合差异
+/** 右上角:logo 头像即菜单(切换深浅色 / 退出登录),移动端的品牌位也由它承担 */
+function AvatarMenu() {
+  const [open, setOpen] = useState(false)
+  // 惰性读取 DOM 初始主题;SSR 时为 false,配合 suppressHydrationWarning 消除水合差异
   const [dark, setDark] = useState(() =>
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   )
 
-  const toggle = useCallback(() => {
+  const toggleColorMode = useCallback(() => {
     const next = !document.documentElement.classList.contains('dark')
     document.documentElement.classList.toggle('dark', next)
     localStorage.setItem('color-scheme', next ? 'dark' : 'light')
@@ -35,15 +38,42 @@ function ColorModeButton() {
   }, [])
 
   return (
-    <button
-      type="button"
-      aria-label="切换深浅色"
-      className="glass-chip pointer-events-auto flex size-9 items-center justify-center"
-      suppressHydrationWarning
-      onClick={toggle}
-    >
-      {dark ? '🌙' : '☀️'}
-    </button>
+    <Dropdown.Root isOpen={open} onOpenChange={setOpen}>
+      <Dropdown.Trigger
+        aria-label="账户菜单"
+        className="glass-chip pointer-events-auto flex size-10 cursor-pointer items-center justify-center rounded-full p-1 transition-transform hover:-translate-y-0.5"
+      >
+        <Image
+          src="/logo-mark.jpg"
+          alt="pigcoder"
+          width={32}
+          height={32}
+          className="size-8 shrink-0 rounded-full object-cover"
+        />
+      </Dropdown.Trigger>
+      <Dropdown.Popover placement="bottom end" offset={8} className="glass-panel w-44">
+        <Dropdown.Menu className="p-1.5 outline-none">
+          <Dropdown.Item
+            textValue="切换深浅色"
+            className="glass-pill flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium"
+            onAction={toggleColorMode}
+          >
+            <span suppressHydrationWarning className="flex items-center gap-2">
+              {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              {dark ? '切换浅色模式' : '切换深色模式'}
+            </span>
+          </Dropdown.Item>
+          <Dropdown.Item
+            textValue="退出登录"
+            className="glass-pill flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-red-500"
+            onAction={() => logout()}
+          >
+            <LogOut className="size-4" />
+            退出登录
+          </Dropdown.Item>
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown.Root>
   )
 }
 
@@ -52,7 +82,7 @@ export function TopNav() {
 
   return (
     <>
-      {/* 窄屏空间不够:logo 只在 sm+ 显示,导航靠左,右侧按钮收紧,避免三块 fixed 元素互相压盖 */}
+      {/* sm+ 左上角品牌章(移动端品牌由右上角头像菜单承担,避免窄屏三块 fixed 压盖) */}
       <div className="pointer-events-none fixed left-4 top-3 z-50 hidden sm:block">
         <Link
           href="/"
@@ -84,17 +114,8 @@ export function TopNav() {
         </div>
       </nav>
 
-      <div className="pointer-events-none fixed right-3 top-3 z-50 flex items-center gap-1.5 sm:right-4 sm:gap-2">
-        <button
-          type="button"
-          aria-label="退出登录"
-          title="退出登录"
-          className="glass-chip pointer-events-auto flex size-9 items-center justify-center"
-          onClick={() => logout()}
-        >
-          <LogOut className="size-4" />
-        </button>
-        <ColorModeButton />
+      <div className="pointer-events-none fixed right-3 top-3 z-50 sm:right-4">
+        <AvatarMenu />
       </div>
     </>
   )
