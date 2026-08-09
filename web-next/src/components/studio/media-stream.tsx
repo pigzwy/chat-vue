@@ -2,7 +2,8 @@
 
 import { ChatConversation } from '@heroui-pro/react/chat-conversation'
 import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
-import { CircleAlert, Clapperboard, Download, Pencil, Quote, RotateCw, Trash2 } from 'lucide-react'
+import { CircleAlert, Clapperboard, Download, Pencil, Quote, RotateCw, Trash2, WandSparkles } from 'lucide-react'
+import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
 import {
   deleteMediaTask,
@@ -56,87 +57,109 @@ function TurnActions({ task, selected }: { task: MediaTask, selected: boolean })
   )
 }
 
-/** 单轮:右侧提示词气泡 + 左侧生成结果 */
+/** 模型品牌图标(静态条件渲染,规避 static-components 规则) */
+function ModelBrandIcon({ model, className }: { model: string, className?: string }) {
+  if (/grok/i.test(model)) return <GrokIcon className={className} />
+  if (/gpt|dall|openai/i.test(model)) return <OpenaiIcon className={className} />
+  return <WandSparkles className={className} />
+}
+
+/** 单轮:右侧「你」的提示词气泡 + 左侧「模型」署名的回答 */
 function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
   const spec = resolveMediaModelSpec(task.model)
   const selected = state.selectedTaskId === task.id
-  const metaParts = [spec.label]
-  if (task.kind === 'image' && task.ratio && task.ratio !== 'Auto') metaParts.push(`${task.ratio} · ${task.resolution}`)
-  if (task.kind === 'video' && task.duration) metaParts.push(`${task.duration}s${task.videoResolution ? ` · ${task.videoResolution}` : ''}`)
-  metaParts.push(formatTaskCreatedAt(task))
 
-  const doneMeta: string[] = []
-  if (task.durationSeconds) doneMeta.push(`${task.durationSeconds}s`)
-  if (task.costUsd) doneMeta.push(`$${task.costUsd.toFixed(3)}`)
+  // 用户侧元信息:参数 + 时间
+  const askMeta: string[] = []
+  if (task.kind === 'image' && task.ratio && task.ratio !== 'Auto') askMeta.push(`${task.ratio} · ${task.resolution}`)
+  if (task.kind === 'video' && task.duration) askMeta.push(`${task.duration}s${task.videoResolution ? ` · ${task.videoResolution}` : ''}`)
+  askMeta.push(formatTaskCreatedAt(task))
+
+  // 模型侧署名行的状态信息
+  const answerMeta: string[] = []
+  if (task.status === 'completed') {
+    if (task.durationSeconds) answerMeta.push(`${task.durationSeconds}s`)
+    if (task.costUsd) answerMeta.push(`$${task.costUsd.toFixed(3)}`)
+  }
 
   return (
-    <div className="group/turn flex flex-col gap-3">
-      {/* 用户侧:提示词 */}
+    <div className="group/turn flex flex-col gap-4">
+      {/* 你:提示词(右对齐主色气泡) */}
       <div className="flex flex-col items-end gap-1">
-        <div className="glass-panel max-w-[80%] rounded-3xl rounded-br-lg px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap">
+        <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-(--app-primary-subtle) px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap ring-1 ring-(--app-glass-border)">
           {task.prompt}
         </div>
-        <p className="label-mono text-[10px] opacity-50">{metaParts.join(' · ')}</p>
+        <p className="label-mono text-[10px] opacity-50">{askMeta.join(' · ')}</p>
       </div>
 
-      {/* 结果侧 */}
+      {/* 模型:署名头(品牌图标+模型名+耗时/费用) + 缩进的回答内容 */}
       <div className="max-w-[85%] sm:max-w-[70%]">
-        {task.status === 'generating' && (
-          <div className="glass-panel flex w-64 flex-col gap-3 rounded-3xl rounded-tl-lg p-4">
-            <div className="shimmer-block aspect-square w-full rounded-2xl" />
-            <p className="label-mono">
+        <div className="flex items-center gap-2">
+          <div className="glass-orb flex size-7 shrink-0 items-center justify-center rounded-full">
+            <ModelBrandIcon model={task.model} className="size-3.5" />
+          </div>
+          <span className="text-sm font-semibold">{spec.label}</span>
+          {task.status === 'generating' && (
+            <span className="label-mono text-[10px] opacity-60">
               {task.kind === 'video' ? '视频生成中' : '生成中'} · {getTaskDurationSeconds(state, task)}s
-            </p>
-          </div>
-        )}
+            </span>
+          )}
+          {answerMeta.length > 0 && (
+            <span className="label-mono text-[10px] opacity-50">{answerMeta.join(' · ')}</span>
+          )}
+        </div>
 
-        {task.status === 'error' && (
-          <div className="flex max-w-md flex-col gap-2 rounded-3xl rounded-tl-lg bg-red-500/10 px-4 py-3">
-            <p className="flex items-start gap-2 text-sm leading-6 text-red-500">
-              <CircleAlert className="mt-1 size-4 shrink-0" />
-              <span className="min-w-0">{task.error || '生成失败'}</span>
-            </p>
-            <button
-              type="button"
-              className="glass-pill flex w-fit items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
-              onClick={() => { void retryMediaTask(task) }}
-            >
-              <RotateCw className="size-3.5" />
-              重试
-            </button>
-          </div>
-        )}
+        <div className="mt-2 pl-9">
+          {task.status === 'generating' && (
+            <div className="shimmer-block aspect-square w-56 rounded-2xl rounded-tl-md" />
+          )}
 
-        {task.status === 'completed' && task.imageUrl && (
-          <>
-            <button
-              type="button"
-              className="block cursor-zoom-in overflow-hidden rounded-3xl rounded-tl-lg border border-black/5 transition hover:brightness-105 dark:border-white/10"
-              data-selected={selected}
-              style={selected ? { outline: '2px solid var(--app-primary)', outlineOffset: 2 } : undefined}
-              onClick={() => previewMediaTask(task)}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={task.imageUrl} alt={task.prompt} className="block max-h-[420px] w-auto max-w-full" />
-            </button>
-            {doneMeta.length > 0 && <p className="label-mono mt-1.5 text-[10px] opacity-50">{doneMeta.join(' · ')}</p>}
-            <TurnActions task={task} selected={selected} />
-          </>
-        )}
+          {task.status === 'error' && (
+            <div className="flex max-w-md flex-col gap-2 rounded-2xl rounded-tl-md bg-red-500/10 px-4 py-3">
+              <p className="flex items-start gap-2 text-sm leading-6 text-red-500">
+                <CircleAlert className="mt-1 size-4 shrink-0" />
+                <span className="min-w-0">{task.error || '生成失败'}</span>
+              </p>
+              <button
+                type="button"
+                className="glass-pill flex w-fit items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
+                onClick={() => { void retryMediaTask(task) }}
+              >
+                <RotateCw className="size-3.5" />
+                重试
+              </button>
+            </div>
+          )}
 
-        {task.status === 'completed' && task.videoUrl && (
-          <>
-            <video
-              src={task.videoUrl}
-              controls
-              playsInline
-              preload="metadata"
-              className="block max-h-[420px] w-auto max-w-full overflow-hidden rounded-3xl rounded-tl-lg border border-black/5 dark:border-white/10"
-            />
-            {doneMeta.length > 0 && <p className="label-mono mt-1.5 text-[10px] opacity-50">{doneMeta.join(' · ')}</p>}
-            <TurnActions task={task} selected={selected} />
-          </>
-        )}
+          {task.status === 'completed' && task.imageUrl && (
+            <>
+              <button
+                type="button"
+                className="block cursor-zoom-in overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm transition hover:brightness-105 dark:border-white/10"
+                data-selected={selected}
+                style={selected ? { outline: '2px solid var(--app-primary)', outlineOffset: 2 } : undefined}
+                onClick={() => previewMediaTask(task)}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={task.imageUrl} alt={task.prompt} className="block max-h-[420px] w-auto max-w-full" />
+              </button>
+              <TurnActions task={task} selected={selected} />
+            </>
+          )}
+
+          {task.status === 'completed' && task.videoUrl && (
+            <>
+              <video
+                src={task.videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                className="block max-h-[420px] w-auto max-w-full overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm dark:border-white/10"
+              />
+              <TurnActions task={task} selected={selected} />
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
