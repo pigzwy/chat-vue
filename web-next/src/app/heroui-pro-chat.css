@@ -7,6 +7,7 @@
 @import "@heroui-pro/react/css/components/chain-of-thought.css";
 @import "@heroui-pro/react/css/components/chat-tool.css";
 @import "@heroui-pro/react/css/components/chat-loader.css";
+@import "@heroui-pro/react/css/components/command.css";
 
 /* Pro token → 玻璃拟态桥接(亮色) */
 :root {

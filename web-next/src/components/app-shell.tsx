@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { TopNav } from '@/components/top-nav'
+import { CommandPalette } from '@/components/command-palette'
 import { LoginScreen } from '@/components/login-screen'
 import { useHydrated } from '@/hooks/use-hydrated'
 import { modelsStore } from '@/lib/models-store'
@@ -34,6 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <>
       <TopNav />
+      <CommandPalette />
       <main className="flex h-screen flex-col overflow-hidden pt-16">
         {children}
       </main>
