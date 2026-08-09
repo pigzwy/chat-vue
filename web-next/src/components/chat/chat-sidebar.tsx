@@ -66,7 +66,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <button
                     type="button"
                     aria-label="删除对话"
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1 opacity-0 transition group-hover:opacity-60 hover:!opacity-100"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1 opacity-0 transition group-hover:opacity-60 hover:!opacity-100 pointer-coarse:opacity-60"
                     onClick={() => onDelete(item.id)}
                   >
                     <X className="size-3.5" />

@@ -87,7 +87,7 @@ export function Composer({
               <button
                 type="button"
                 aria-label="移除附件"
-                className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
+                className="absolute right-0.5 top-0.5 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition pointer-coarse:opacity-100 group-hover:opacity-100"
                 onClick={() => onRemoveAttachment(attachment.id)}
               >
                 <X className="size-3" />

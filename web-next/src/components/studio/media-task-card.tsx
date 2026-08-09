@@ -226,7 +226,7 @@ export function MediaTaskCard({ task }: { task: MediaTask }) {
 
             {!state.batchMode && (
               <div
-                className={`absolute top-2 right-2 flex gap-1 transition ${menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                className={`absolute top-2 right-2 flex gap-1 transition ${menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100'}`}
               >
                 <Tooltip.Root>
                   <Tooltip.Trigger<'button'>

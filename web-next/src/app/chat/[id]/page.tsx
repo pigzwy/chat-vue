@@ -233,14 +233,14 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
                       )
                     : <ChatMessage message={message} />}
                   {message.role === 'user' && !isEditing && !streaming && !message.parts.some(isFileUIPart) && (
-                    <ProChatMessage.Actions className="mt-1 flex justify-end opacity-0 transition group-hover/message:opacity-100">
+                    <ProChatMessage.Actions className="mt-1 flex justify-end opacity-0 transition group-hover/message:opacity-100 pointer-coarse:opacity-100">
                       <MessageAction label="编辑消息" onClick={() => setEditingId(message.id)}>
                         <Pencil className="size-3.5" />
                       </MessageAction>
                     </ProChatMessage.Actions>
                   )}
                   {message.role === 'assistant' && !isStreamingThis && (
-                    <ProChatMessage.Actions className="mt-1 flex gap-1 opacity-0 transition group-hover/message:opacity-100">
+                    <ProChatMessage.Actions className="mt-1 flex gap-1 opacity-0 transition group-hover/message:opacity-100 pointer-coarse:opacity-100">
                       <MessageAction label="复制回答" onClick={() => onCopy(message)}>
                         {copiedId === message.id ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                       </MessageAction>

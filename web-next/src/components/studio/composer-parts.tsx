@@ -117,7 +117,7 @@ export function SourceImageStrip({ className }: { className?: string }) {
           <button
             type="button"
             aria-label="移除源图"
-            className="absolute top-0.5 right-0.5 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition group-hover:opacity-100"
+            className="absolute top-0.5 right-0.5 rounded-full bg-black/60 p-0.5 text-white opacity-0 transition pointer-coarse:opacity-100 group-hover:opacity-100"
             onClick={() => removeUploadedImage(file.id)}
           >
             <X className="size-3" />

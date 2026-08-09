@@ -180,7 +180,7 @@ export default function VoicePage() {
                     <button
                       type="button"
                       aria-label="删除记录"
-                      className="rounded-full p-1 opacity-0 transition group-hover:opacity-60 hover:!opacity-100"
+                      className="rounded-full p-1 opacity-0 transition group-hover:opacity-60 hover:!opacity-100 pointer-coarse:opacity-60"
                       onClick={() => deleteVoiceRecord(record.id)}
                     >
                       <Trash2 className="size-3.5" />

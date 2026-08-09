@@ -52,7 +52,8 @@ export function TopNav() {
 
   return (
     <>
-      <div className="pointer-events-none fixed left-4 top-3 z-50">
+      {/* 窄屏空间不够:logo 只在 sm+ 显示,导航靠左,右侧按钮收紧,避免三块 fixed 元素互相压盖 */}
+      <div className="pointer-events-none fixed left-4 top-3 z-50 hidden sm:block">
         <Link
           href="/"
           className="glass-chip pointer-events-auto inline-flex items-center gap-2 py-1.5 pl-1.5 pr-3 transition-transform hover:-translate-y-0.5"
@@ -64,18 +65,18 @@ export function TopNav() {
             height={28}
             className="size-7 shrink-0 rounded-full object-cover"
           />
-          <span className="hidden text-sm font-bold tracking-tight sm:inline">pigcoder</span>
+          <span className="hidden text-sm font-bold tracking-tight md:inline">pigcoder</span>
         </Link>
       </div>
 
-      <nav className="pointer-events-none fixed left-1/2 top-3 z-50 -translate-x-1/2">
-        <div className="glass-chip pointer-events-auto inline-flex items-center gap-1 p-1">
+      <nav className="pointer-events-none fixed left-3 top-3 z-50 sm:left-1/2 sm:-translate-x-1/2">
+        <div className="glass-chip pointer-events-auto inline-flex items-center gap-0.5 p-1 sm:gap-1">
           {tabs.map(tab => (
             <Link
               key={tab.href}
               href={tab.href}
               data-selected={isTabActive(pathname, tab.href)}
-              className="glass-pill inline-flex h-8 items-center gap-1.5 px-3.5 text-sm font-semibold"
+              className="glass-pill inline-flex h-8 items-center px-2.5 text-[13px] font-semibold sm:px-3.5 sm:text-sm"
             >
               <span className="whitespace-nowrap">{tab.label}</span>
             </Link>
@@ -83,7 +84,7 @@ export function TopNav() {
         </div>
       </nav>
 
-      <div className="pointer-events-none fixed right-4 top-3 z-50 flex items-center gap-2">
+      <div className="pointer-events-none fixed right-3 top-3 z-50 flex items-center gap-1.5 sm:right-4 sm:gap-2">
         <button
           type="button"
           aria-label="退出登录"

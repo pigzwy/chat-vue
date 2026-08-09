@@ -25,7 +25,7 @@ function TurnActions({ task, selected }: { task: MediaTask, selected: boolean })
   const isImage = task.kind === 'image' && Boolean(task.imageUrl)
   const done = Boolean(task.imageUrl || task.videoUrl)
   return (
-    <ProChatMessage.Actions className="mt-1.5 flex gap-1 opacity-0 transition group-hover/turn:opacity-100">
+    <ProChatMessage.Actions className="mt-1.5 flex gap-1 opacity-0 transition group-hover/turn:opacity-100 pointer-coarse:opacity-100">
       {done && (
         <ProChatMessage.Action aria-label="下载" tooltip="下载" className="glass-pill" onPress={() => { void downloadMediaTask(task) }}>
           <Download className="size-3.5" />
