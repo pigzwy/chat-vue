@@ -55,10 +55,11 @@ function ViewToggle({ view }: { view: 'stream' | 'grid' }) {
   )
 }
 
-/** 无任务时的空态引导 */
+/** 无任务时的空态引导:预设灵感只在这里出现(冷启动),有历史后不再打扰 */
 function StudioEmptyState({ isVideo }: { isVideo: boolean }) {
+  const presets = isVideo ? videoPromptPresets : imagePromptPresets
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
+    <div className="flex flex-col items-center justify-center gap-5 py-24 text-center">
       <div className="glass-orb flex size-14 items-center justify-center rounded-3xl">
         {isVideo ? <Clapperboard className="size-6" /> : <WandSparkles className="size-6" />}
       </div>
@@ -72,6 +73,10 @@ function StudioEmptyState({ isVideo }: { isVideo: boolean }) {
             : '在下方描述你想要的画面，也可以上传参考图以图生图。'}
         </p>
       </div>
+      <div className="mx-auto max-w-lg">
+        <PresetRow presets={presets} center onSelect={appendPresetPrompt} />
+      </div>
+      <p className="label-mono opacity-40">更多灵感在「灵感墙」,点一下就能拿来创作</p>
     </div>
   )
 }
@@ -108,9 +113,6 @@ export default function StudioPage() {
   if (imageCount) statsParts.push(`${imageCount} 张图片`)
   if (videoCount) statsParts.push(`${videoCount} 个视频`)
   const statsText = statsParts.join(' · ') || '还没有生成记录'
-
-  const presets = isVideo ? videoPromptPresets : imagePromptPresets
-  const showPresets = !state.prompt.trim() && !state.files.length
 
   return (
     <div
@@ -160,15 +162,8 @@ export default function StudioPage() {
           )}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 sm:px-6">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
-          {showPresets && (
-            <div className="pointer-events-auto">
-              <PresetRow presets={presets} onSelect={appendPresetPrompt} />
-            </div>
-          )}
-          <div className="pointer-events-auto">
-            <ComposerBar />
-          </div>
+        <div className="pointer-events-auto mx-auto w-full max-w-3xl">
+          <ComposerBar />
         </div>
       </div>
 
