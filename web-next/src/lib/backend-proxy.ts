@@ -3,7 +3,9 @@
 // Nitro 的 CSRF cookie 无法建立（实测确认）。
 const backendOrigin = process.env.BACKEND_ORIGIN || 'http://localhost:3000'
 
-const forwardRequestHeaders = ['cookie', 'x-csrf-token', 'authorization', 'content-type', 'accept', 'accept-encoding', 'range']
+// user-agent / x-forwarded-* 必须透传:上游网关的会话绑定按「登录时 IP+UA」校验指纹,
+// 丢头会导致 SESSION_BINDING_MISMATCH 且触发网关撤销整个会话家族
+const forwardRequestHeaders = ['cookie', 'x-csrf-token', 'authorization', 'content-type', 'accept', 'accept-encoding', 'range', 'user-agent', 'x-forwarded-for', 'x-forwarded-proto', 'x-real-ip']
 const dropResponseHeaders = ['transfer-encoding', 'connection', 'keep-alive', 'content-encoding', 'content-length', 'set-cookie']
 
 export async function proxyToBackend(request: Request, prefix: string, pathSegments: string[]) {

@@ -174,15 +174,22 @@ async function sub2apiFetch<T>(path: string, token: string): Promise<T> {
   return response.json()
 }
 
+function humanizeGatewayMessage(message: string) {
+  if (message === 'Token has expired') return 'Token失效 请从主网站重新登录'
+  if (/network fingerprint changed/i.test(message)) {
+    return '登录环境与 Token 不匹配,该会话已被网关注销。请到 sub2.pigcoder.com 重新登录,并在同一浏览器里粘贴新 Token'
+  }
+  return message
+}
+
 function toErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : ''
   if (!message) return defaultErrorMessage
   try {
     const parsed = JSON.parse(message)
-    const errorMessage = parsed.message || parsed.error?.message || message
-    return errorMessage === 'Token has expired' ? 'Token失效 请从主网站重新登录' : errorMessage
+    return humanizeGatewayMessage(parsed.message || parsed.error?.message || message)
   } catch {
-    return message === 'Token has expired' ? 'Token失效 请从主网站重新登录' : message
+    return humanizeGatewayMessage(message)
   }
 }
 
@@ -392,7 +399,8 @@ async function validateToken(token: string) {
     const parsed = JSON.parse(text)
     message = parsed.message || parsed.error?.message || message
   } catch { /* 保留默认 */ }
-  return { ok: false as const, status: response.status, message: toErrorMessage(message) }
+  // toErrorMessage 只认 Error 实例,传字符串会吞掉真实报错(曾把网关会话绑定报错显示成通用失败)
+  return { ok: false as const, status: response.status, message: toErrorMessage(new Error(message)) }
 }
 
 /** 登录：校验 JWT 有效后写入 token 并加载分组/模型；失败抛出可读错误，不落盘 */
