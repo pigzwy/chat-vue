@@ -9,7 +9,8 @@ import { modelsStore } from '@/lib/models-store'
 /** 登录门:未登录展示登录页,登录后展示顶部导航 + 应用内容 */
 export function AppShell({ children }: { children: ReactNode }) {
   const hydrated = useHydrated()
-  const { token, authChecked } = modelsStore.useStore()
+  const { token, manualKey, authChecked } = modelsStore.useStore()
+  const authed = Boolean(token || manualKey)
 
   // 水合前 / 初始 token 校验中:占位骨架,避免闪登录页或 hydration 不匹配
   if (!hydrated || !authChecked) {
@@ -22,7 +23,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     )
   }
 
-  if (!token) {
+  if (!authed) {
     return (
       <main className="flex h-screen flex-col overflow-hidden">
         <LoginScreen />

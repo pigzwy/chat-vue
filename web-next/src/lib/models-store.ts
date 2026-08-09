@@ -73,6 +73,8 @@ export interface ModelsState {
   error: string
   /** 是否已完成初始 token 校验（用于登录门:false=校验中显示骨架,true=可判定登录态） */
   authChecked: boolean
+  /** sk 直连模式的手填 API Key(非空即处于该模式,跳过 JWT/分组体系) */
+  manualKey: string
 }
 
 const TOKEN_KEY = 'sub2api-token'
@@ -83,6 +85,8 @@ const API_KEY_KEY = 'sub2api-api-key'
 const API_KEYS_KEY = 'sub2api-api-keys'
 const GROUPS_CACHE_KEY = 'sub2api-groups-cache'
 const MODELS_CACHE_KEY = 'sub2api-models-cache-v2'
+/** sk 直连模式:用户手填的 API Key(绕过 JWT 会话绑定;网关 sk 认证无指纹校验) */
+const MANUAL_KEY_KEY = 'sub2api-manual-key'
 const defaultErrorMessage = '加载 Sub2API 失败'
 
 function readJson<T>(key: string, fallback: T): T {
@@ -203,7 +207,8 @@ export const modelsStore = createStore<ModelsState>({
   apiKey: '',
   loading: false,
   error: '',
-  authChecked: false
+  authChecked: false,
+  manualKey: ''
 })
 
 function patch(partial: Partial<ModelsState>) {
@@ -251,6 +256,18 @@ export async function initModels() {
     reasoningEffort: readString(EFFORT_KEY, 'auto') as ReasoningEffort,
     apiKey: readString(API_KEY_KEY, '')
   })
+
+  // sk 直连模式:有手填密钥则复验后直接进入(优先于 JWT)
+  const manualKey = readString(MANUAL_KEY_KEY)
+  if (manualKey) {
+    try {
+      await loginWithApiKey(manualKey)
+    } catch (error) {
+      writeString(MANUAL_KEY_KEY, '')
+      patch({ authChecked: true, error: toErrorMessage(error) })
+    }
+    return
+  }
 
   if (!token) {
     patch({ authChecked: true })
@@ -364,7 +381,9 @@ function getCachedApiKey(cache: Record<string, string | ApiKeyCacheItem>, groupI
 }
 
 export async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
-  const { token } = modelsStore.get()
+  const { token, manualKey } = modelsStore.get()
+  // sk 直连模式:所有分组统一用手填密钥(无 JWT 无法按分组自动建 key)
+  if (manualKey) return manualKey
   if (!token) throw new Error('缺少 Sub2API token')
 
   const cacheKey = String(groupId)
@@ -384,7 +403,8 @@ export async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
 }
 
 export function hasSub2apiToken() {
-  return Boolean(modelsStore.get().token)
+  const state = modelsStore.get()
+  return Boolean(state.token || state.manualKey)
 }
 
 /** 校验 sub2.pigcoder.com 会话 JWT：能拉到分组即视为有效 */
@@ -401,6 +421,55 @@ async function validateToken(token: string) {
   } catch { /* 保留默认 */ }
   // toErrorMessage 只认 Error 实例,传字符串会吞掉真实报错(曾把网关会话绑定报错显示成通用失败)
   return { ok: false as const, status: response.status, message: toErrorMessage(new Error(message)) }
+}
+
+/** sk 直连登录：校验 API Key(拉 /v1/models)后进入,跳过 JWT/分组体系。
+ *  网关对 sk 无会话指纹校验,不受 SESSION_BINDING 影响。 */
+export async function loginWithApiKey(rawKey: string) {
+  const key = rawKey.trim().replace(/^Bearer\s+/i, '')
+  if (!key) throw new Error('请输入 API Key(sk- 开头)')
+
+  patch({ loading: true })
+  try {
+    const response = await fetch('/sub2api/v1/models', {
+      headers: { Authorization: `Bearer ${key}` }
+    })
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      let message = `密钥校验失败（${response.status}）`
+      try {
+        const parsed = JSON.parse(text)
+        message = parsed.error?.message || parsed.message || message
+      } catch { /* 保留默认 */ }
+      throw new Error(toErrorMessage(new Error(message)))
+    }
+    const allItems = getItems<ModelItem>(await response.json()).map(toModelSelectItem)
+    if (!allItems.length) throw new Error('该密钥下没有可用模型')
+
+    writeString(MANUAL_KEY_KEY, key)
+    writeString(API_KEY_KEY, key)
+    writeJson(MODELS_CACHE_KEY, { manual: { token: key, items: allItems } })
+
+    const models = toChatModels(allItems)
+    let model = modelsStore.get().model
+    if (!models.some(item => item.value === model)) {
+      model = models[0]?.value || ''
+      writeString(MODEL_KEY, model)
+    }
+    patch({
+      manualKey: key,
+      apiKey: key,
+      token: '',
+      groups: [],
+      group: null,
+      models,
+      model,
+      error: '',
+      authChecked: true
+    })
+  } finally {
+    patch({ loading: false })
+  }
 }
 
 /** 登录：校验 JWT 有效后写入 token 并加载分组/模型；失败抛出可读错误，不落盘 */
@@ -423,15 +492,16 @@ export async function login(rawToken: string) {
   await loadGroups()
 }
 
-/** 退出登录：清 token 与全部账号相关缓存，回到登录页 */
+/** 退出登录：清 token/手填密钥 与全部账号相关缓存，回到登录页 */
 export function logout() {
   writeString(TOKEN_KEY, '')
+  writeString(MANUAL_KEY_KEY, '')
   writeJson(GROUPS_CACHE_KEY, null)
   writeJson(MODELS_CACHE_KEY, {})
   writeJson(API_KEYS_KEY, {})
   writeString(API_KEY_KEY, '')
   writeJson(GROUP_KEY, null)
-  patch({ token: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
+  patch({ token: '', manualKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
 }
 
 /** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用 */
