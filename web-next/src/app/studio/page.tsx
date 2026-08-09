@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Clapperboard, ImagePlus, WandSparkles } from 'lucide-react'
+import { Clapperboard, ImagePlus, LayoutGrid, Rows3, WandSparkles } from 'lucide-react'
 import { PresetRow } from '@/components/chat/preset-row'
 import { ComposerBar } from '@/components/studio/composer-bar'
 import { appendPresetPrompt } from '@/components/studio/composer-parts'
 import { ConfirmDialog } from '@/components/studio/confirm-dialog'
 import { EditHistoryPanel } from '@/components/studio/edit-history-panel'
 import { MediaPreviewOverlay } from '@/components/studio/media-preview-overlay'
+import { MediaStream } from '@/components/studio/media-stream'
 import { MediaTaskGrid } from '@/components/studio/media-task-grid'
 import { TaskBatchToolbar } from '@/components/studio/task-batch-toolbar'
 import { imagePromptPresets, videoPromptPresets } from '@/lib/presets'
@@ -21,9 +22,38 @@ import {
   onDropImages,
   onPasteImages,
   setPrompt,
+  setStudioView,
   studioStore,
   trimUploadedImagesToLimit
 } from '@/lib/studio/tasks-store'
+
+/** 视图切换:对话流 / 网格 */
+function ViewToggle({ view }: { view: 'stream' | 'grid' }) {
+  return (
+    <div className="flex items-center gap-0.5 rounded-full bg-black/5 p-0.5 dark:bg-white/5">
+      <button
+        type="button"
+        aria-label="对话流视图"
+        title="对话流视图"
+        data-selected={view === 'stream'}
+        className="glass-pill flex size-7 items-center justify-center rounded-full"
+        onClick={() => setStudioView('stream')}
+      >
+        <Rows3 className="size-3.5" />
+      </button>
+      <button
+        type="button"
+        aria-label="网格视图"
+        title="网格视图"
+        data-selected={view === 'grid'}
+        className="glass-pill flex size-7 items-center justify-center rounded-full"
+        onClick={() => setStudioView('grid')}
+      >
+        <LayoutGrid className="size-3.5" />
+      </button>
+    </div>
+  )
+}
 
 /** 无任务时的空态引导 */
 function StudioEmptyState({ isVideo }: { isVideo: boolean }) {
@@ -91,21 +121,43 @@ export default function StudioPage() {
       onDrop={onDropImages}
       onPaste={onPasteImages}
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-72 sm:px-6">
-        <div className="mx-auto w-full max-w-7xl">
-          <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">创作台</h1>
-              <p className="label-mono mt-1">{statsText}</p>
-            </div>
-            <TaskBatchToolbar />
-          </div>
+      {state.studioView === 'stream' && state.queue.length > 0
+        ? (
+            <MediaStream
+              header={(
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight">创作台</h1>
+                    <p className="label-mono mt-1">{statsText}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ViewToggle view={state.studioView} />
+                    <TaskBatchToolbar />
+                  </div>
+                </div>
+              )}
+            />
+          )
+        : (
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-72 sm:px-6">
+              <div className="mx-auto w-full max-w-7xl">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight">创作台</h1>
+                    <p className="label-mono mt-1">{statsText}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {state.queue.length > 0 && <ViewToggle view={state.studioView} />}
+                    <TaskBatchToolbar />
+                  </div>
+                </div>
 
-          {state.queue.length
-            ? <MediaTaskGrid tasks={state.queue} />
-            : <StudioEmptyState isVideo={isVideo} />}
-        </div>
-      </div>
+                {state.queue.length
+                  ? <MediaTaskGrid tasks={state.queue} />
+                  : <StudioEmptyState isVideo={isVideo} />}
+              </div>
+            </div>
+          )}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-4 pb-4 sm:px-6">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">

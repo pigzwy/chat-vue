@@ -90,7 +90,11 @@ export interface UploadedImage {
   type: string
 }
 
+export type StudioView = 'stream' | 'grid'
+
 export interface StudioState {
+  /** 生成记录视图:stream=对话流(默认,airgate/ChatGPT 式),grid=卡片网格 */
+  studioView: StudioView
   prompt: string
   ratio: ImageRatio
   resolution: ImageResolution
@@ -109,6 +113,7 @@ export interface StudioState {
   timerNow: number
 }
 
+const studioViewStorageKey = 'sub2api-studio-view'
 const mediaStorageKey = 'sub2api-media-tasks'
 const legacyImageStorageKey = 'sub2api-image-tasks'
 const imageQualityStorageKey = 'sub2api-image-quality'
@@ -362,6 +367,7 @@ function initialState(): StudioState {
   const videoResolutionValue = readStorage(videoResolutionStorageKey)
 
   return {
+    studioView: readStorage(studioViewStorageKey) === 'grid' ? 'grid' : 'stream',
     prompt: '',
     ratio: isImageRatio(ratio) ? ratio : '16:9',
     resolution: isImageResolution(resolution) ? resolution : '2K',
@@ -384,6 +390,7 @@ function initialState(): StudioState {
 export const studioStore = createStore<StudioState>(initialState(), {
   // 与服务端渲染分支（无 localStorage）一致的快照，避免 /studio 直连水合不匹配
   serverSnapshot: {
+    studioView: 'stream',
     prompt: '',
     ratio: '16:9',
     resolution: '2K',
@@ -963,8 +970,16 @@ export async function deleteMediaTask(task: MediaTask) {
   toast({ title: '已删除', description: '已从本地生成历史中移除' })
 }
 
+export function setStudioView(view: StudioView) {
+  patch({ studioView: view })
+  writeStorage(studioViewStorageKey, view)
+}
+
 export function toggleBatchMode() {
-  patch({ batchMode: !get().batchMode, selectedBatchIds: [] })
+  const entering = !get().batchMode
+  // 批量选择依赖卡片网格的复选交互,进入批量模式时自动切网格视图
+  if (entering && get().studioView === 'stream') setStudioView('grid')
+  patch({ batchMode: entering, selectedBatchIds: [] })
 }
 
 export function toggleBatchTask(task: MediaTask) {
