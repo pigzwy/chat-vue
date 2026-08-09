@@ -24,12 +24,21 @@ services:
       - studio-backend-data:/app/.data
 
   web-next:
-    image: studio-web-next:latest
+    # 宿主机 pnpm build 产物直挂(standalone 为工作区嵌套结构:server.js 在 web-next/ 下)。
+    # 部署 = `cd web-next && pnpm build` + `docker compose up -d web-next`,无需 docker build。
+    image: node:22-bookworm-slim
     container_name: studio-web-next
     restart: unless-stopped
     network_mode: host
     depends_on:
       - backend
+    working_dir: /app
+    command: ["node", "web-next/server.js"]
+    volumes:
+      # 外层不加 :ro——docker 需在其中创建嵌套挂载点目录
+      - ./web-next/.next/standalone:/app
+      - ./web-next/.next/static:/app/web-next/.next/static:ro
+      - ./web-next/public:/app/web-next/public:ro
     environment:
       NODE_ENV: production
       HOSTNAME: 127.0.0.1
