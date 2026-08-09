@@ -25,7 +25,7 @@ import { MediaModelMenu } from './media-model-menu'
 import { RatioResolutionPopover } from './ratio-resolution-popover'
 import { QualityPopover } from './quality-popover'
 
-/** 底部创作输入栏（lg 以下的移动形态）：模式 / 模型 / 参数 / 源图 / prompt / 提交 */
+/** 底部悬浮创作栏（全断面统一形态）：模式 / 模型 / 参数 / 源图 / prompt / 提交 */
 export function ComposerBar() {
   const state = studioStore.useStore()
   const models = mediaModelsStore.useStore()
