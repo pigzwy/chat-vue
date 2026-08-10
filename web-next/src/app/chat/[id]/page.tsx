@@ -17,6 +17,7 @@ import { MessageEditBox } from '@/components/chat/message-edit'
 import { Composer } from '@/components/chat/composer'
 import { ModelMenu } from '@/components/chat/model-menu'
 import { ChatSidebar, SidebarOpenButton } from '@/components/chat/chat-sidebar'
+import { ScrollMinimap } from '@/components/scroll-minimap'
 import { useChatAttachments } from '@/hooks/use-attachments'
 import { getChat, refreshChats, updateChatMessages, updateChatVotes, type LocalVote } from '@/lib/chats-store'
 import { modelsStore } from '@/lib/models-store'
@@ -206,8 +207,14 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
 
   const streaming = status === 'streaming' || status === 'submitted'
 
+  // 滚动缩略导航:一格对应一次提问,悬停看问题、点击跳转(右缘,左边让给会话边栏)
+  const minimapItems = messages
+    .filter(message => message.role === 'user')
+    .map(message => ({ id: message.id, label: getMessageText(message) || '(附件消息)' }))
+
   return (
     <div className="flex min-h-0 flex-1">
+      <ScrollMinimap items={minimapItems} attr="data-msg-id" side="right" />
       <ChatSidebar />
       <div className="glass-panel glass-panel--lg aurora-shell mx-4 mb-4 flex min-w-0 flex-1 flex-col lg:ml-0">
         <div className="flex items-center gap-1 p-4">
@@ -223,7 +230,7 @@ function ChatView({ data }: { data: NonNullable<ReturnType<typeof getChat>> }) {
               const isStreamingThis = streaming && isLast
               const isEditing = editingId === message.id && message.role === 'user'
               return (
-                <div key={message.id} className="group/message">
+                <div key={message.id} className="group/message" data-msg-id={message.role === 'user' ? message.id : undefined}>
                   {isEditing
                     ? (
                         <MessageEditBox
