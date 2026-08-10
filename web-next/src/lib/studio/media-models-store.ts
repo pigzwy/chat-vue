@@ -106,10 +106,15 @@ export const mediaModelsStore = createStore<MediaModelsState>(initialState(), {
 })
 
 function priceTextForSpec(spec: MediaModelSpec) {
+  const range = (rates: number[], unit: string) => {
+    const min = Math.min(...rates)
+    const max = Math.max(...rates)
+    return min === max ? `$${min}/${unit}` : `$${min}~${max}/${unit}`
+  }
   if (spec.kind === 'video') {
     const rates = spec.costPerSecondByResolution ? Object.values(spec.costPerSecondByResolution) : []
     if (!rates.length) return undefined
-    return `$${Math.min(...rates)}~${Math.max(...rates)}/秒`
+    return range(rates, '秒')
   }
   if (spec.costPerImage) {
     return spec.costPerImageMax && spec.costPerImageMax !== spec.costPerImage
@@ -117,8 +122,7 @@ function priceTextForSpec(spec: MediaModelSpec) {
       : `$${spec.costPerImage}/张`
   }
   if (spec.costByResolution) {
-    const rates = Object.values(spec.costByResolution)
-    return `$${Math.min(...rates)}~${Math.max(...rates)}/张`
+    return range(Object.values(spec.costByResolution), '张')
   }
   return undefined
 }

@@ -85,6 +85,11 @@ export function RatioResolutionPopover() {
                   </div>
 
                   <p className="label-mono mt-3">输出尺寸 {size}</p>
+                  {state.resolution === '4K' && (
+                    <p className="mt-2 max-w-56 text-xs leading-5 opacity-60">
+                      4K 为尽力输出:上游不保证 100% 按 4K 生成,可能回落到较低分辨率(价格不变)
+                    </p>
+                  )}
                 </>
               )
             : <p className="label-mono mt-3">该模型不支持指定分辨率</p>}

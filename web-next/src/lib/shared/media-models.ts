@@ -47,36 +47,35 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'gpt-image-2',
     label: 'GPT Image 2',
-    description: '细节丰富，支持编辑与多参考图，按分辨率计费',
+    description: '细节丰富，支持编辑与多参考图（4K 为尽力输出）',
     kind: 'image',
     provider: 'openai',
     supportsEdit: true,
     supportsSizeQuality: true,
     supportsStream: true,
-    costByResolution: { '1K': 0.135, '2K': 0.18, '4K': 0.27 },
+    costByResolution: { '1K': 0.2, '2K': 0.2, '4K': 0.2 },
     defaultGroupId: defaultOpenaiMediaGroupId
   },
   {
     id: 'grok-imagine-image',
     label: 'Grok 画图 · 快速',
-    description: '出图快、成本低，支持以图生图（参考图最多 3 张）',
+    description: '出图快，支持以图生图（参考图最多 3 张）',
     kind: 'image',
     provider: 'grok',
     supportsEdit: true,
     supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'],
-    costPerImage: 0.02,
+    costPerImage: 0.2,
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
     id: 'grok-imagine-image-quality',
     label: 'Grok 画图 · 高清',
-    description: '更高质量输出，支持以图生图（1K $0.05 / 2K $0.07）',
+    description: '更高质量输出，支持以图生图',
     kind: 'image',
     provider: 'grok',
     supportsEdit: true,
     supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'],
-    costPerImage: 0.05,
-    costPerImageMax: 0.07,
+    costPerImage: 0.2,
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
@@ -88,19 +87,19 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     supportsSourceImage: true,
     supportsVideoResolution: true,
     maxDurationSeconds: 15,
-    costPerSecondByResolution: { '480p': 0.05, '720p': 0.07 },
+    costPerSecondByResolution: { '480p': 0.05, '720p': 0.05 },
     defaultGroupId: defaultGrokMediaGroupId
   },
   {
     id: 'grok-imagine-video-1.5',
     label: 'Grok 视频 · 1.5',
-    description: '新版模型画质更好、计费更高；纯文生视频会自动用标准版',
+    description: '新版模型画质更好；纯文生视频会自动用标准版',
     kind: 'video',
     provider: 'grok',
     supportsSourceImage: true,
     supportsVideoResolution: true,
     maxDurationSeconds: 15,
-    costPerSecondByResolution: { '480p': 0.08, '720p': 0.14 },
+    costPerSecondByResolution: { '480p': 0.05, '720p': 0.05 },
     defaultGroupId: defaultGrokMediaGroupId
   }
 ]
@@ -122,7 +121,7 @@ export function resolveMediaModelSpec(id: string): MediaModelSpec {
     return { id, label: id, kind: 'image', provider: 'openai', supportsEdit: true, supportsSizeQuality: true, supportsStream: true, defaultGroupId: defaultOpenaiMediaGroupId }
   }
   if (isVideoMediaModelId(id)) {
-    return { id, label: id, kind: 'video', provider: 'grok', supportsSourceImage: true, maxDurationSeconds: 15, costPerSecondByResolution: { '480p': 0.05, '720p': 0.07 }, defaultGroupId: defaultGrokMediaGroupId }
+    return { id, label: id, kind: 'video', provider: 'grok', supportsSourceImage: true, maxDurationSeconds: 15, costPerSecondByResolution: { '480p': 0.05, '720p': 0.05 }, defaultGroupId: defaultGrokMediaGroupId }
   }
   if (isGrokMediaModelId(id)) {
     return { id, label: id, kind: 'image', provider: 'grok', supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'], defaultGroupId: defaultGrokMediaGroupId }
