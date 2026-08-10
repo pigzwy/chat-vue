@@ -17,6 +17,9 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3009
+    # SUB2API_BASE_URL 可写 docker 宿主地址(http://host.docker.internal:8080)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - chat-vue-data:/app/.data
 
@@ -32,6 +35,10 @@ services:
       NODE_ENV: production
       # /api 与 /sub2api 经容器网络转发给 Nitro,再由 Nitro 按 .env 打到网关
       BACKEND_ORIGIN: http://chat-vue:3009
+      # 创作台分组 id(运行时经 /api/app-config 注入前端,改 .env 重启即生效)
+      MEDIA_GROUP_OPENAI: ${MEDIA_GROUP_OPENAI:-}
+      MEDIA_GROUP_GROK: ${MEDIA_GROUP_GROK:-}
+      MEDIA_GROUP_NANOBANANA: ${MEDIA_GROUP_NANOBANANA:-}
 
 volumes:
   chat-vue-data:

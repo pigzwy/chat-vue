@@ -47,6 +47,10 @@ services:
       HOSTNAME: 127.0.0.1
       PORT: 3400
       BACKEND_ORIGIN: http://127.0.0.1:3009
+      # 创作台分组 id(取自根 .env,运行时经 /api/app-config 注入前端)
+      MEDIA_GROUP_OPENAI: ${MEDIA_GROUP_OPENAI:-}
+      MEDIA_GROUP_GROK: ${MEDIA_GROUP_GROK:-}
+      MEDIA_GROUP_NANOBANANA: ${MEDIA_GROUP_NANOBANANA:-}
 
 volumes:
   studio-backend-data:

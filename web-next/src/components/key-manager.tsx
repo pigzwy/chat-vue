@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Modal } from '@heroui/react'
 import { KeyRound, LoaderCircle } from 'lucide-react'
-import { modelsStore, setManualMediaKeys } from '@/lib/models-store'
+import { mediaGroupIds, modelsStore, setManualMediaKeys } from '@/lib/models-store'
 import { refreshGroupModels } from '@/lib/studio/media-models-store'
 import { toast } from '@/lib/toast'
 
@@ -12,12 +12,13 @@ function maskKey(key: string) {
   return `${key.slice(0, 6)}····${key.slice(-4)}`
 }
 
-/** sk 模式的分组密钥管理:image-2 / Grok 各配一把,创作台按模型自动路由 */
+/** sk 模式的分组密钥管理:image-2 / Grok / Nano Banana 各配一把,创作台按模型自动路由 */
 export function KeyManager() {
-  const { manualKey, manualImageKey, manualGrokKey } = modelsStore.useStore()
+  const { manualKey, manualImageKey, manualGrokKey, manualNanoKey } = modelsStore.useStore()
   const [open, setOpen] = useState(false)
   const [imageKey, setImageKey] = useState('')
   const [grokKey, setGrokKey] = useState('')
+  const [nanoKey, setNanoKey] = useState('')
   const [pending, setPending] = useState(false)
 
   // 仅 sk 直连模式需要(JWT 模式下 key 按分组自动创建)
@@ -26,6 +27,7 @@ export function KeyManager() {
   function openDialog() {
     setImageKey(manualImageKey)
     setGrokKey(manualGrokKey)
+    setNanoKey(manualNanoKey)
     setOpen(true)
   }
 
@@ -35,7 +37,8 @@ export function KeyManager() {
     try {
       const changed = await setManualMediaKeys({
         image: imageKey !== manualImageKey ? imageKey : undefined,
-        grok: grokKey !== manualGrokKey ? grokKey : undefined
+        grok: grokKey !== manualGrokKey ? grokKey : undefined,
+        nanobanana: nanoKey !== manualNanoKey ? nanoKey : undefined
       })
       if (changed) {
         await refreshGroupModels()
@@ -48,6 +51,27 @@ export function KeyManager() {
       setPending(false)
     }
   }
+
+  const groups = mediaGroupIds()
+  const slots = [
+    {
+      label: `图片密钥(image-2 · 分组 ${groups.openai})`,
+      value: imageKey,
+      onChange: setImageKey
+    },
+    {
+      label: `Grok 密钥(画图/视频 · 分组 ${groups.grok})`,
+      value: grokKey,
+      onChange: setGrokKey
+    },
+    {
+      label: groups.nanobanana
+        ? `Nano Banana 密钥(分组 ${groups.nanobanana})`
+        : 'Nano Banana 密钥(分组未配置:服务端 MEDIA_GROUP_NANOBANANA)',
+      value: nanoKey,
+      onChange: setNanoKey
+    }
+  ]
 
   return (
     <>
@@ -66,7 +90,7 @@ export function KeyManager() {
           <Modal.Dialog aria-label="密钥管理" className="glass-panel glass-panel--lg w-full max-w-md rounded-3xl p-6">
             <h2 className="text-lg font-bold">密钥管理</h2>
             <p className="mt-1 text-sm leading-6 opacity-60">
-              每把 sk 只属于一个分组。给 image-2 和 Grok 分别配上各自分组的密钥,创作台会按模型自动路由;未配置的回落到主密钥。
+              每把 sk 只属于一个分组。给各分组配上各自的密钥,创作台会按模型自动路由;未配置的回落到主密钥。
             </p>
 
             <div className="mt-5 space-y-4">
@@ -75,24 +99,17 @@ export function KeyManager() {
                 <p className="glass-pill inline-block px-3 py-1.5 font-mono text-xs">{maskKey(manualKey)}</p>
                 <p className="mt-1 text-xs opacity-45">更换主密钥请退出后重新登录</p>
               </div>
-              <div>
-                <p className="label-mono mb-1.5">图片密钥(image-2 分组)</p>
-                <input
-                  value={imageKey}
-                  placeholder="sk-...(留空则用主密钥)"
-                  className="glass-input w-full rounded-2xl px-3.5 py-2.5 font-mono text-xs outline-none"
-                  onChange={event => setImageKey(event.target.value)}
-                />
-              </div>
-              <div>
-                <p className="label-mono mb-1.5">Grok 密钥(画图/视频分组)</p>
-                <input
-                  value={grokKey}
-                  placeholder="sk-...(留空则用主密钥)"
-                  className="glass-input w-full rounded-2xl px-3.5 py-2.5 font-mono text-xs outline-none"
-                  onChange={event => setGrokKey(event.target.value)}
-                />
-              </div>
+              {slots.map(slot => (
+                <div key={slot.label}>
+                  <p className="label-mono mb-1.5">{slot.label}</p>
+                  <input
+                    value={slot.value}
+                    placeholder="sk-...(留空则用主密钥)"
+                    className="glass-input w-full rounded-2xl px-3.5 py-2.5 font-mono text-xs outline-none"
+                    onChange={event => slot.onChange(event.target.value)}
+                  />
+                </div>
+              ))}
             </div>
 
             <div className="mt-6 flex justify-end gap-2">

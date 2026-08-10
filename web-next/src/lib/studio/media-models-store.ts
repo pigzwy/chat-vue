@@ -1,6 +1,7 @@
 // 自 useMediaModels.ts 移植：创作台模型选择（目录精选 + 按 provider 可用性过滤）
 // 分组对用户不可见——每个模型按 provider 绑定默认分组（GPT Image 2 → 25，Grok 全系 → 66）
 import { createStore } from '@/lib/store'
+import { loadAppConfig, resolveMediaGroupId } from '@/lib/runtime-config'
 import {
   clearApiKeyForGroup,
   getApiKeyForGroup,
@@ -193,20 +194,24 @@ function correctSelections() {
 }
 
 export async function refreshGroupModels() {
-  const state = mediaModelsStore.get()
   if (!hasSub2apiToken()) {
     mediaModelsStore.set(prev => ({ ...prev, openaiAvailableIds: null, grokAvailableIds: null }))
     correctSelections()
     return
   }
 
+  // 分组 id 经运行时配置重解析(localStorage 覆盖 > 服务端 env > 内置默认)
+  await loadAppConfig()
+  const openaiGroupId = resolveMediaGroupId('openai')
+  const grokGroupId = resolveMediaGroupId('grok')
+
   const strict = Boolean(modelsStore.get().manualKey)
-  mediaModelsStore.set(prev => ({ ...prev, loadingModels: true, strictAvailability: strict }))
+  mediaModelsStore.set(prev => ({ ...prev, openaiGroupId, grokGroupId, loadingModels: true, strictAvailability: strict }))
   try {
     // 只拉两个默认媒体分组（会按需为各分组自动创建 key），不做全分组扫描
     const [openaiResult, grokResult] = await Promise.allSettled([
-      getModelsForGroup(state.openaiGroupId, mediaApiKeyName),
-      getModelsForGroup(state.grokGroupId, mediaApiKeyName)
+      getModelsForGroup(openaiGroupId, mediaApiKeyName),
+      getModelsForGroup(grokGroupId, mediaApiKeyName)
     ])
     mediaModelsStore.set(prev => ({
       ...prev,

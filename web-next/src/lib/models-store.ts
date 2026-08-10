@@ -1,6 +1,7 @@
 import { createStore } from './store'
 import { MODELS } from './shared/models'
-import { defaultGrokMediaGroupId, defaultOpenaiMediaGroupId, isMediaModelId } from './shared/media-models'
+import { isMediaModelId } from './shared/media-models'
+import { loadAppConfig, resolveMediaGroupId } from './runtime-config'
 import type { ReasoningEffort } from './shared/reasoning'
 import { csrfHeaderName, getCsrfToken } from './csrf'
 
@@ -75,9 +76,10 @@ export interface ModelsState {
   authChecked: boolean
   /** sk 直连模式的手填 API Key(非空即处于该模式,跳过 JWT/分组体系) */
   manualKey: string
-  /** 可选分组密钥:image-2(分组25)与 Grok(分组66),未配则回落 manualKey */
+  /** 可选分组密钥:image-2 / Grok / Nano Banana 各一把,未配则回落 manualKey */
   manualImageKey: string
   manualGrokKey: string
+  manualNanoKey: string
 }
 
 const TOKEN_KEY = 'sub2api-token'
@@ -90,9 +92,10 @@ const GROUPS_CACHE_KEY = 'sub2api-groups-cache'
 const MODELS_CACHE_KEY = 'sub2api-models-cache-v2'
 /** sk 直连模式:用户手填的 API Key(绕过 JWT 会话绑定;网关 sk 认证无指纹校验) */
 const MANUAL_KEY_KEY = 'sub2api-manual-key'
-/** 分组密钥(可选):image-2 与 Grok 各自的 key,创作台按模型自动路由 */
+/** 分组密钥(可选):image-2 / Grok / Nano Banana 各自的 key,创作台按模型自动路由 */
 const MANUAL_IMAGE_KEY_KEY = 'sub2api-manual-key-image'
 const MANUAL_GROK_KEY_KEY = 'sub2api-manual-key-grok'
+const MANUAL_NANO_KEY_KEY = 'sub2api-manual-key-nanobanana'
 const defaultErrorMessage = '加载 Sub2API 失败'
 
 function readJson<T>(key: string, fallback: T): T {
@@ -216,7 +219,8 @@ export const modelsStore = createStore<ModelsState>({
   authChecked: false,
   manualKey: '',
   manualImageKey: '',
-  manualGrokKey: ''
+  manualGrokKey: '',
+  manualNanoKey: ''
 })
 
 function patch(partial: Partial<ModelsState>) {
@@ -257,10 +261,14 @@ export async function initModels() {
     writeString(TOKEN_KEY, token)
   }
 
+  // 服务端注入的分组配置尽早拉取(登录流程后面会用到分组 id 路由)
+  void loadAppConfig()
+
   patch({
     token,
     manualImageKey: readString(MANUAL_IMAGE_KEY_KEY),
     manualGrokKey: readString(MANUAL_GROK_KEY_KEY),
+    manualNanoKey: readString(MANUAL_NANO_KEY_KEY),
     group: readJson<number | null>(GROUP_KEY, null),
     model: readString(MODEL_KEY, 'anthropic/claude-haiku-4.5'),
     reasoningEffort: readString(EFFORT_KEY, 'auto') as ReasoningEffort,
@@ -412,19 +420,22 @@ export async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
   return key
 }
 
-function readMediaGroupId(key: string, fallback: number) {
-  const raw = readString(key)
-  const value = Number(raw)
-  return Number.isFinite(value) && value > 0 ? value : fallback
+/** 三个媒体分组的当前 id(localStorage 覆盖 > 服务端配置 > 内置默认;nanobanana 0=未配置) */
+export function mediaGroupIds() {
+  return {
+    openai: resolveMediaGroupId('openai'),
+    grok: resolveMediaGroupId('grok'),
+    nanobanana: resolveMediaGroupId('nanobanana')
+  }
 }
 
-/** sk 模式:按分组路由到对应密钥(image-2→图片密钥,Grok→Grok 密钥,未配回落主密钥) */
+/** sk 模式:按分组路由到对应密钥(image-2→图片密钥,Grok→Grok 密钥,Nano Banana→香蕉密钥,未配回落主密钥) */
 export function manualKeyForGroup(groupId: number) {
-  const { manualKey, manualImageKey, manualGrokKey } = modelsStore.get()
-  const grokGid = readMediaGroupId('sub2api-media-group-grok', defaultGrokMediaGroupId)
-  const openaiGid = readMediaGroupId('sub2api-media-group-openai', defaultOpenaiMediaGroupId)
-  if (groupId === grokGid) return manualGrokKey || manualKey
-  if (groupId === openaiGid) return manualImageKey || manualKey
+  const { manualKey, manualImageKey, manualGrokKey, manualNanoKey } = modelsStore.get()
+  const ids = mediaGroupIds()
+  if (groupId === ids.grok) return manualGrokKey || manualKey
+  if (groupId === ids.openai) return manualImageKey || manualKey
+  if (ids.nanobanana && groupId === ids.nanobanana) return manualNanoKey || manualKey
   return manualKey
 }
 
@@ -446,7 +457,7 @@ async function validateApiKey(key: string) {
 }
 
 /** 保存分组密钥(空串=清除;非空校验后落盘)。返回是否有变更 */
-export async function setManualMediaKeys(keys: { image?: string, grok?: string }) {
+export async function setManualMediaKeys(keys: { image?: string, grok?: string, nanobanana?: string }) {
   const patchState: Partial<ModelsState> = {}
   if (keys.image !== undefined) {
     const key = keys.image.trim().replace(/^Bearer\s+/i, '')
@@ -459,6 +470,12 @@ export async function setManualMediaKeys(keys: { image?: string, grok?: string }
     if (key) await validateApiKey(key)
     writeString(MANUAL_GROK_KEY_KEY, key)
     patchState.manualGrokKey = key
+  }
+  if (keys.nanobanana !== undefined) {
+    const key = keys.nanobanana.trim().replace(/^Bearer\s+/i, '')
+    if (key) await validateApiKey(key)
+    writeString(MANUAL_NANO_KEY_KEY, key)
+    patchState.manualNanoKey = key
   }
   if (Object.keys(patchState).length) {
     // 分组密钥变了,按分组的模型缓存指纹随之失效(fingerprint=该组实际用的 key)
@@ -563,12 +580,13 @@ export function logout() {
   writeString(MANUAL_KEY_KEY, '')
   writeString(MANUAL_IMAGE_KEY_KEY, '')
   writeString(MANUAL_GROK_KEY_KEY, '')
+  writeString(MANUAL_NANO_KEY_KEY, '')
   writeJson(GROUPS_CACHE_KEY, null)
   writeJson(MODELS_CACHE_KEY, {})
   writeJson(API_KEYS_KEY, {})
   writeString(API_KEY_KEY, '')
   writeJson(GROUP_KEY, null)
-  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
+  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', manualNanoKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
 }
 
 /** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用。
