@@ -18,6 +18,7 @@ import {
   TimerOff,
   Trash
 } from 'lucide-react'
+import { useCachedVideoUrl } from '@/lib/studio/video-cache'
 import {
   addTaskImageAsReference,
   copyImage,
@@ -49,6 +50,7 @@ const tooltipClass = 'glass-panel rounded-full px-2.5 py-1 text-xs font-medium'
 
 /** 单条生成任务卡片：生成中 / 失败 / 完成三态 + 操作菜单 + 批量选择 */
 export function MediaTaskCard({ task }: { task: MediaTask }) {
+  const cachedVideoSrc = useCachedVideoUrl(task.id, task.videoUrl)
   const state = studioStore.useStore()
   // 视频代理地址随任务过期（2h/服务重启）失效，加载失败时给出明确状态
   const [videoFailed, setVideoFailed] = useState(false)
@@ -177,7 +179,7 @@ export function MediaTaskCard({ task }: { task: MediaTask }) {
                     {isVideo && task.videoUrl
                       ? (
                           <video
-                            src={task.videoUrl}
+                            src={cachedVideoSrc}
                             preload="metadata"
                             muted
                             playsInline

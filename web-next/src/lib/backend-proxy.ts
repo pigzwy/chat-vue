@@ -35,6 +35,11 @@ export async function proxyToBackend(request: Request, prefix: string, pathSegme
     if (dropResponseHeaders.includes(key.toLowerCase())) return
     responseHeaders.append(key, value)
   })
+  // 视频内容代理:上游不带缓存头导致每次组件重建都重新拉流;
+  // 链接本身约 2 小时有效,允许浏览器私有缓存同等时长
+  if (upstream.ok && /\/api\/videos\/content\//.test(target)) {
+    responseHeaders.set('Cache-Control', 'private, max-age=7200')
+  }
   for (const cookie of upstream.headers.getSetCookie?.() || []) {
     responseHeaders.append('set-cookie', cookie)
   }

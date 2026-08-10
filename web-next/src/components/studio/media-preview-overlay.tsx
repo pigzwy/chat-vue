@@ -1,5 +1,6 @@
 'use client'
 
+import { useCachedVideoUrl } from '@/lib/studio/video-cache'
 import { useState } from 'react'
 import { Modal } from '@heroui/react'
 import { Clapperboard, Copy, Download, Paperclip, TextCursorInput, TimerOff, X } from 'lucide-react'
@@ -24,6 +25,7 @@ export function MediaPreviewOverlay() {
   const open = Boolean(previewTask || previewUploadedImage)
 
   const previewVideoUrl = previewTask?.videoUrl || ''
+  const cachedPreviewVideo = useCachedVideoUrl(previewTask?.id || '', previewTask?.videoUrl)
   const previewImageUrl = previewTask?.imageUrl || previewUploadedImage?.previewUrl || ''
   const previewRevisedPrompt = previewTask?.revisedPrompt?.trim() || ''
 
@@ -65,7 +67,7 @@ export function MediaPreviewOverlay() {
                 : previewVideoUrl
                   ? (
                       <video
-                        src={previewVideoUrl}
+                        src={cachedPreviewVideo || previewVideoUrl}
                         controls
                         autoPlay
                         loop

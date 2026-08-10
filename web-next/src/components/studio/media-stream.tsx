@@ -5,6 +5,7 @@ import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
 import { CircleAlert, Clapperboard, Copy, Download, Pencil, Quote, RotateCw, Trash2, WandSparkles } from 'lucide-react'
 import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
+import { useCachedVideoUrl } from '@/lib/studio/video-cache'
 import {
   copyRevisedPrompt,
   deleteMediaTask,
@@ -69,6 +70,7 @@ function ModelBrandIcon({ model, className }: { model: string, className?: strin
 function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
   const spec = resolveMediaModelSpec(task.model)
   const selected = state.selectedTaskId === task.id
+  const videoSrc = useCachedVideoUrl(task.id, task.videoUrl)
 
   // 用户侧元信息:参数 + 时间
   const askMeta: string[] = []
@@ -196,7 +198,7 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
           {task.status === 'completed' && task.videoUrl && (
             <>
               <video
-                src={task.videoUrl}
+                src={videoSrc}
                 controls
                 playsInline
                 preload="metadata"

@@ -2,6 +2,7 @@
 // 持久化策略与 Vue 版完全一致：localStorage 存元数据（图片/视频各限 12 条），
 // IndexedDB（sub2api-image-assets）存图片 base64；恢复轮询按 id 合并回队列。
 import { createStore } from '@/lib/store'
+import { dropCachedVideo } from '@/lib/studio/video-cache'
 import { toast } from '@/lib/toast'
 import { requestConfirm } from '@/lib/confirm-store'
 import { clearApiKeyForGroup, getApiKeyForGroup } from '@/lib/models-store'
@@ -971,6 +972,7 @@ export async function deleteMediaTask(task: MediaTask) {
   next.splice(index, 1)
   setQueue(next)
   void deleteImageAsset(task.id).catch(() => {})
+  dropCachedVideo(task.id)
 
   const cleanup: Partial<StudioState> = {}
   if (state.selectedTaskId === task.id) cleanup.selectedTaskId = ''
@@ -1026,6 +1028,7 @@ export async function deleteSelectedTasks() {
   setQueue(get().queue.filter(task => !selected.has(task.id)))
   selected.forEach((id) => {
     void deleteImageAsset(id).catch(() => {})
+    dropCachedVideo(id)
   })
 
   const current = get()
