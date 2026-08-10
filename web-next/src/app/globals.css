@@ -10,6 +10,7 @@
 @theme {
   --font-sans: var(--font-inter), 'Public Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ---------------------------------------------------------------------------
@@ -19,7 +20,7 @@
   --app-bg-deep: #f3f4f7;
   --app-bg-glass: rgba(255, 255, 255, 0.72);
   --app-bg-glass-strong: rgba(255, 255, 255, 0.86);
-  --app-bg-hover: rgba(79, 70, 229, 0.05);
+  --app-bg-hover: rgba(17, 18, 28, 0.05);
 
   --app-primary: #4f46e5;
   --app-primary-subtle: rgba(79, 70, 229, 0.08);
@@ -47,7 +48,7 @@
   --app-bg-deep: #0b0c11;
   --app-bg-glass: rgba(21, 23, 34, 0.66);
   --app-bg-glass-strong: rgba(22, 24, 36, 0.88);
-  --app-bg-hover: rgba(165, 180, 252, 0.07);
+  --app-bg-hover: rgba(236, 238, 245, 0.08);
 
   --app-primary: #a5b4fc;
   --app-primary-subtle: rgba(165, 180, 252, 0.11);
@@ -68,15 +69,20 @@
     background-color: var(--app-bg-deep);
   }
 
+  h1, h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
   body {
     min-height: 100vh;
     background-color: var(--app-bg-deep);
-    background-image: radial-gradient(ellipse 90% 60% at 50% -12%, color-mix(in oklab, var(--app-primary) 5%, transparent), transparent 60%);
+    background-image: radial-gradient(ellipse 90% 60% at 50% -12%, color-mix(in oklab, var(--app-primary) 3%, transparent), transparent 60%);
     background-attachment: fixed;
   }
 
   .dark body {
-    background-image: radial-gradient(ellipse 90% 60% at 50% -12%, color-mix(in oklab, var(--app-primary) 7%, transparent), transparent 60%);
+    background-image: radial-gradient(ellipse 90% 60% at 50% -12%, color-mix(in oklab, var(--app-primary) 4%, transparent), transparent 60%);
   }
 
   ::selection {
@@ -157,15 +163,15 @@
 
   .glass-pill:hover {
     background: var(--app-bg-hover);
-    color: var(--app-primary);
-    border-color: color-mix(in oklab, var(--app-primary) 14%, transparent);
+    color: var(--app-ink);
+    border-color: transparent;
   }
 
   .glass-pill[data-selected="true"],
   .glass-pill.is-selected {
-    background: var(--app-primary-subtle);
-    color: var(--app-primary);
-    border-color: var(--app-glass-border);
+    background: color-mix(in oklab, var(--app-ink) 8%, transparent);
+    color: var(--app-ink);
+    border-color: color-mix(in oklab, var(--app-ink) 10%, transparent);
   }
 
   .glass-btn {
@@ -223,9 +229,9 @@
     pointer-events: none;
     /* 多层极淡渐晕:顶部冷紫呼吸 + 两翼中性光斑,给大留白以纵深而不抢内容 */
     background:
-      radial-gradient(ellipse 90% 55% at 50% -10%, color-mix(in oklab, var(--app-primary) 6%, transparent), transparent 70%),
+      radial-gradient(ellipse 90% 55% at 50% -10%, color-mix(in oklab, var(--app-primary) 3%, transparent), transparent 70%),
       radial-gradient(ellipse 60% 45% at 12% 30%, color-mix(in oklab, var(--app-ink) 3%, transparent), transparent 70%),
-      radial-gradient(ellipse 55% 40% at 92% 72%, color-mix(in oklab, var(--app-primary) 3%, transparent), transparent 72%);
+      radial-gradient(ellipse 55% 40% at 92% 72%, color-mix(in oklab, var(--app-ink) 2%, transparent), transparent 72%);
   }
 
   .label-mono {

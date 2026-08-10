@@ -170,7 +170,7 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
                 type="button"
                 className="block cursor-zoom-in overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm transition hover:brightness-105 dark:border-white/10"
                 data-selected={selected}
-                style={selected ? { outline: '2px solid var(--app-primary)', outlineOffset: 2 } : undefined}
+                style={selected ? { outline: '2px solid var(--app-ink)', outlineOffset: 2 } : undefined}
                 onClick={() => previewMediaTask(task)}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}

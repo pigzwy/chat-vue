@@ -15,7 +15,7 @@
   --surface-shadow: var(--app-shadow-sm);
   --foreground: var(--app-ink);
   --muted: color-mix(in oklab, var(--app-ink) 55%, transparent);
-  --accent: var(--app-primary);
+  --accent: var(--app-ink);
   --border: var(--app-border-subtle);
   --default: color-mix(in oklab, var(--app-ink) 8%, transparent);
   --danger: #e5484d;
@@ -33,7 +33,7 @@
   --surface-shadow: var(--app-shadow-sm);
   --foreground: var(--app-ink);
   --muted: color-mix(in oklab, var(--app-ink) 55%, transparent);
-  --accent: var(--app-primary);
+  --accent: var(--app-ink);
   --border: var(--app-border-subtle);
   --default: color-mix(in oklab, var(--app-ink) 12%, transparent);
 }
