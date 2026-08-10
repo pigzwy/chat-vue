@@ -4,9 +4,23 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { Drawer } from '@heroui/react'
-import { MessagesSquare, Search, SquarePen, X } from 'lucide-react'
+import { MessagesSquare, PanelLeft, PanelLeftClose, Search, SquarePen, X } from 'lucide-react'
 import { chatsStore, deleteChat, groupChats } from '@/lib/chats-store'
+import { createStore } from '@/lib/store'
 import { toast } from '@/lib/toast'
+
+/* 桌面侧栏收起偏好(持久化;serverSnapshot=false 避免直连水合不匹配) */
+const COLLAPSED_KEY = 'sidebar-collapsed'
+const collapsedStore = createStore(
+  typeof window !== 'undefined' && window.localStorage.getItem(COLLAPSED_KEY) === '1',
+  { serverSnapshot: false }
+)
+
+function toggleCollapsed() {
+  const next = !collapsedStore.get()
+  collapsedStore.set(next)
+  window.localStorage.setItem(COLLAPSED_KEY, next ? '1' : '')
+}
 
 /** 侧栏行的统一样式(对齐 ChatGPT:同一左边线、同一行高、朴素 hover/选中态) */
 const rowClass = 'flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5'
@@ -93,11 +107,38 @@ export function ChatSidebar() {
     if (open) setOpen(false)
   }
 
+  const collapsed = collapsedStore.useStore()
+
   return (
     <>
-      <aside className="hidden w-64 shrink-0 flex-col px-2 pb-4 pt-16 lg:flex">
-        <SidebarContent />
-      </aside>
+      {collapsed
+        ? (
+            <button
+              type="button"
+              aria-label="打开边栏"
+              title="打开边栏"
+              className="fixed left-4 top-16 z-40 hidden size-9 items-center justify-center rounded-lg opacity-60 transition hover:bg-black/5 hover:opacity-100 lg:flex dark:hover:bg-white/5"
+              onClick={toggleCollapsed}
+            >
+              <PanelLeft className="size-4.5" />
+            </button>
+          )
+        : (
+            <aside className="hidden w-64 shrink-0 flex-col px-2 pb-4 pt-14 lg:flex">
+              <div className="flex justify-end px-1 pb-1">
+                <button
+                  type="button"
+                  aria-label="关闭边栏"
+                  title="关闭边栏"
+                  className="flex size-8 items-center justify-center rounded-lg opacity-50 transition hover:bg-black/5 hover:opacity-100 dark:hover:bg-white/5"
+                  onClick={toggleCollapsed}
+                >
+                  <PanelLeftClose className="size-4.5" />
+                </button>
+              </div>
+              <SidebarContent />
+            </aside>
+          )}
 
       <Drawer.Root isOpen={open} onOpenChange={setOpen}>
         <Drawer.Trigger
