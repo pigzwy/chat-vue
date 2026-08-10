@@ -87,7 +87,7 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
     <div className="group/turn flex flex-col gap-4">
       {/* 你:提示词气泡,下方一行操作(复制/修改)+参数时间——对齐 OpenAI 的排法 */}
       <div className="flex flex-col items-end gap-1">
-        <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-(--app-primary-subtle) px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap ring-1 ring-(--app-glass-border)">
+        <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-black/[0.05] px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap dark:bg-white/[0.09]">
           {task.prompt}
         </div>
         <div className="flex items-center gap-1.5">

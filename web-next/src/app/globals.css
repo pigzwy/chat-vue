@@ -221,8 +221,11 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(ellipse at 50% 0%, color-mix(in oklab, var(--app-primary) 4%, transparent), transparent 62%);
-    mask-image: radial-gradient(circle at 50% 15%, black, transparent 72%);
+    /* 多层极淡渐晕:顶部冷紫呼吸 + 两翼中性光斑,给大留白以纵深而不抢内容 */
+    background:
+      radial-gradient(ellipse 90% 55% at 50% -10%, color-mix(in oklab, var(--app-primary) 6%, transparent), transparent 70%),
+      radial-gradient(ellipse 60% 45% at 12% 30%, color-mix(in oklab, var(--app-ink) 3%, transparent), transparent 70%),
+      radial-gradient(ellipse 55% 40% at 92% 72%, color-mix(in oklab, var(--app-primary) 3%, transparent), transparent 72%);
   }
 
   .label-mono {
