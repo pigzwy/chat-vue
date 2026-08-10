@@ -85,8 +85,21 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
 
   return (
     <div className="group/turn flex flex-col gap-4">
-      {/* 你:提示词气泡,下方一行操作(复制/修改)+参数时间——对齐 OpenAI 的排法 */}
+      {/* 你:参考图缩略 + 提示词气泡,下方一行操作(复制/修改)+参数时间——对齐 OpenAI 的排法 */}
       <div className="flex flex-col items-end gap-1">
+        {task.sourceThumbs && task.sourceThumbs.length > 0 && (
+          <div className="flex justify-end gap-1.5 pb-0.5">
+            {task.sourceThumbs.map((thumb, index) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={index}
+                src={thumb}
+                alt="参考图"
+                className="size-16 rounded-xl border border-black/5 object-cover dark:border-white/10"
+              />
+            ))}
+          </div>
+        )}
         <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-black/[0.05] px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap dark:bg-white/[0.09]">
           {task.prompt}
         </div>

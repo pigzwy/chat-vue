@@ -50,6 +50,8 @@ export interface MediaTask {
   type: MediaTaskType
   parentId?: string
   sourceImageIds?: string[]
+  /** 提交时的参考图小缩略图(≤160px JPEG dataURL,≤3 张)——对话流里展示"这轮带了什么图" */
+  sourceThumbs?: string[]
   prompt: string
   model: string
   groupId: number
@@ -1123,6 +1125,41 @@ async function executeMediaTask(
   }
 }
 
+/** 参考图 → 小缩略图(最长边 160px JPEG);失败返回 null 静默跳过 */
+async function makeSourceThumb(src: File | string): Promise<string | null> {
+  const url = typeof src === 'string' ? src : URL.createObjectURL(src)
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('decode failed'))
+      el.src = url
+    })
+    const scale = Math.min(1, 160 / Math.max(image.naturalWidth, image.naturalHeight, 1))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+    canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.8)
+  } catch {
+    return null
+  } finally {
+    if (typeof src !== 'string') URL.revokeObjectURL(url)
+  }
+}
+
+/** 异步给任务补参考图缩略图(不阻塞提交链路) */
+function attachSourceThumbs(taskId: string, sources: Array<File | string>) {
+  if (!sources.length) return
+  void Promise.all(sources.slice(0, 3).map(makeSourceThumb)).then((thumbs) => {
+    const list = thumbs.filter((thumb): thumb is string => Boolean(thumb))
+    if (list.length) {
+      updateTask(taskId, { sourceThumbs: list })
+      persistNow()
+    }
+  })
+}
+
 async function getSourcesFromTaskIds(sourceIds: string[]) {
   const sourceTasks = sourceIds
     .map(id => getTaskById(id))
@@ -1248,6 +1285,7 @@ export async function submitStudioTask() {
     if (uploadedSources.length) {
       sourceFilesByTaskId.set(task.id, uploadedSources)
     }
+    attachSourceThumbs(task.id, uploadedSources.length ? uploadedSources : (sourceTask?.imageUrl ? [sourceTask.imageUrl] : []))
     patch({ prompt: '' })
 
     await executeMediaTask(
@@ -1282,6 +1320,7 @@ export async function submitStudioTask() {
   if (uploadedSources.length) {
     sourceFilesByTaskId.set(task.id, uploadedSources)
   }
+  attachSourceThumbs(task.id, uploadedSources.length ? uploadedSources : (sourceTask?.imageUrl ? [sourceTask.imageUrl] : []))
   patch({ prompt: '' })
 
   await executeMediaTask(
@@ -1327,7 +1366,8 @@ export async function retryMediaTask(task: MediaTask) {
     quality: task.quality,
     size: task.size,
     duration: task.duration,
-    videoResolution: task.videoResolution
+    videoResolution: task.videoResolution,
+    sourceThumbs: task.sourceThumbs
   }
   if (cachedSources.length) {
     sourceFilesByTaskId.set(retryTask.id, cachedSources)
