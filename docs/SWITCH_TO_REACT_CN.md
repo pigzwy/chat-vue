@@ -47,10 +47,28 @@ docker compose pull && docker compose up -d
 
 ## 4. 换域名(可选,和切换解耦,先后皆可)
 
+> 切换本身(第 2 步)不碰 Caddy:端口没变,反代不感知应用更换。只有换域名才改。
+
 1. DNS/CDN:新域名按老域名同样的方式解析(Cloudflare 记录指向同一映射/源站)
-2. 服务器反向代理(1Panel):新建网站 → 反代到 `127.0.0.1:${APP_PORT}`,
-   照抄老域名站点配置;证书走你现有的签发通道
-3. 验证新域名后,老域名可保留、301 到新域名、或删除
+2. 服务器 Caddyfile 加一个 site block(证书 Caddy 自动签,与老域名同机制):
+
+   ```caddy
+   新域名 {
+       encode zstd gzip
+       reverse_proxy 127.0.0.1:3009
+   }
+   ```
+
+   老域名想跳转的话,把原 block 换成:
+
+   ```caddy
+   老域名 {
+       redir https://新域名{uri} permanent
+   }
+   ```
+
+   然后 `sudo systemctl reload caddy`(或 `caddy reload`)。
+3. 新域名验证 OK 后,老域名可保留、301 到新域名、或删除
 
 注意:登录态与聊天/生成历史都存在浏览器 localStorage,**按域名隔离**——
 新域名上需要重新登录,本地历史从零开始。
