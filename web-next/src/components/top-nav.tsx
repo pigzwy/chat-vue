@@ -22,8 +22,9 @@ function isTabActive(pathname: string, href: string) {
   return pathname.startsWith(href)
 }
 
-/** 网关连接呼吸灯:绿=已连接,红=已断开(需重新登录),hover 看详情 */
-function ConnectionDot() {
+/** 品牌章 + 连接状态:猪鼻子(logo 里自带的绿色 </> 椭圆)即状态灯——
+ *  正常保持原生绿;断开时染红并轻微呼吸。hover 看详情 */
+function BrandMark() {
   const { connection, connectionDetail } = modelsStore.useStore()
 
   useEffect(() => {
@@ -37,12 +38,29 @@ function ConnectionDot() {
     }
   }, [])
 
-  if (connection === 'unknown') return null
-  const color = connection === 'ok' ? 'bg-emerald-500' : 'bg-red-500'
   return (
-    <span className="relative ml-0.5 flex size-2 shrink-0" title={connectionDetail}>
-      <span className={`status-breathe absolute inline-flex size-full rounded-full ${color} opacity-60`} />
-      <span className={`relative inline-flex size-2 rounded-full ${color}`} />
+    <span className="relative size-7 shrink-0" title={connectionDetail}>
+      <Image
+        src="/logo-mark.jpg"
+        alt="pigcoder"
+        width={28}
+        height={28}
+        className="size-7 rounded-full object-cover"
+      />
+      {connection === 'down' && (
+        <span
+          aria-hidden
+          className="nose-alert absolute rounded-full"
+          style={{
+            left: '60%',
+            top: '42%',
+            width: '37%',
+            height: '33%',
+            background: '#ef4444',
+            mixBlendMode: 'color'
+          }}
+        />
+      )}
     </span>
   )
 }
@@ -83,17 +101,10 @@ export function TopNav() {
       <div className="pointer-events-none fixed left-3 top-3 z-50 sm:left-4">
         <Link
           href="/"
-          className="glass-chip pointer-events-auto inline-flex items-center gap-2 p-1.5 pr-2.5 transition-transform hover:-translate-y-0.5 sm:pr-3"
+          className="glass-chip pointer-events-auto inline-flex items-center gap-2 p-1.5 transition-transform hover:-translate-y-0.5 sm:pr-3"
         >
-          <Image
-            src="/logo-mark.jpg"
-            alt="pigcoder"
-            width={28}
-            height={28}
-            className="size-7 shrink-0 rounded-full object-cover"
-          />
+          <BrandMark />
           <span className="hidden text-sm font-bold tracking-tight sm:inline">pigcoder</span>
-          <ConnectionDot />
         </Link>
       </div>
 

@@ -264,11 +264,11 @@
   }
 }
 
-/* 顶栏连接状态呼吸灯 */
-@keyframes status-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.55; }
-  50% { transform: scale(1.9); opacity: 0; }
+/* 品牌章猪鼻子故障态:红色轻呼吸 */
+@keyframes nose-alert {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
-.status-breathe {
-  animation: status-breathe 1.8s ease-in-out infinite;
+.nose-alert {
+  animation: nose-alert 1.6s ease-in-out infinite;
 }

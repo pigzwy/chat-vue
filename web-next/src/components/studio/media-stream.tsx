@@ -250,7 +250,6 @@ export function MediaStream({ header }: { header?: React.ReactNode }) {
         ))}
         <ChatConversation.ScrollAnchor />
       </ChatConversation.Content>
-      <ChatConversation.ScrollButton aria-label="回到底部" className="bottom-72" />
     </ChatConversation>
   )
 }
