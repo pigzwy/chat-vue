@@ -83,6 +83,8 @@ export interface ModelsState {
   /** 网关连通性(顶栏呼吸灯):ok=凭证有效,down=断开/凭证失效,unknown=未检测 */
   connection: 'ok' | 'down' | 'unknown'
   connectionDetail: string
+  /** 网关账户余额(JWT 模式随心跳刷新;sk 模式/未知为 null) */
+  balanceUsd: number | null
 }
 
 const TOKEN_KEY = 'sub2api-token'
@@ -225,7 +227,8 @@ export const modelsStore = createStore<ModelsState>({
   manualGrokKey: '',
   manualNanoKey: '',
   connection: 'unknown',
-  connectionDetail: '连接状态检测中…'
+  connectionDetail: '连接状态检测中…',
+  balanceUsd: null
 })
 
 function patch(partial: Partial<ModelsState>) {
@@ -494,21 +497,32 @@ export function hasSub2apiToken() {
   return Boolean(state.token || state.manualKey)
 }
 
-/** 轻量连通性探测(顶栏呼吸灯用):用当前凭证打一次网关,60s 周期 + 窗口聚焦时触发 */
+/** 轻量连通性探测(顶栏呼吸灯用):用当前凭证打一次网关,60s 周期 + 窗口聚焦时触发。
+ *  JWT 模式打 profile 接口,一次调用同时拿到余额 */
 export async function checkConnection() {
   const { token, manualKey } = modelsStore.get()
   const credential = manualKey || token
   if (!credential) {
-    patch({ connection: 'down', connectionDetail: '未登录' })
+    patch({ connection: 'down', connectionDetail: '未登录', balanceUsd: null })
     return
   }
   try {
-    const path = manualKey ? '/sub2api/v1/models' : '/sub2api/api/v1/groups/available'
+    const path = manualKey ? '/sub2api/v1/models' : '/sub2api/api/v1/user/profile'
     const response = await fetch(path, { headers: { Authorization: `Bearer ${credential}` } })
     if (response.ok) {
-      patch({ connection: 'ok', connectionDetail: manualKey ? '已连接(API Key 有效)' : '已连接(会话有效)' })
+      let balanceUsd: number | null = null
+      if (!manualKey) {
+        const profile = await response.json().catch(() => null) as { balance?: number, data?: { balance?: number } } | null
+        const balance = profile?.balance ?? profile?.data?.balance
+        balanceUsd = typeof balance === 'number' && Number.isFinite(balance) ? balance : null
+      }
+      patch({
+        connection: 'ok',
+        connectionDetail: manualKey ? '已连接(API Key 有效)' : '已连接(会话有效)',
+        balanceUsd
+      })
     } else if (response.status === 401 || response.status === 403) {
-      patch({ connection: 'down', connectionDetail: '已断开:凭证失效,请退出后重新登录' })
+      patch({ connection: 'down', connectionDetail: '已断开:凭证失效,点击重新进入', balanceUsd: null })
     } else {
       patch({ connection: 'down', connectionDetail: `已断开:网关异常(${response.status})` })
     }
@@ -614,7 +628,7 @@ export function logout() {
   writeJson(API_KEYS_KEY, {})
   writeString(API_KEY_KEY, '')
   writeJson(GROUP_KEY, null)
-  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', manualNanoKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '', connection: 'unknown', connectionDetail: '连接状态检测中…' })
+  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', manualNanoKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '', connection: 'unknown', connectionDetail: '连接状态检测中…', balanceUsd: null })
 }
 
 /** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用。

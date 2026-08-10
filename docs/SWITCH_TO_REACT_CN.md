@@ -73,6 +73,18 @@ docker compose pull && docker compose up -d
 注意:登录态与聊天/生成历史都存在浏览器 localStorage,**按域名隔离**——
 新域名上需要重新登录,本地历史从零开始。
 
+## 无感登录(SSO 接力)
+
+1. 网关部署 `feat/connect-studio` 分支(sub2api-gy 仓库,新增前端路由
+   `/connect/studio`:已登录带 token 302 跳入 Studio,未登录先走网关登录再续跳)
+2. Studio 服务器 `.env` 配置 `SSO_CONNECT_URL=https://sub2.pigcoder.com/connect/studio`
+   并 `docker compose up -d`
+3. 网关菜单 iframe、独立 tab、官网首页按钮统一指向 `/connect/studio`
+
+效果:登录页变为「使用 Pigcoder 账号进入」一键跳转(无手动贴凭证入口,
+调试机用 `ALLOW_KEY_LOGIN=1` 打开);顶栏显示账户余额(随 60s 心跳刷新,
+点击去网关充值/明细);会话过期时猪鼻子变红,点一下即走网关无感续期。
+
 ## 回滚
 
 ```bash

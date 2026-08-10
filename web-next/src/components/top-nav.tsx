@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { LogOut, Moon, Sun } from 'lucide-react'
 import { KeyManager } from '@/components/key-manager'
 import { checkConnection, logout, modelsStore } from '@/lib/models-store'
+import { gatewayHomeUrl, ssoEntryUrl } from '@/lib/runtime-config'
 
 const tabs = [
   { label: '对话', href: '/', icon: '💬' },
@@ -23,7 +24,7 @@ function isTabActive(pathname: string, href: string) {
 }
 
 /** 品牌章 + 连接状态:猪鼻子(logo 里自带的绿色 </> 椭圆)即状态灯——
- *  正常保持原生绿;断开时染红并轻微呼吸。hover 看详情 */
+ *  正常保持原生绿;断开时染红并轻微呼吸,点击走网关一键重进。hover 看详情 */
 function BrandMark() {
   const { connection, connectionDetail } = modelsStore.useStore()
 
@@ -38,8 +39,17 @@ function BrandMark() {
     }
   }, [])
 
+  // 断开且配置了接力入口:点鼻子直接去网关续期(网关登录态还在则完全无感)
+  function onNoseClick(event: React.MouseEvent) {
+    const sso = ssoEntryUrl()
+    if (connection === 'down' && sso) {
+      event.preventDefault()
+      window.location.href = sso
+    }
+  }
+
   return (
-    <span className="relative size-7 shrink-0" title={connectionDetail}>
+    <span className="relative size-7 shrink-0" title={connectionDetail} onClick={onNoseClick}>
       <Image
         src="/logo-mark.jpg"
         alt="pigcoder"
@@ -62,6 +72,29 @@ function BrandMark() {
         />
       )}
     </span>
+  )
+}
+
+/** 余额胶囊(JWT 模式):随心跳刷新,点击去网关充值/看明细 */
+function BalanceChip() {
+  const { token, manualKey, balanceUsd } = modelsStore.useStore()
+  if (!token || manualKey || balanceUsd === null) return null
+
+  const home = gatewayHomeUrl()
+  const text = `$${balanceUsd.toFixed(2)}`
+  if (!home) {
+    return <span className="glass-chip pointer-events-auto flex h-9 items-center px-3 font-mono text-xs font-semibold">{text}</span>
+  }
+  return (
+    <a
+      href={`${home}/dashboard`}
+      target="_blank"
+      rel="noreferrer"
+      title="余额(点击去充值/看明细)"
+      className="glass-chip pointer-events-auto flex h-9 items-center px-3 font-mono text-xs font-semibold transition-transform hover:-translate-y-0.5"
+    >
+      {text}
+    </a>
   )
 }
 
@@ -125,6 +158,7 @@ export function TopNav() {
       </nav>
 
       <div className="pointer-events-none fixed right-3 top-3 z-50 flex items-center gap-1.5 sm:right-4 sm:gap-2">
+        <BalanceChip />
         <KeyManager />
         <button
           type="button"

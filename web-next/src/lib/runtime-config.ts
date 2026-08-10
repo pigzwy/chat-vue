@@ -11,6 +11,10 @@ export type MediaGroupProvider = 'openai' | 'grok' | 'nanobanana'
 
 interface AppConfig {
   mediaGroups: Partial<Record<MediaGroupProvider, number>>
+  /** 网关免登录接力入口(/connect/studio);配置后登录页展示一键进入 */
+  ssoEntry?: string
+  /** 放开手动粘贴凭证(sk/JWT)入口;生产默认隐藏 */
+  allowKeyLogin?: boolean
 }
 
 const builtinDefaults: Record<MediaGroupProvider, number> = {
@@ -29,10 +33,35 @@ export function loadAppConfig() {
     .then(async (response) => {
       if (!response.ok) return
       const parsed = await response.json() as AppConfig
-      if (parsed && typeof parsed === 'object') config = { mediaGroups: parsed.mediaGroups || {} }
+      if (parsed && typeof parsed === 'object') {
+        config = {
+          mediaGroups: parsed.mediaGroups || {},
+          ssoEntry: typeof parsed.ssoEntry === 'string' && /^https?:\/\//.test(parsed.ssoEntry) ? parsed.ssoEntry : undefined,
+          allowKeyLogin: Boolean(parsed.allowKeyLogin)
+        }
+      }
     })
     .catch(() => {})
   return loading
+}
+
+/** 网关免登录接力入口(未配置返回 undefined) */
+export function ssoEntryUrl() {
+  return config.ssoEntry
+}
+
+/** 网关站点根(余额跳充值/明细用):从 ssoEntry 推导 */
+export function gatewayHomeUrl() {
+  if (!config.ssoEntry) return undefined
+  try {
+    return new URL(config.ssoEntry).origin
+  } catch {
+    return undefined
+  }
+}
+
+export function allowKeyLogin() {
+  return Boolean(config.allowKeyLogin)
 }
 
 function normalizeGroupId(value: unknown) {
