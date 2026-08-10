@@ -1,0 +1,21 @@
+---
+# 旧版编排:Vue(Nitro 单容器)直接对外。仅作回滚备份:
+#   docker compose down && docker compose -f docker-compose.legacy.yml up -d
+services:
+  chat-vue:
+    image: ${IMAGE:-llpig/chat-vue:latest}
+    container_name: chat-vue
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3009}:3009"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3009
+    volumes:
+      - chat-vue-data:/app/.data
+
+volumes:
+  chat-vue-data:
