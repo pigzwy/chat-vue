@@ -1,0 +1,47 @@
+/* HeroUI Pro 聊天套件样式桥接
+ * 只按需引入用到的组件 BEM 样式(不引 dist/css/index.css 整包,避免与本项目 Tailwind 冲突),
+ * 并把 Pro 语义 token 映射到本项目玻璃拟态色板,使 Pro 组件融入现有视觉体系。 */
+@import "@heroui-pro/react/css/components/chat-conversation.css";
+@import "@heroui-pro/react/css/components/chat-message.css";
+@import "@heroui-pro/react/css/components/chat-message-actions.css";
+@import "@heroui-pro/react/css/components/chain-of-thought.css";
+@import "@heroui-pro/react/css/components/chat-tool.css";
+@import "@heroui-pro/react/css/components/chat-loader.css";
+@import "@heroui-pro/react/css/components/command.css";
+
+/* Pro token → 玻璃拟态桥接(亮色) */
+:root {
+  --surface: var(--app-bg-glass-strong);
+  --surface-shadow: var(--app-shadow-sm);
+  --foreground: var(--app-ink);
+  --muted: color-mix(in oklab, var(--app-ink) 55%, transparent);
+  --accent: var(--app-ink);
+  --border: var(--app-border-subtle);
+  --default: color-mix(in oklab, var(--app-ink) 8%, transparent);
+  --danger: #e5484d;
+  --warning: #f5a524;
+  --radius: 1rem;
+  --cursor-interactive: pointer;
+  --scrollbar-color: color-mix(in oklab, var(--app-ink) 22%, transparent);
+  --scrollbar-width: thin;
+  --scrollbar-gutter: auto;
+}
+
+/* Pro token → 玻璃拟态桥接(暗色) */
+.dark {
+  --surface: var(--app-bg-glass-strong);
+  --surface-shadow: var(--app-shadow-sm);
+  --foreground: var(--app-ink);
+  --muted: color-mix(in oklab, var(--app-ink) 55%, transparent);
+  --accent: var(--app-ink);
+  --border: var(--app-border-subtle);
+  --default: color-mix(in oklab, var(--app-ink) 12%, transparent);
+}
+
+/* 供 Pro 组件内联工具类(text-muted/text-danger/text-warning)在本项目 Tailwind 生成 */
+@theme inline {
+  --color-muted: var(--muted);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-accent: var(--accent);
+}

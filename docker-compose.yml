@@ -1,10 +1,16 @@
+---
+# 生产编排:React 前端(web-next)对外承接原端口,Nitro(原 Vue 镜像)退居后端。
+# 服务器上更新:docker compose pull && docker compose up -d
+# 回滚到 Vue:docker compose down && docker compose -f docker-compose.legacy.yml up -d
+#   (或把反向代理临时指回 127.0.0.1:${LEGACY_PORT:-3010},Vue 界面仍在)
 services:
   chat-vue:
     image: ${IMAGE:-llpig/chat-vue:latest}
     container_name: chat-vue
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-3009}:3009"
+      # 仅本机回环保留 Vue 直连口,用于回滚与排障
+      - "127.0.0.1:${LEGACY_PORT:-3010}:3009"
     env_file:
       - .env
     environment:
@@ -13,6 +19,19 @@ services:
       PORT: 3009
     volumes:
       - chat-vue-data:/app/.data
+
+  web:
+    image: ${WEB_IMAGE:-llpig/chat-vue-next:latest}
+    container_name: chat-vue-web
+    restart: unless-stopped
+    depends_on:
+      - chat-vue
+    ports:
+      - "${APP_PORT:-3009}:3400"
+    environment:
+      NODE_ENV: production
+      # /api 与 /sub2api 经容器网络转发给 Nitro,再由 Nitro 按 .env 打到网关
+      BACKEND_ORIGIN: http://chat-vue:3009
 
 volumes:
   chat-vue-data:

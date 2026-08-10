@@ -1,0 +1,42 @@
+{
+  "name": "web-next",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "^4.0.61",
+    "@heroui-pro/react": "1.0.0-beta.8",
+    "@heroui/react": "^3.2.4",
+    "ai": "^7.0.58",
+    "framer-motion": "^13.0.0",
+    "geist": "^1.7.2",
+    "lucide-react": "^1.30.0",
+    "motion": "^13.0.0",
+    "next": "16.3.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "shiki": "^4.4.2",
+    "streamdown": "^2.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@heroui-pro/react"
+    ]
+  }
+}

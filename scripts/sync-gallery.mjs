@@ -121,8 +121,8 @@ const interfaceBlock = `export interface GalleryCase {
 }
 `
 
-writeFileSync(
-  OUTPUT,
-  `${banner}\n${interfaceBlock}\nexport const galleryCases: GalleryCase[] = ${JSON.stringify(cases, null, 2)}\n`
-)
-console.log(`完成：${cases.length} 条案例写入 src/data/galleryCases.ts`)
+const content = `${banner}\n${interfaceBlock}\nexport const galleryCases: GalleryCase[] = ${JSON.stringify(cases, null, 2)}\n`
+writeFileSync(OUTPUT, content)
+// React 版（web-next）用同一份数据，双写保持同步
+writeFileSync(new URL('../web-next/src/data/gallery-cases.ts', import.meta.url), content)
+console.log(`完成：${cases.length} 条案例写入 src/data/galleryCases.ts 与 web-next/src/data/gallery-cases.ts`)
