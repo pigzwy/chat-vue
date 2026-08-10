@@ -97,6 +97,9 @@ const GROUPS_CACHE_KEY = 'sub2api-groups-cache'
 const MODELS_CACHE_KEY = 'sub2api-models-cache-v2'
 /** sk 直连模式:用户手填的 API Key(绕过 JWT 会话绑定;网关 sk 认证无指纹校验) */
 const MANUAL_KEY_KEY = 'sub2api-manual-key'
+/** 账号密码登录的会话续签:refresh token + access token 过期时间戳(ms) */
+const REFRESH_KEY = 'sub2api-refresh-token'
+const EXPIRES_AT_KEY = 'sub2api-token-expires-at'
 /** 分组密钥(可选):image-2 / Grok / Nano Banana 各自的 key,创作台按模型自动路由 */
 const MANUAL_IMAGE_KEY_KEY = 'sub2api-manual-key-image'
 const MANUAL_GROK_KEY_KEY = 'sub2api-manual-key-grok'
@@ -300,6 +303,13 @@ export async function initModels() {
     return
   }
 
+  // 密码登录的会话:access token 已过期/临期时先静默续签,再进校验
+  const expiresAt = Number(readString(EXPIRES_AT_KEY))
+  if (readString(REFRESH_KEY) && Number.isFinite(expiresAt) && expiresAt > 0 && expiresAt - Date.now() < 120_000) {
+    if (await refreshGatewaySession()) token = readString(TOKEN_KEY)
+  }
+  scheduleTokenRefresh()
+
   // 校验已存 token:失效则清掉,让登录门回落到登录页(而不是带着死 token 进应用)
   const result = await validateToken(token)
   if (!result.ok) {
@@ -497,6 +507,89 @@ export function hasSub2apiToken() {
   return Boolean(state.token || state.manualKey)
 }
 
+// ==================== 账号密码登录 + 静默续签(网关公开 auth API,全程走 /sub2api 代理) ====================
+
+interface GatewayAuthPayload {
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  pending_auth_token?: string
+}
+
+/** 网关响应统一 {code,message,data} 包裹,兼容裸结构 */
+function unwrapGatewayData<T>(parsed: unknown): T | null {
+  if (!parsed || typeof parsed !== 'object') return null
+  const wrapper = parsed as { data?: T }
+  return (wrapper.data && typeof wrapper.data === 'object' ? wrapper.data : parsed) as T
+}
+
+let refreshTimer: number | null = null
+
+function persistSession(access: string, refresh?: string, expiresIn?: number) {
+  writeString(TOKEN_KEY, access)
+  if (refresh) writeString(REFRESH_KEY, refresh)
+  writeString(EXPIRES_AT_KEY, expiresIn ? String(Date.now() + expiresIn * 1000) : '')
+  patch({ token: access })
+  scheduleTokenRefresh()
+}
+
+/** 在过期前 2 分钟静默续签;无 refresh token 或无过期信息则不排程 */
+export function scheduleTokenRefresh() {
+  if (typeof window === 'undefined') return
+  if (refreshTimer) window.clearTimeout(refreshTimer)
+  refreshTimer = null
+  if (!readString(REFRESH_KEY)) return
+  const expiresAt = Number(readString(EXPIRES_AT_KEY))
+  if (!Number.isFinite(expiresAt) || expiresAt <= 0) return
+  const delay = Math.max(expiresAt - Date.now() - 120_000, 30_000)
+  refreshTimer = window.setTimeout(() => { void refreshGatewaySession() }, delay)
+}
+
+/** 用 refresh token 换新 access token;成功返回 true 并重新排程 */
+export async function refreshGatewaySession(): Promise<boolean> {
+  const refreshToken = readString(REFRESH_KEY)
+  if (!refreshToken) return false
+  try {
+    const response = await fetch('/sub2api/api/v1/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [csrfHeaderName]: getCsrfToken() },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    })
+    if (!response.ok) return false
+    const payload = unwrapGatewayData<GatewayAuthPayload>(await response.json().catch(() => null))
+    if (!payload?.access_token) return false
+    persistSession(payload.access_token, payload.refresh_token, payload.expires_in)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 账号密码登录网关(Turnstile 开启时需带人机验证 token),成功后走既有 JWT 流程 */
+export async function loginWithPassword(email: string, password: string, turnstileToken?: string) {
+  const response = await fetch('/sub2api/api/v1/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', [csrfHeaderName]: getCsrfToken() },
+    body: JSON.stringify({
+      email,
+      password,
+      ...(turnstileToken ? { turnstile_token: turnstileToken } : {})
+    })
+  })
+  const parsed = await response.json().catch(() => null) as { message?: string } | null
+  if (!response.ok) {
+    throw new Error(toErrorMessage(new Error(parsed?.message || `登录失败(${response.status})`)))
+  }
+  const payload = unwrapGatewayData<GatewayAuthPayload>(parsed)
+  if (!payload?.access_token) {
+    throw new Error(payload?.pending_auth_token
+      ? '该账号开启了两步验证,暂请在网关侧登录使用'
+      : (parsed?.message || '登录失败,请重试'))
+  }
+  persistSession(payload.access_token, payload.refresh_token, payload.expires_in)
+  await login(payload.access_token)
+}
+
 /** 轻量连通性探测(顶栏呼吸灯用):用当前凭证打一次网关,60s 周期 + 窗口聚焦时触发。
  *  JWT 模式打 profile 接口,一次调用同时拿到余额 */
 export async function checkConnection() {
@@ -522,7 +615,12 @@ export async function checkConnection() {
         balanceUsd
       })
     } else if (response.status === 401 || response.status === 403) {
-      patch({ connection: 'down', connectionDetail: '已断开:凭证失效,点击重新进入', balanceUsd: null })
+      // 密码登录的会话先尝试静默续签,成功则立即恢复绿灯
+      if (!manualKey && await refreshGatewaySession()) {
+        patch({ connection: 'ok', connectionDetail: '已连接(会话已续期)' })
+        return
+      }
+      patch({ connection: 'down', connectionDetail: '已断开:凭证失效,请重新登录', balanceUsd: null })
     } else {
       patch({ connection: 'down', connectionDetail: `已断开:网关异常(${response.status})` })
     }
@@ -619,6 +717,12 @@ export async function login(rawToken: string) {
 /** 退出登录：清 token/手填密钥 与全部账号相关缓存，回到登录页 */
 export function logout() {
   writeString(TOKEN_KEY, '')
+  writeString(REFRESH_KEY, '')
+  writeString(EXPIRES_AT_KEY, '')
+  if (typeof window !== 'undefined' && refreshTimer) {
+    window.clearTimeout(refreshTimer)
+    refreshTimer = null
+  }
   writeString(MANUAL_KEY_KEY, '')
   writeString(MANUAL_IMAGE_KEY_KEY, '')
   writeString(MANUAL_GROK_KEY_KEY, '')

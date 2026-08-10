@@ -11,7 +11,9 @@ export type MediaGroupProvider = 'openai' | 'grok' | 'nanobanana'
 
 interface AppConfig {
   mediaGroups: Partial<Record<MediaGroupProvider, number>>
-  /** 网关免登录接力入口(/connect/studio);配置后登录页展示一键进入 */
+  /** 网关站点根(注册/忘记密码/充值明细跳转用) */
+  gatewayOrigin?: string
+  /** 网关免登录接力入口(/connect/studio,可选);配置后登录页额外展示一键进入 */
   ssoEntry?: string
   /** 放开手动粘贴凭证(sk/JWT)入口;生产默认隐藏 */
   allowKeyLogin?: boolean
@@ -34,9 +36,12 @@ export function loadAppConfig() {
       if (!response.ok) return
       const parsed = await response.json() as AppConfig
       if (parsed && typeof parsed === 'object') {
+        const httpUrl = (value: unknown) =>
+          typeof value === 'string' && /^https?:\/\//.test(value) ? value : undefined
         config = {
           mediaGroups: parsed.mediaGroups || {},
-          ssoEntry: typeof parsed.ssoEntry === 'string' && /^https?:\/\//.test(parsed.ssoEntry) ? parsed.ssoEntry : undefined,
+          gatewayOrigin: httpUrl(parsed.gatewayOrigin),
+          ssoEntry: httpUrl(parsed.ssoEntry),
           allowKeyLogin: Boolean(parsed.allowKeyLogin)
         }
       }
@@ -50,8 +55,13 @@ export function ssoEntryUrl() {
   return config.ssoEntry
 }
 
-/** 网关站点根(余额跳充值/明细用):从 ssoEntry 推导 */
+/** 网关站点根(注册/充值/明细跳转用):显式配置优先,否则从 ssoEntry 推导 */
 export function gatewayHomeUrl() {
+  if (config.gatewayOrigin) {
+    try {
+      return new URL(config.gatewayOrigin).origin
+    } catch { /* 落到 ssoEntry 推导 */ }
+  }
   if (!config.ssoEntry) return undefined
   try {
     return new URL(config.ssoEntry).origin

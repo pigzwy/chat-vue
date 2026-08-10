@@ -51,7 +51,8 @@ services:
       MEDIA_GROUP_OPENAI: ${MEDIA_GROUP_OPENAI:-}
       MEDIA_GROUP_GROK: ${MEDIA_GROUP_GROK:-}
       MEDIA_GROUP_NANOBANANA: ${MEDIA_GROUP_NANOBANANA:-}
-      # 本机调试:保留手动贴凭证入口(JWT 过不了跨服务器绑定,E2E 只能走 sk)
+      # 本机调试:保留手动贴凭证入口(E2E 走 sk)
+      GATEWAY_ORIGIN: ${GATEWAY_ORIGIN:-}
       SSO_CONNECT_URL: ${SSO_CONNECT_URL:-}
       ALLOW_KEY_LOGIN: "1"
 

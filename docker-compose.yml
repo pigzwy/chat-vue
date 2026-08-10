@@ -45,7 +45,8 @@ services:
       MEDIA_GROUP_OPENAI: ${MEDIA_GROUP_OPENAI:-}
       MEDIA_GROUP_GROK: ${MEDIA_GROUP_GROK:-}
       MEDIA_GROUP_NANOBANANA: ${MEDIA_GROUP_NANOBANANA:-}
-      # 网关免登录接力入口(登录页一键进入/断线重进);手动贴凭证入口默认隐藏
+      # 网关站点根(登录页注册/忘记密码、余额跳充值明细);SSO 接力入口可选
+      GATEWAY_ORIGIN: ${GATEWAY_ORIGIN:-}
       SSO_CONNECT_URL: ${SSO_CONNECT_URL:-}
       ALLOW_KEY_LOGIN: ${ALLOW_KEY_LOGIN:-}
 

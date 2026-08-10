@@ -73,17 +73,21 @@ docker compose pull && docker compose up -d
 注意:登录态与聊天/生成历史都存在浏览器 localStorage,**按域名隔离**——
 新域名上需要重新登录,本地历史从零开始。
 
-## 无感登录(SSO 接力)
+## 账号登录(零网关改动)
 
-1. 网关部署 `feat/connect-studio` 分支(sub2api-gy 仓库,新增前端路由
-   `/connect/studio`:已登录带 token 302 跳入 Studio,未登录先走网关登录再续跳)
-2. Studio 服务器 `.env` 配置 `SSO_CONNECT_URL=https://sub2.pigcoder.com/connect/studio`
-   并 `docker compose up -d`
-3. 网关菜单 iframe、独立 tab、官网首页按钮统一指向 `/connect/studio`
+Studio 登录页直接用 **Pigcoder 账号密码**登录:经 `/sub2api` 代理调网关公开
+auth API(`/auth/login`),拿 access+refresh token 后**自动静默续签**(过期前
+2 分钟换新;心跳遇 401 也会先试续签),等于登录一次永久在线。
 
-效果:登录页变为「使用 Pigcoder 账号进入」一键跳转(无手动贴凭证入口,
-调试机用 `ALLOW_KEY_LOGIN=1` 打开);顶栏显示账户余额(随 60s 心跳刷新,
-点击去网关充值/明细);会话过期时猪鼻子变红,点一下即走网关无感续期。
+1. `.env` 配 `GATEWAY_ORIGIN=https://sub2.pigcoder.com` 后 `docker compose up -d`
+2. 网关开了 Turnstile 时,到 Cloudflare Turnstile 控制台把 Studio 域名
+   (如 chat.pigcoder.com)加进该 widget 的域名白名单,否则登录页人机验证
+   加载失败无法提交
+3. 注册/忘记密码链接、顶栏余额胶囊(60s 心跳刷新)的充值/明细都跳网关
+
+可选增强:网关部署 sub2api-gy 的 `feat/connect-studio` 分支并配置
+`SSO_CONNECT_URL`,登录页会多一个「已在网关登录?一键进入」。
+调试机用 `ALLOW_KEY_LOGIN=1` 打开手动贴凭证通道(sk/JWT)。
 
 ## 回滚
 
