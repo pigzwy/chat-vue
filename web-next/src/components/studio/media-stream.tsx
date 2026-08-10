@@ -2,10 +2,11 @@
 
 import { ChatConversation } from '@heroui-pro/react/chat-conversation'
 import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
-import { CircleAlert, Clapperboard, Download, Pencil, Quote, RotateCw, Trash2, WandSparkles } from 'lucide-react'
+import { CircleAlert, Clapperboard, Copy, Download, Pencil, Quote, RotateCw, Trash2, WandSparkles } from 'lucide-react'
 import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
 import {
+  copyRevisedPrompt,
   deleteMediaTask,
   downloadMediaTask,
   formatTaskCreatedAt,
@@ -84,23 +85,34 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
 
   return (
     <div className="group/turn flex flex-col gap-4">
-      {/* 你:提示词(右对齐主色气泡,点铅笔拿回输入框修改) */}
+      {/* 你:提示词气泡,下方一行操作(复制/修改)+参数时间——对齐 OpenAI 的排法 */}
       <div className="flex flex-col items-end gap-1">
-        <div className="flex max-w-[80%] items-end gap-1.5">
-          <button
-            type="button"
-            aria-label="修改提示词"
-            title="修改提示词"
-            className="glass-pill mb-1 shrink-0 p-1.5 opacity-0 transition group-hover/turn:opacity-100 pointer-coarse:opacity-100"
-            onClick={() => reusePrompt(task)}
-          >
-            <Pencil className="size-3.5" />
-          </button>
-          <div className="min-w-0 rounded-3xl rounded-br-lg bg-(--app-primary-subtle) px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap ring-1 ring-(--app-glass-border)">
-            {task.prompt}
-          </div>
+        <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-(--app-primary-subtle) px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap ring-1 ring-(--app-glass-border)">
+          {task.prompt}
         </div>
-        <p className="label-mono text-[10px] opacity-50">{askMeta.join(' · ')}</p>
+        <div className="flex items-center gap-1.5">
+          <span className="flex gap-0.5 opacity-0 transition group-hover/turn:opacity-100 pointer-coarse:opacity-100">
+            <button
+              type="button"
+              aria-label="复制提示词"
+              title="复制提示词"
+              className="glass-pill p-1.5"
+              onClick={() => { void copyRevisedPrompt(task.prompt) }}
+            >
+              <Copy className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="修改提示词"
+              title="修改提示词"
+              className="glass-pill p-1.5"
+              onClick={() => reusePrompt(task)}
+            >
+              <Pencil className="size-3.5" />
+            </button>
+          </span>
+          <p className="label-mono text-[10px] opacity-50">{askMeta.join(' · ')}</p>
+        </div>
       </div>
 
       {/* 模型:署名头(品牌图标+模型名+耗时/费用) + 缩进的回答内容 */}
