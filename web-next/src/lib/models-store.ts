@@ -80,6 +80,9 @@ export interface ModelsState {
   manualImageKey: string
   manualGrokKey: string
   manualNanoKey: string
+  /** 网关连通性(顶栏呼吸灯):ok=凭证有效,down=断开/凭证失效,unknown=未检测 */
+  connection: 'ok' | 'down' | 'unknown'
+  connectionDetail: string
 }
 
 const TOKEN_KEY = 'sub2api-token'
@@ -220,7 +223,9 @@ export const modelsStore = createStore<ModelsState>({
   manualKey: '',
   manualImageKey: '',
   manualGrokKey: '',
-  manualNanoKey: ''
+  manualNanoKey: '',
+  connection: 'unknown',
+  connectionDetail: '连接状态检测中…'
 })
 
 function patch(partial: Partial<ModelsState>) {
@@ -489,6 +494,29 @@ export function hasSub2apiToken() {
   return Boolean(state.token || state.manualKey)
 }
 
+/** 轻量连通性探测(顶栏呼吸灯用):用当前凭证打一次网关,60s 周期 + 窗口聚焦时触发 */
+export async function checkConnection() {
+  const { token, manualKey } = modelsStore.get()
+  const credential = manualKey || token
+  if (!credential) {
+    patch({ connection: 'down', connectionDetail: '未登录' })
+    return
+  }
+  try {
+    const path = manualKey ? '/sub2api/v1/models' : '/sub2api/api/v1/groups/available'
+    const response = await fetch(path, { headers: { Authorization: `Bearer ${credential}` } })
+    if (response.ok) {
+      patch({ connection: 'ok', connectionDetail: manualKey ? '已连接(API Key 有效)' : '已连接(会话有效)' })
+    } else if (response.status === 401 || response.status === 403) {
+      patch({ connection: 'down', connectionDetail: '已断开:凭证失效,请退出后重新登录' })
+    } else {
+      patch({ connection: 'down', connectionDetail: `已断开:网关异常(${response.status})` })
+    }
+  } catch {
+    patch({ connection: 'down', connectionDetail: '已断开:网关不可达' })
+  }
+}
+
 /** 校验 sub2.pigcoder.com 会话 JWT：能拉到分组即视为有效 */
 async function validateToken(token: string) {
   const response = await fetch('/sub2api/api/v1/groups/available', {
@@ -586,7 +614,7 @@ export function logout() {
   writeJson(API_KEYS_KEY, {})
   writeString(API_KEY_KEY, '')
   writeJson(GROUP_KEY, null)
-  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', manualNanoKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
+  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', manualNanoKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '', connection: 'unknown', connectionDetail: '连接状态检测中…' })
 }
 
 /** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用。

@@ -263,3 +263,12 @@
     animation: fade-scale var(--motion-slow) var(--motion-ease);
   }
 }
+
+/* 顶栏连接状态呼吸灯 */
+@keyframes status-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.9); opacity: 0; }
+}
+.status-breathe {
+  animation: status-breathe 1.8s ease-in-out infinite;
+}

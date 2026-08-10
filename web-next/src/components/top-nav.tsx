@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { LogOut, Moon, Sun } from 'lucide-react'
 import { KeyManager } from '@/components/key-manager'
-import { logout } from '@/lib/models-store'
+import { checkConnection, logout, modelsStore } from '@/lib/models-store'
 
 const tabs = [
   { label: '对话', href: '/', icon: '💬' },
@@ -20,6 +20,31 @@ function isTabActive(pathname: string, href: string) {
     return !pathname.startsWith('/studio') && !pathname.startsWith('/gallery') && !pathname.startsWith('/voice')
   }
   return pathname.startsWith(href)
+}
+
+/** 网关连接呼吸灯:绿=已连接,红=已断开(需重新登录),hover 看详情 */
+function ConnectionDot() {
+  const { connection, connectionDetail } = modelsStore.useStore()
+
+  useEffect(() => {
+    void checkConnection()
+    const timer = window.setInterval(() => { void checkConnection() }, 60_000)
+    const onFocus = () => { void checkConnection() }
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
+
+  if (connection === 'unknown') return null
+  const color = connection === 'ok' ? 'bg-emerald-500' : 'bg-red-500'
+  return (
+    <span className="relative ml-0.5 flex size-2 shrink-0" title={connectionDetail}>
+      <span className={`status-breathe absolute inline-flex size-full rounded-full ${color} opacity-60`} />
+      <span className={`relative inline-flex size-2 rounded-full ${color}`} />
+    </span>
+  )
 }
 
 function ColorModeButton() {
@@ -58,7 +83,7 @@ export function TopNav() {
       <div className="pointer-events-none fixed left-3 top-3 z-50 sm:left-4">
         <Link
           href="/"
-          className="glass-chip pointer-events-auto inline-flex items-center gap-2 p-1.5 transition-transform hover:-translate-y-0.5 sm:pr-3"
+          className="glass-chip pointer-events-auto inline-flex items-center gap-2 p-1.5 pr-2.5 transition-transform hover:-translate-y-0.5 sm:pr-3"
         >
           <Image
             src="/logo-mark.jpg"
@@ -68,6 +93,7 @@ export function TopNav() {
             className="size-7 shrink-0 rounded-full object-cover"
           />
           <span className="hidden text-sm font-bold tracking-tight sm:inline">pigcoder</span>
+          <ConnectionDot />
         </Link>
       </div>
 

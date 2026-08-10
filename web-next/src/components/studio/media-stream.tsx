@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { ChatConversation } from '@heroui-pro/react/chat-conversation'
 import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
-import { CircleAlert, Clapperboard, Copy, Download, Pencil, Quote, RotateCw, Trash2, WandSparkles } from 'lucide-react'
+import { CircleAlert, Clapperboard, Copy, Download, Pencil, Quote, RotateCw, TimerOff, Trash2, WandSparkles } from 'lucide-react'
 import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
 import { useCachedVideoUrl } from '@/lib/studio/video-cache'
@@ -71,6 +72,8 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
   const spec = resolveMediaModelSpec(task.model)
   const selected = state.selectedTaskId === task.id
   const videoSrc = useCachedVideoUrl(task.id, task.videoUrl)
+  // 视频代理地址随后端重启/任务过期(2h)失效,黑播放器换成明确的过期状态
+  const [videoFailed, setVideoFailed] = useState(false)
 
   // 用户侧元信息:参数 + 时间
   const askMeta: string[] = []
@@ -197,13 +200,33 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
 
           {task.status === 'completed' && task.videoUrl && (
             <>
-              <video
-                src={videoSrc}
-                controls
-                playsInline
-                preload="metadata"
-                className="block max-h-[420px] w-auto max-w-full overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm dark:border-white/10"
-              />
+              {videoFailed
+                ? (
+                    <div className="flex flex-col items-start gap-2 rounded-2xl rounded-tl-md border border-black/5 bg-black/[0.03] px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.06]">
+                      <p className="flex items-center gap-1.5 text-sm opacity-70">
+                        <TimerOff className="size-4" />
+                        视频已过期(链接随服务重启或 2 小时时效失效),请重新生成
+                      </p>
+                      <button
+                        type="button"
+                        className="glass-pill flex items-center gap-1 px-2.5 py-1 text-xs font-semibold"
+                        onClick={() => { void retryMediaTask(task) }}
+                      >
+                        <RotateCw className="size-3.5" />
+                        重新生成
+                      </button>
+                    </div>
+                  )
+                : (
+                    <video
+                      src={videoSrc}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="block max-h-[420px] w-auto max-w-full overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm dark:border-white/10"
+                      onError={() => setVideoFailed(true)}
+                    />
+                  )}
               <TurnActions task={task} selected={selected} />
             </>
           )}
