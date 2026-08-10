@@ -48,12 +48,19 @@ function clampReasoningEffort(effort: Exclude<ReasoningEffort, 'auto'>): 'low' |
   return effort
 }
 
+// grok 上游不接受 reasoning_effort 参数(带上直接 400 断请求);
+// 思考与否由模型变体决定(-reasoning / -non-reasoning),强度参数必须剥掉
+function isGrokModel(model: string) {
+  return /^grok|^x-ai\//i.test(model) || model.includes('grok')
+}
+
 function buildProviderOptions(
   model: string,
   usesSub2api: boolean,
   reasoningEffort: ReasoningEffort
 ): ProviderOptionsResult {
   if (reasoningEffort === 'auto') return undefined
+  if (isGrokModel(model)) return undefined
 
   if (isAnthropicModel(model)) {
     return {
@@ -69,7 +76,8 @@ function buildProviderOptions(
     return {
       providerOptions: {
         openai: {
-          reasoningEffort: reasoningEffort as OpenAILanguageModelResponsesOptions['reasoningEffort'],
+          // ai-sdk 的枚举无 'max'(校验会抛错断请求),就近收敛到 xhigh
+          reasoningEffort: (reasoningEffort === 'max' ? 'xhigh' : reasoningEffort) as OpenAILanguageModelResponsesOptions['reasoningEffort'],
           reasoningSummary: 'detailed'
         } satisfies OpenAILanguageModelResponsesOptions
       }

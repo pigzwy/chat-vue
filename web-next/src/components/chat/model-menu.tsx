@@ -51,12 +51,14 @@ export function ModelMenu() {
   const effortOptions = useMemo(() => {
     const reasoning = activeModel?.reasoning
     if (reasoning?.supported === false) return []
+    // grok 系不接受思考强度参数(上游 400),思考与否由 -reasoning 变体决定,不展示档位
+    if (/grok|x-ai/i.test(state.model)) return []
     const declared = (reasoning?.efforts || []).filter(effort => isReasoningEffort(effort.value))
     if (declared.length) {
       return [{ value: 'auto' as const, label: '默认' }, ...declared]
     }
     return reasoningEffortItems.map(item => ({ value: item.value, label: item.label }))
-  }, [activeModel])
+  }, [activeModel, state.model])
 
   useEffect(() => {
     if (effortOptions.length && !effortOptions.some(option => option.value === state.reasoningEffort)) {
@@ -70,7 +72,7 @@ export function ModelMenu() {
         {state.loading
           ? <Loader2 className="size-4 shrink-0 animate-spin" />
           : <Sparkles className="size-4 shrink-0" />}
-        <span className="truncate">{activeModel?.label || state.model}</span>
+        <span className="truncate uppercase tracking-wide">{activeModel?.label || state.model}</span>
         <ChevronDown className="size-4 shrink-0 opacity-60" />
       </Popover.Trigger>
 
@@ -134,7 +136,7 @@ export function ModelMenu() {
                           className="glass-pill flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left text-sm font-medium"
                           onClick={() => setModel(item.value)}
                         >
-                          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                          <span className="min-w-0 flex-1 truncate uppercase tracking-wide">{item.label}</span>
                           {state.model === item.value && <Check className="size-4 shrink-0" />}
                         </button>
                       ))}
