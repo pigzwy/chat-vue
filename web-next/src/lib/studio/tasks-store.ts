@@ -801,6 +801,10 @@ export function formatTaskCreatedAt(task: MediaTask) {
 
 export function reusePrompt(task: MediaTask) {
   patch({ prompt: task.prompt })
+  // 通知输入框聚焦(移动端顺带唤起键盘),方便立即修改
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('studio:focus-prompt'))
+  }
 }
 
 export function selectMediaTask(task: MediaTask) {

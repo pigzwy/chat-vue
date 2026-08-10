@@ -84,10 +84,21 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
 
   return (
     <div className="group/turn flex flex-col gap-4">
-      {/* 你:提示词(右对齐主色气泡) */}
+      {/* 你:提示词(右对齐主色气泡,点铅笔拿回输入框修改) */}
       <div className="flex flex-col items-end gap-1">
-        <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-(--app-primary-subtle) px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap ring-1 ring-(--app-glass-border)">
-          {task.prompt}
+        <div className="flex max-w-[80%] items-end gap-1.5">
+          <button
+            type="button"
+            aria-label="修改提示词"
+            title="修改提示词"
+            className="glass-pill mb-1 shrink-0 p-1.5 opacity-0 transition group-hover/turn:opacity-100 pointer-coarse:opacity-100"
+            onClick={() => reusePrompt(task)}
+          >
+            <Pencil className="size-3.5" />
+          </button>
+          <div className="min-w-0 rounded-3xl rounded-br-lg bg-(--app-primary-subtle) px-4 py-2.5 text-sm leading-6 whitespace-pre-wrap ring-1 ring-(--app-glass-border)">
+            {task.prompt}
+          </div>
         </div>
         <p className="label-mono text-[10px] opacity-50">{askMeta.join(' · ')}</p>
       </div>
@@ -120,14 +131,24 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
                 <CircleAlert className="mt-1 size-4 shrink-0" />
                 <span className="min-w-0">{task.error || '生成失败'}</span>
               </p>
-              <button
-                type="button"
-                className="glass-pill flex w-fit items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
-                onClick={() => { void retryMediaTask(task) }}
-              >
-                <RotateCw className="size-3.5" />
-                重试
-              </button>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => { void retryMediaTask(task) }}
+                >
+                  <RotateCw className="size-3.5" />
+                  重试
+                </button>
+                <button
+                  type="button"
+                  className="glass-pill flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold"
+                  onClick={() => reusePrompt(task)}
+                >
+                  <Pencil className="size-3.5" />
+                  修改提示词
+                </button>
+              </div>
             </div>
           )}
 

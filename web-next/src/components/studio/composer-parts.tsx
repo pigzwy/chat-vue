@@ -182,6 +182,18 @@ export function PromptTextarea({
   const state = studioStore.useStore()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // 「修改提示词」回填后聚焦光标到末尾(reusePrompt 派发)
+  useEffect(() => {
+    function onFocusPrompt() {
+      const el = textareaRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    }
+    window.addEventListener('studio:focus-prompt', onFocusPrompt)
+    return () => window.removeEventListener('studio:focus-prompt', onFocusPrompt)
+  }, [])
+
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
