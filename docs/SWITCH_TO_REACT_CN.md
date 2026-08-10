@@ -1,47 +1,59 @@
-# 生产切换到 React 版(web-next)
+# 生产切换到 React 版(web-next)完整步骤
 
-镜像由 GitHub Actions 自动构建推送:
+镜像由 GitHub Actions 自动构建推送,服务器只拉不建:
 
-- `llpig/chat-vue-next:latest` — React 前端(main 分支)
-- `llpig/chat-vue:latest` — Nitro 后端(原 Vue 镜像,继续负责 /api、/sub2api、媒体任务)
+- `llpig/chat-vue-next:latest` — React 前端(对外承接原端口)
+- `llpig/chat-vue:latest` — Nitro 后端(原 Vue 镜像,退居内部:/api、/sub2api、媒体任务)
 
-## 配置(.env,全部知识点见 .env.example)
+> **不是"只改镜像"**:是单容器 → 双容器拓扑(web 对外 + 原镜像退居后端),
+> 由新 docker-compose.yml 描述;`.env` 里的 IMAGE 变量不用动。
+
+## 0. 前提(一次性确认)
 
 ```bash
-# 网关地址三种形态任选:
-SUB2API_BASE_URL=https://sub2.pigcoder.com          # 公网
-#SUB2API_BASE_URL=http://host.docker.internal:8080  # 同机宿主端口
-#SUB2API_BASE_URL=http://<网关容器名>:8080           # 同 docker 网络(见下)
-
-# 创作台分组 id(运行时注入,改完 up -d 即生效,不用重构建)
-MEDIA_GROUP_OPENAI=25       # GPT Image 2 分组
-MEDIA_GROUP_GROK=66         # Grok 画图/视频分组
-MEDIA_GROUP_NANOBANANA=     # Nano Banana 分组(生成管线待接,先占位)
+docker network ls | grep app-shared     # 共享网络存在(编排已声明自动加入)
+docker ps                               # 记下网关容器名(SUB2API_BASE_URL 要用)
 ```
 
-**docker 网络**:编排已声明 chat-vue 加入外部网络 `app-shared`(每次 up 自动接上,
-取代以前手动的 `docker network connect app-shared chat-vue`——手动连接在容器重建后
-会丢失)。网关容器也在 app-shared 上时,SUB2API_BASE_URL 直接写它的容器名。
-若服务器上没有这个网络:`docker network create app-shared`,或从两份 compose 里
-删掉 app-shared 相关两处。
+## 1. 补 .env(compose 目录,如 /opt/chat-vue)
 
-分组 id 生效顺序:浏览器 localStorage 显式覆盖 > 服务端 .env > 内置默认(25/66)。
-生效验证:打开 `/api/app-config` 应能看到配置的分组 id;sk 模式下右上角
-「密钥管理」每个槽位也会显示当前解析到的分组。
-
-## 服务器上执行(compose 目录,如 /opt/chat-vue)
+原有内容保留,补/确认以下几项(全部知识点见 .env.example):
 
 ```bash
-# 1. 取最新编排(替换 docker-compose.yml,新增 docker-compose.legacy.yml)
+SUB2API_BASE_URL=http://<网关容器名>:8080   # 或保持你现有的地址不变
+MEDIA_GROUP_OPENAI=25        # GPT Image 2 分组
+MEDIA_GROUP_GROK=66          # Grok 画图/视频分组
+MEDIA_GROUP_NANOBANANA=      # Nano Banana 分组 id(生成管线待接,先占位)
+LEGACY_PORT=3010             # Vue 界面的本机回滚口(新增)
+# APP_PORT 保持原值(反向代理指向它)
+```
+
+## 2. 换编排并切换
+
+```bash
 curl -fsSLO https://raw.githubusercontent.com/pigzwy/chat-vue/main/docker-compose.yml
 curl -fsSLO https://raw.githubusercontent.com/pigzwy/chat-vue/main/docker-compose.legacy.yml
-
-# 2. 拉镜像并切换(.env 不用改;反向代理仍指原端口,无需动)
 docker compose pull && docker compose up -d
 ```
 
-切换后:对外端口(默认 3009)由 React 前端接管;Vue 界面保留在本机回环
-`127.0.0.1:3010`(LEGACY_PORT)用于排障。
+反向代理、CDN、域名此步都不用动:对外端口不变,落到端口上的应用换成了 React。
+
+## 3. 验证
+
+- `curl -s 127.0.0.1:${APP_PORT:-3009}/api/app-config` → 能看到配置的分组 id
+- 打开原域名 → React 界面;原 JWT 登录态直接继承(存储键与 Vue 一致),
+  创作台出模型列表、能正常生成
+- Vue 界面仍在 `127.0.0.1:3010` 可直连排障
+
+## 4. 换域名(可选,和切换解耦,先后皆可)
+
+1. DNS/CDN:新域名按老域名同样的方式解析(Cloudflare 记录指向同一映射/源站)
+2. 服务器反向代理(1Panel):新建网站 → 反代到 `127.0.0.1:${APP_PORT}`,
+   照抄老域名站点配置;证书走你现有的签发通道
+3. 验证新域名后,老域名可保留、301 到新域名、或删除
+
+注意:登录态与聊天/生成历史都存在浏览器 localStorage,**按域名隔离**——
+新域名上需要重新登录,本地历史从零开始。
 
 ## 回滚
 
@@ -49,10 +61,11 @@ docker compose pull && docker compose up -d
 docker compose down && docker compose -f docker-compose.legacy.yml up -d
 ```
 
-或把反向代理临时指回 `127.0.0.1:3010`。
+或把反向代理临时指回 `127.0.0.1:3010`。回滚编排同样声明了 app-shared,不会断网关。
 
-## 登录说明
+## 数据说明
 
-与 Vue 版一致:粘贴 sub2 网关 JWT 登录,分组 API key 自动创建/复用
-(同服务器信任链,会话绑定校验可过)。另支持 sk 直连模式作为兜底,
-不同分组的 sk 可在右上角「密钥管理」分槽配置。
+- 登录态:同域名下 Vue ↔ React 互通(同一存储键),切换/回滚都不用重登
+- 聊天记录、创作台历史:两版浏览器本地存储格式不同,**不互通也不迁移**;
+  Vue 的记录仍留在浏览器里,回滚即见,不会丢失
+- 服务端数据卷 `chat-vue-data`(错误日志等)双方共用,切换不影响
