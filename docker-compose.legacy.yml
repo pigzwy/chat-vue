@@ -3,7 +3,7 @@
 #   docker compose down && docker compose -f docker-compose.legacy.yml up -d
 services:
   chat-vue:
-    image: ${IMAGE:-llpig/chat-vue:latest}
+    image: llpig/chat-vue:latest
     container_name: chat-vue
     restart: unless-stopped
     ports:

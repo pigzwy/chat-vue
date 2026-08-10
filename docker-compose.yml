@@ -5,7 +5,7 @@
 #   (或把反向代理临时指回 127.0.0.1:${LEGACY_PORT:-3010},Vue 界面仍在)
 services:
   chat-vue:
-    image: ${IMAGE:-llpig/chat-vue:latest}
+    image: llpig/chat-vue:latest
     container_name: chat-vue
     restart: unless-stopped
     ports:
@@ -30,7 +30,7 @@ services:
       - chat-vue-data:/app/.data
 
   web:
-    image: ${WEB_IMAGE:-llpig/chat-vue-next:latest}
+    image: llpig/chat-vue-next:latest
     container_name: chat-vue-web
     restart: unless-stopped
     depends_on:
