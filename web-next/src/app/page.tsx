@@ -7,7 +7,7 @@ import type { UIMessage } from 'ai'
 import { Composer } from '@/components/chat/composer'
 import { ModelMenu } from '@/components/chat/model-menu'
 import { PresetRow } from '@/components/chat/preset-row'
-import { ChatSidebar } from '@/components/chat/chat-sidebar'
+import { ChatSidebar, SidebarOpenButton } from '@/components/chat/chat-sidebar'
 import { useChatAttachments } from '@/hooks/use-attachments'
 import { createChat, refreshChats } from '@/lib/chats-store'
 import { modelsStore } from '@/lib/models-store'
@@ -60,7 +60,8 @@ export default function HomePage() {
     <div className="flex min-h-0 flex-1">
       <ChatSidebar />
       <div className="glass-panel glass-panel--lg aurora-shell mx-4 mb-4 flex min-w-0 flex-1 flex-col lg:ml-0">
-        <div className="flex justify-start p-4">
+        <div className="flex items-center gap-1 p-4">
+          <SidebarOpenButton />
           <ModelMenu />
         </div>
         <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-7 px-4 pb-10">

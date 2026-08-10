@@ -1,25 +1,19 @@
 import type { Metadata } from 'next'
-import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google'
+import { GeistSans } from 'geist/font/sans'
+import { GeistMono } from 'geist/font/mono'
+import { Noto_Sans_SC } from 'next/font/google'
 import Script from 'next/script'
 import { Toaster } from '@/components/toaster'
 import { AppInit } from '@/components/app-init'
 import { AppShell } from '@/components/app-shell'
 import './globals.css'
 
-const inter = Inter({
-  variable: '--font-inter',
-  subsets: ['latin']
-})
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: '--font-jetbrains-mono',
-  subsets: ['latin']
-})
-
-/* 标题字(拉丁字符更有辨识度,中文回退系统黑体) */
-const spaceGrotesk = Space_Grotesk({
-  variable: '--font-space-grotesk',
-  subsets: ['latin']
+/* 中文正文字体(Noto Sans SC,unicode-range 分片按需加载);拉丁走 Geist */
+const notoSansSC = Noto_Sans_SC({
+  variable: '--font-noto-sc',
+  weight: ['400', '500', '700'],
+  subsets: ['latin'],
+  preload: false
 })
 
 export const metadata: Metadata = {
@@ -42,7 +36,7 @@ export default function RootLayout({
           })()`}
         </Script>
       </head>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
+      <body className={`${GeistSans.variable} ${GeistMono.variable} ${notoSansSC.variable} font-sans antialiased`}>
         <AppInit />
         <Toaster />
         <AppShell>{children}</AppShell>

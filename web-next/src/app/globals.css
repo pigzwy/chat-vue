@@ -7,10 +7,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme {
-  --font-sans: var(--font-inter), 'Public Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  --font-display: var(--font-space-grotesk), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+/* 必须用 @theme inline:next/font 的 --font-geist-* 变量定义在 body 的 class 上,
+ * 若经 :root 中转(--font-sans: var(--font-geist-sans)),:root 求值时变量不存在,
+ * 整条声明"计算时无效"直接归空——字体永远不生效(此前 Inter 就死于此)。
+ * inline 把变量链内联进工具类,在元素处求值,body 上的变量可见。 */
+@theme inline {
+  /* 拉丁 Geist(Vercel 官方字体),中文 Noto Sans SC 网络字体(分片按需加载),再回退系统 */
+  --font-sans: var(--font-geist-sans), var(--font-noto-sc), 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-display: var(--font-geist-sans), var(--font-noto-sc), 'PingFang SC', ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ---------------------------------------------------------------------------
