@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, KeyRound, LoaderCircle, Sparkles } from 'lucide-react'
-import { login, loginWithApiKey, loginWithPassword } from '@/lib/models-store'
-import { allowKeyLogin, gatewayHomeUrl, loadAppConfig, ssoEntryUrl } from '@/lib/runtime-config'
+import { ArrowRight, LoaderCircle, Sparkles } from 'lucide-react'
+import { loginWithPassword } from '@/lib/models-store'
+import { gatewayHomeUrl, loadAppConfig, ssoEntryUrl } from '@/lib/runtime-config'
 
 declare global {
   interface Window {
@@ -69,18 +69,17 @@ export function LoginScreen({ initialError }: { initialError?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [turnstileToken, setTurnstileToken] = useState('')
-  const [credential, setCredential] = useState('')
   const [error, setError] = useState(initialError || '')
   const [pending, setPending] = useState(false)
   // null = 配置加载中
-  const [cfg, setCfg] = useState<{ sso?: string, manual: boolean, home?: string } | null>(null)
+  const [cfg, setCfg] = useState<{ sso?: string, home?: string } | null>(null)
   const [settings, setSettings] = useState<PublicSettings | null>(null)
 
   useEffect(() => {
     let mounted = true
     void loadAppConfig().then(() => {
       if (!mounted) return
-      setCfg({ sso: ssoEntryUrl(), manual: allowKeyLogin(), home: gatewayHomeUrl() })
+      setCfg({ sso: ssoEntryUrl(), home: gatewayHomeUrl() })
     })
     // 网关公开设置:决定是否渲染 Turnstile
     void fetch('/sub2api/api/v1/settings/public')
@@ -110,19 +109,6 @@ export function LoginScreen({ initialError }: { initialError?: string }) {
     }
   }
 
-  async function onCredentialLogin() {
-    const value = credential.trim().replace(/^Bearer\s+/i, '')
-    if (!value || pending) return
-    setPending(true)
-    setError('')
-    try {
-      if (/^sk-/i.test(value)) await loginWithApiKey(value)
-      else await login(value)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败,请重试')
-      setPending(false)
-    }
-  }
 
   return (
     <div className="aurora-shell flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-4">
@@ -194,35 +180,6 @@ export function LoginScreen({ initialError }: { initialError?: string }) {
                     已在网关登录?一键进入
                     <ArrowRight className="size-3.5" />
                   </button>
-                )}
-
-                {cfg.manual && (
-                  <div className="mt-6 border-t border-black/5 pt-5 dark:border-white/10">
-                    <p className="label-mono mb-3 text-center opacity-50">调试通道</p>
-                    <label className="label-mono mb-1.5 flex items-center gap-1.5">
-                      <KeyRound className="size-3.5" />
-                      API Key / 登录 Token
-                    </label>
-                    <textarea
-                      value={credential}
-                      rows={3}
-                      placeholder="sk-xxxxxxxx 或 eyJhbGciOi...(JWT)"
-                      className="glass-input w-full resize-none rounded-2xl px-4 py-3 font-mono text-xs leading-5 outline-none"
-                      onChange={(event) => { setCredential(event.target.value); setError('') }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); void onCredentialLogin() }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      disabled={!credential.trim() || pending}
-                      className="glass-btn mt-3 flex h-10 w-full items-center justify-center gap-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
-                      onClick={() => { void onCredentialLogin() }}
-                    >
-                      <KeyRound className="size-4" />
-                      凭证登录
-                    </button>
-                  </div>
                 )}
               </>
             )}

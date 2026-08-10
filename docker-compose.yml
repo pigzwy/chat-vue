@@ -48,7 +48,6 @@ services:
       # 网关站点根(登录页注册/忘记密码、余额跳充值明细);SSO 接力入口可选
       GATEWAY_ORIGIN: ${GATEWAY_ORIGIN:-}
       SSO_CONNECT_URL: ${SSO_CONNECT_URL:-}
-      ALLOW_KEY_LOGIN: ${ALLOW_KEY_LOGIN:-}
 
 volumes:
   chat-vue-data:

@@ -85,6 +85,8 @@ export interface ModelsState {
   connectionDetail: string
   /** 网关账户余额(JWT 模式随心跳刷新;sk 模式/未知为 null) */
   balanceUsd: number | null
+  /** 网关账户用户名(随 profile 心跳更新) */
+  userName: string
 }
 
 const TOKEN_KEY = 'sub2api-token'
@@ -231,7 +233,8 @@ export const modelsStore = createStore<ModelsState>({
   manualNanoKey: '',
   connection: 'unknown',
   connectionDetail: '连接状态检测中…',
-  balanceUsd: null
+  balanceUsd: null,
+  userName: ''
 })
 
 function patch(partial: Partial<ModelsState>) {
@@ -604,15 +607,21 @@ export async function checkConnection() {
     const response = await fetch(path, { headers: { Authorization: `Bearer ${credential}` } })
     if (response.ok) {
       let balanceUsd: number | null = null
+      let userName = ''
       if (!manualKey) {
-        const profile = await response.json().catch(() => null) as { balance?: number, data?: { balance?: number } } | null
-        const balance = profile?.balance ?? profile?.data?.balance
+        const parsed = await response.json().catch(() => null) as { data?: Record<string, unknown> } | Record<string, unknown> | null
+        const profile = (parsed && 'data' in (parsed as object) && (parsed as { data?: unknown }).data
+          ? (parsed as { data: Record<string, unknown> }).data
+          : parsed) as Record<string, unknown> | null
+        const balance = profile?.balance
         balanceUsd = typeof balance === 'number' && Number.isFinite(balance) ? balance : null
+        userName = typeof profile?.username === 'string' ? profile.username : ''
       }
       patch({
         connection: 'ok',
         connectionDetail: manualKey ? '已连接(API Key 有效)' : '已连接(会话有效)',
-        balanceUsd
+        balanceUsd,
+        userName
       })
     } else if (response.status === 401 || response.status === 403) {
       // 密码登录的会话先尝试静默续签,成功则立即恢复绿灯
@@ -732,7 +741,7 @@ export function logout() {
   writeJson(API_KEYS_KEY, {})
   writeString(API_KEY_KEY, '')
   writeJson(GROUP_KEY, null)
-  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', manualNanoKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '', connection: 'unknown', connectionDetail: '连接状态检测中…', balanceUsd: null })
+  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', manualNanoKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '', connection: 'unknown', connectionDetail: '连接状态检测中…', balanceUsd: null, userName: '' })
 }
 
 /** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用。

@@ -5,6 +5,7 @@ import { ChatConversation } from '@heroui-pro/react/chat-conversation'
 import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
 import { CircleAlert, Clapperboard, Copy, Download, Pencil, Quote, RotateCw, TimerOff, Trash2, WandSparkles } from 'lucide-react'
 import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
+import { StreamMinimap } from '@/components/studio/stream-minimap'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
 import { useCachedVideoUrl } from '@/lib/studio/video-cache'
 import {
@@ -89,7 +90,7 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
   }
 
   return (
-    <div className="group/turn flex flex-col gap-4">
+    <div className="group/turn flex flex-col gap-4" data-turn-id={task.id}>
       {/* 你:参考图缩略 + 提示词气泡,下方一行操作(复制/修改)+参数时间——对齐 OpenAI 的排法 */}
       <div className="flex flex-col items-end gap-1">
         {task.sourceThumbs && task.sourceThumbs.length > 0 && (
@@ -242,14 +243,17 @@ export function MediaStream({ header }: { header?: React.ReactNode }) {
   const turns = [...state.queue].reverse()
 
   return (
-    <ChatConversation className="min-h-0 flex-1" initial="instant" resize="smooth">
+    <>
+      <StreamMinimap tasks={turns} />
+      <ChatConversation className="min-h-0 flex-1" initial="instant" resize="smooth">
       <ChatConversation.Content className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 pt-2 pb-72 sm:px-6">
         {header}
         {turns.map(task => (
           <StreamTurn key={task.id} task={task} state={state} />
         ))}
         <ChatConversation.ScrollAnchor />
-      </ChatConversation.Content>
-    </ChatConversation>
+        </ChatConversation.Content>
+      </ChatConversation>
+    </>
   )
 }

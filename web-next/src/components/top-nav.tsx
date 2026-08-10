@@ -75,25 +75,30 @@ function BrandMark() {
   )
 }
 
-/** 余额胶囊(JWT 模式):随心跳刷新,点击去网关充值/看明细 */
+/** 账户胶囊(JWT 模式):用户名 + 余额,随心跳刷新,点击去网关充值/看明细 */
 function BalanceChip() {
-  const { token, manualKey, balanceUsd } = modelsStore.useStore()
+  const { token, manualKey, balanceUsd, userName } = modelsStore.useStore()
   if (!token || manualKey || balanceUsd === null) return null
 
   const home = gatewayHomeUrl()
-  const text = `$${balanceUsd.toFixed(2)}`
+  const inner = (
+    <>
+      {userName && <span className="hidden max-w-24 truncate text-xs font-semibold sm:inline">{userName}</span>}
+      <span className="font-mono text-xs font-semibold">${balanceUsd.toFixed(2)}</span>
+    </>
+  )
   if (!home) {
-    return <span className="glass-chip pointer-events-auto flex h-9 items-center px-3 font-mono text-xs font-semibold">{text}</span>
+    return <span className="glass-chip pointer-events-auto flex h-9 items-center gap-1.5 px-3">{inner}</span>
   }
   return (
     <a
       href={`${home}/dashboard`}
       target="_blank"
       rel="noreferrer"
-      title="余额(点击去充值/看明细)"
-      className="glass-chip pointer-events-auto flex h-9 items-center px-3 font-mono text-xs font-semibold transition-transform hover:-translate-y-0.5"
+      title="账户余额(点击去充值/看明细)"
+      className="glass-chip pointer-events-auto flex h-9 items-center gap-1.5 px-3 transition-transform hover:-translate-y-0.5"
     >
-      {text}
+      {inner}
     </a>
   )
 }

@@ -15,8 +15,6 @@ interface AppConfig {
   gatewayOrigin?: string
   /** 网关免登录接力入口(/connect/studio,可选);配置后登录页额外展示一键进入 */
   ssoEntry?: string
-  /** 放开手动粘贴凭证(sk/JWT)入口;生产默认隐藏 */
-  allowKeyLogin?: boolean
 }
 
 const builtinDefaults: Record<MediaGroupProvider, number> = {
@@ -41,8 +39,7 @@ export function loadAppConfig() {
         config = {
           mediaGroups: parsed.mediaGroups || {},
           gatewayOrigin: httpUrl(parsed.gatewayOrigin),
-          ssoEntry: httpUrl(parsed.ssoEntry),
-          allowKeyLogin: Boolean(parsed.allowKeyLogin)
+          ssoEntry: httpUrl(parsed.ssoEntry)
         }
       }
     })
@@ -68,10 +65,6 @@ export function gatewayHomeUrl() {
   } catch {
     return undefined
   }
-}
-
-export function allowKeyLogin() {
-  return Boolean(config.allowKeyLogin)
 }
 
 function normalizeGroupId(value: unknown) {
