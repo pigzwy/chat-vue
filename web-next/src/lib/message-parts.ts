@@ -11,7 +11,6 @@ function sourceToMarkdownLink(url: string) {
 
 const THINK_OPEN_TAG = '<think>'
 const THINK_CLOSE_TAG = '</think>'
-const THINK_SEPARATOR = '\n\n---\n\n'
 
 type MessagePart = UIMessagePart<UIDataTypes, UITools>
 type TextLikePart = Extract<MessagePart, { type: 'text' }>
@@ -106,7 +105,9 @@ function appendReasoning(result: UIMessage['parts'], text: string, state: Reason
 function joinReasoningText(current: string, next: string) {
   if (!current) return next
   if (!next) return current
-  return `${current}${THINK_SEPARATOR}${next}`
+  // 网关会把思考流按 token 切成许多相邻 reasoning 片段("The"" user"" just"…),
+  // 必须直接拼接;用 "---" 之类的分隔符会被 Markdown 渲染成每词一条横线
+  return `${current}${next}`
 }
 
 function stripLooseThinkCloseTag(text: string) {
