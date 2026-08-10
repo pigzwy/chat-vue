@@ -20,6 +20,12 @@ services:
     # SUB2API_BASE_URL 可写 docker 宿主地址(http://host.docker.internal:8080)
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # 加入网关所在的共享网络,SUB2API_BASE_URL 可直接写网关容器名。
+    # 以前的 `docker network connect app-shared chat-vue` 是手动操作,容器一重建
+    # 就丢;声明在这里每次 up 都自动接上。没有该网络的环境删掉相关两处即可。
+    networks:
+      - default
+      - app-shared
     volumes:
       - chat-vue-data:/app/.data
 
@@ -42,3 +48,7 @@ services:
 
 volumes:
   chat-vue-data:
+
+networks:
+  app-shared:
+    external: true

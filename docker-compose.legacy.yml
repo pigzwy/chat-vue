@@ -14,8 +14,18 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3009
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # 与主编排一致:声明式加入网关共享网络(手动 network connect 会在重建后丢失)
+    networks:
+      - default
+      - app-shared
     volumes:
       - chat-vue-data:/app/.data
 
 volumes:
   chat-vue-data:
+
+networks:
+  app-shared:
+    external: true

@@ -11,13 +11,19 @@
 # 网关地址三种形态任选:
 SUB2API_BASE_URL=https://sub2.pigcoder.com          # 公网
 #SUB2API_BASE_URL=http://host.docker.internal:8080  # 同机宿主端口
-#SUB2API_BASE_URL=http://sub2api:8080               # 同 docker 网络(需 network connect)
+#SUB2API_BASE_URL=http://<网关容器名>:8080           # 同 docker 网络(见下)
 
 # 创作台分组 id(运行时注入,改完 up -d 即生效,不用重构建)
 MEDIA_GROUP_OPENAI=25       # GPT Image 2 分组
 MEDIA_GROUP_GROK=66         # Grok 画图/视频分组
 MEDIA_GROUP_NANOBANANA=     # Nano Banana 分组(生成管线待接,先占位)
 ```
+
+**docker 网络**:编排已声明 chat-vue 加入外部网络 `app-shared`(每次 up 自动接上,
+取代以前手动的 `docker network connect app-shared chat-vue`——手动连接在容器重建后
+会丢失)。网关容器也在 app-shared 上时,SUB2API_BASE_URL 直接写它的容器名。
+若服务器上没有这个网络:`docker network create app-shared`,或从两份 compose 里
+删掉 app-shared 相关两处。
 
 分组 id 生效顺序:浏览器 localStorage 显式覆盖 > 服务端 .env > 内置默认(25/66)。
 生效验证:打开 `/api/app-config` 应能看到配置的分组 id;sk 模式下右上角
