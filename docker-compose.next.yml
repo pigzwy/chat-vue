@@ -35,10 +35,13 @@ services:
     working_dir: /app
     command: ["node", "web-next/server.js"]
     volumes:
+      # 挂 .deploy 暂存目录而非 .next 本体:构建会重建 .next,与运行中容器的
+      # 挂载互相打架会损坏产物(踩过:standalone 被打空 502)。
+      # 部署脚本:pnpm build && rsync 三件套到 .deploy && compose restart web-next
       # 外层不加 :ro——docker 需在其中创建嵌套挂载点目录
-      - ./web-next/.next/standalone:/app
-      - ./web-next/.next/static:/app/web-next/.next/static:ro
-      - ./web-next/public:/app/web-next/public:ro
+      - ./web-next/.deploy/standalone:/app
+      - ./web-next/.deploy/static:/app/web-next/.next/static:ro
+      - ./web-next/.deploy/public:/app/web-next/public:ro
     environment:
       NODE_ENV: production
       HOSTNAME: 127.0.0.1

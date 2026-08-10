@@ -31,8 +31,16 @@ export function CommandPalette() {
         router.push('/')
       }
     }
+    // 侧栏「搜索对话」等入口也可唤起
+    function onOpenEvent() {
+      setOpen(true)
+    }
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('app:open-command-palette', onOpenEvent)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('app:open-command-palette', onOpenEvent)
+    }
   }, [router])
 
   function go(path: string) {
