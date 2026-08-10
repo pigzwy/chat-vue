@@ -17,9 +17,27 @@ export function OpenaiIcon({ className }: { className?: string }) {
   )
 }
 
+export function AnthropicIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="currentColor">
+      <path d="M17.304 3.541h-3.672l6.696 16.918H24Zm-10.608 0L0 20.459h3.744l1.37-3.553h7.005l1.369 3.553h3.744L10.536 3.541Zm-.371 10.223L8.616 7.82l2.291 5.945Z" />
+    </svg>
+  )
+}
+
+export function GeminiIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" fill="currentColor">
+      <path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68q.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58a12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68q-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96q2.19.93 3.81 2.55t2.55 3.81" />
+    </svg>
+  )
+}
+
 /** 模型 id → 品牌图标组件(无匹配返回 null,由调用方回退到通用图标) */
 export function brandIconForModel(id: string) {
-  if (/grok/i.test(id)) return GrokIcon
-  if (/gpt|dall|openai|o[134]/i.test(id)) return OpenaiIcon
+  if (/claude|anthropic/i.test(id)) return AnthropicIcon
+  if (/gemini|google/i.test(id)) return GeminiIcon
+  if (/grok|x-ai/i.test(id)) return GrokIcon
+  if (/gpt|dall|openai|codex|o[134]/i.test(id)) return OpenaiIcon
   return null
 }
