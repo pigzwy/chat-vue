@@ -123,37 +123,23 @@ export default function StudioPage() {
       onDrop={onDropImages}
       onPaste={onPasteImages}
     >
-      {state.studioView === 'stream' && state.queue.length > 0
-        ? (
-            <MediaStream
-              header={(
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight">创作台</h1>
-                    <p className="label-mono mt-1">{statsText}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ViewToggle view={state.studioView} />
-                    <TaskBatchToolbar />
-                  </div>
-                </div>
-              )}
-            />
-          )
-        : (
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-72 sm:px-6">
-              <div className="mx-auto w-full max-w-7xl">
-                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight">创作台</h1>
-                    <p className="label-mono mt-1">{statsText}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {state.queue.length > 0 && <ViewToggle view={state.studioView} />}
-                    <TaskBatchToolbar />
-                  </div>
-                </div>
+      {/* 固定工具条:不随内容滚动,滚到多深都能切视图/进批量 */}
+      <div className="z-10 flex flex-wrap items-center justify-between gap-2 px-4 pb-2 sm:px-6">
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+          <h1 className="text-lg font-bold tracking-tight">创作台</h1>
+          <p className="label-mono">{statsText}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {state.queue.length > 0 && <ViewToggle view={state.studioView} />}
+          <TaskBatchToolbar />
+        </div>
+      </div>
 
+      {state.studioView === 'stream' && state.queue.length > 0
+        ? <MediaStream />
+        : (
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-1 pb-72 sm:px-6">
+              <div className="mx-auto w-full max-w-7xl">
                 {state.queue.length
                   ? <MediaTaskGrid tasks={state.queue} />
                   : <StudioEmptyState isVideo={isVideo} />}
