@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useCallback, useState } from 'react'
 import { LogOut, Moon, Sun } from 'lucide-react'
+import { KeyManager } from '@/components/key-manager'
 import { logout } from '@/lib/models-store'
 
 const tabs = [
@@ -87,6 +88,7 @@ export function TopNav() {
       </nav>
 
       <div className="pointer-events-none fixed right-3 top-3 z-50 flex items-center gap-1.5 sm:right-4 sm:gap-2">
+        <KeyManager />
         <button
           type="button"
           aria-label="退出登录"

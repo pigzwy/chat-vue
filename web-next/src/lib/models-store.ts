@@ -1,6 +1,6 @@
 import { createStore } from './store'
 import { MODELS } from './shared/models'
-import { isMediaModelId } from './shared/media-models'
+import { defaultGrokMediaGroupId, defaultOpenaiMediaGroupId, isMediaModelId } from './shared/media-models'
 import type { ReasoningEffort } from './shared/reasoning'
 import { csrfHeaderName, getCsrfToken } from './csrf'
 
@@ -75,6 +75,9 @@ export interface ModelsState {
   authChecked: boolean
   /** sk 直连模式的手填 API Key(非空即处于该模式,跳过 JWT/分组体系) */
   manualKey: string
+  /** 可选分组密钥:image-2(分组25)与 Grok(分组66),未配则回落 manualKey */
+  manualImageKey: string
+  manualGrokKey: string
 }
 
 const TOKEN_KEY = 'sub2api-token'
@@ -87,6 +90,9 @@ const GROUPS_CACHE_KEY = 'sub2api-groups-cache'
 const MODELS_CACHE_KEY = 'sub2api-models-cache-v2'
 /** sk 直连模式:用户手填的 API Key(绕过 JWT 会话绑定;网关 sk 认证无指纹校验) */
 const MANUAL_KEY_KEY = 'sub2api-manual-key'
+/** 分组密钥(可选):image-2 与 Grok 各自的 key,创作台按模型自动路由 */
+const MANUAL_IMAGE_KEY_KEY = 'sub2api-manual-key-image'
+const MANUAL_GROK_KEY_KEY = 'sub2api-manual-key-grok'
 const defaultErrorMessage = '加载 Sub2API 失败'
 
 function readJson<T>(key: string, fallback: T): T {
@@ -208,7 +214,9 @@ export const modelsStore = createStore<ModelsState>({
   loading: false,
   error: '',
   authChecked: false,
-  manualKey: ''
+  manualKey: '',
+  manualImageKey: '',
+  manualGrokKey: ''
 })
 
 function patch(partial: Partial<ModelsState>) {
@@ -251,6 +259,8 @@ export async function initModels() {
 
   patch({
     token,
+    manualImageKey: readString(MANUAL_IMAGE_KEY_KEY),
+    manualGrokKey: readString(MANUAL_GROK_KEY_KEY),
     group: readJson<number | null>(GROUP_KEY, null),
     model: readString(MODEL_KEY, 'anthropic/claude-haiku-4.5'),
     reasoningEffort: readString(EFFORT_KEY, 'auto') as ReasoningEffort,
@@ -382,8 +392,8 @@ function getCachedApiKey(cache: Record<string, string | ApiKeyCacheItem>, groupI
 
 export async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
   const { token, manualKey } = modelsStore.get()
-  // sk 直连模式:所有分组统一用手填密钥(无 JWT 无法按分组自动建 key)
-  if (manualKey) return manualKey
+  // sk 直连模式:按分组路由到对应密钥(image/grok 未配则回落主密钥)
+  if (manualKey) return manualKeyForGroup(groupId)
   if (!token) throw new Error('缺少 Sub2API token')
 
   const cacheKey = String(groupId)
@@ -400,6 +410,61 @@ export async function getApiKeyForGroup(groupId: number, keyName = 'chat') {
   const key = activeKey?.key || await createApiKey(groupId, keyName)
   writeJson(API_KEYS_KEY, { ...cache, [cacheKey]: { token, key } })
   return key
+}
+
+function readMediaGroupId(key: string, fallback: number) {
+  const raw = readString(key)
+  const value = Number(raw)
+  return Number.isFinite(value) && value > 0 ? value : fallback
+}
+
+/** sk 模式:按分组路由到对应密钥(image-2→图片密钥,Grok→Grok 密钥,未配回落主密钥) */
+export function manualKeyForGroup(groupId: number) {
+  const { manualKey, manualImageKey, manualGrokKey } = modelsStore.get()
+  const grokGid = readMediaGroupId('sub2api-media-group-grok', defaultGrokMediaGroupId)
+  const openaiGid = readMediaGroupId('sub2api-media-group-openai', defaultOpenaiMediaGroupId)
+  if (groupId === grokGid) return manualGrokKey || manualKey
+  if (groupId === openaiGid) return manualImageKey || manualKey
+  return manualKey
+}
+
+/** 校验一把 sk(拉 /v1/models),返回模型列表;失败抛可读错误 */
+async function validateApiKey(key: string) {
+  const response = await fetch('/sub2api/v1/models', {
+    headers: { Authorization: `Bearer ${key}` }
+  })
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    let message = `密钥校验失败（${response.status}）`
+    try {
+      const parsed = JSON.parse(text)
+      message = parsed.error?.message || parsed.message || message
+    } catch { /* 保留默认 */ }
+    throw new Error(toErrorMessage(new Error(message)))
+  }
+  return getItems<ModelItem>(await response.json()).map(toModelSelectItem)
+}
+
+/** 保存分组密钥(空串=清除;非空校验后落盘)。返回是否有变更 */
+export async function setManualMediaKeys(keys: { image?: string, grok?: string }) {
+  const patchState: Partial<ModelsState> = {}
+  if (keys.image !== undefined) {
+    const key = keys.image.trim().replace(/^Bearer\s+/i, '')
+    if (key) await validateApiKey(key)
+    writeString(MANUAL_IMAGE_KEY_KEY, key)
+    patchState.manualImageKey = key
+  }
+  if (keys.grok !== undefined) {
+    const key = keys.grok.trim().replace(/^Bearer\s+/i, '')
+    if (key) await validateApiKey(key)
+    writeString(MANUAL_GROK_KEY_KEY, key)
+    patchState.manualGrokKey = key
+  }
+  if (Object.keys(patchState).length) {
+    // 分组密钥变了,按分组的模型缓存指纹随之失效(fingerprint=该组实际用的 key)
+    patch(patchState)
+  }
+  return Object.keys(patchState).length > 0
 }
 
 export function hasSub2apiToken() {
@@ -496,19 +561,21 @@ export async function login(rawToken: string) {
 export function logout() {
   writeString(TOKEN_KEY, '')
   writeString(MANUAL_KEY_KEY, '')
+  writeString(MANUAL_IMAGE_KEY_KEY, '')
+  writeString(MANUAL_GROK_KEY_KEY, '')
   writeJson(GROUPS_CACHE_KEY, null)
   writeJson(MODELS_CACHE_KEY, {})
   writeJson(API_KEYS_KEY, {})
   writeString(API_KEY_KEY, '')
   writeJson(GROUP_KEY, null)
-  patch({ token: '', manualKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
+  patch({ token: '', manualKey: '', manualImageKey: '', manualGrokKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
 }
 
 /** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用。
  *  sk 直连模式同样生效:凭证指纹用 manualKey,各分组返回的都是该 key 分组的真实列表 */
 export async function getModelsForGroup(groupId: number, keyName = 'chat'): Promise<ModelSelectItem[]> {
   const { token, manualKey } = modelsStore.get()
-  const credential = manualKey || token
+  const credential = manualKey ? manualKeyForGroup(groupId) : token
   if (!credential) return []
 
   const cacheKey = String(groupId)
