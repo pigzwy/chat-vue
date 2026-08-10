@@ -6,6 +6,7 @@ import { toast } from '@/lib/toast'
 import { requestConfirm } from '@/lib/confirm-store'
 import { clearApiKeyForGroup, getApiKeyForGroup } from '@/lib/models-store'
 import {
+  curatedMediaOptions,
   groupForModel,
   initMediaModels,
   mediaModelsStore,
@@ -711,6 +712,9 @@ export function onDropImages(event: React.DragEvent | DragEvent) {
 // ---------------------------------------------------------------------------
 
 function normalizeApiErrorMessage(message: string) {
+  if (/no eligible .* accounts/i.test(message)) {
+    return '当前密钥的分组没有能跑这个模型的账号——请在模型菜单换一个可用模型,或退出后用对应分组的 API Key 登录'
+  }
   return message.replace(/sub2api/gi, 'API')
 }
 
@@ -1212,6 +1216,16 @@ async function runVideoTask(apiKey: string, task: MediaTask, sourceImage?: File)
 export async function submitStudioTask() {
   const state = get()
   if (!state.prompt.trim()) return
+
+  // sk 直连的严格模式下,该类目可能确实一个可用模型都没有——提交前拦截
+  const models = mediaModelsStore.get()
+  if (models.strictAvailability && !curatedMediaOptions(models, models.mediaMode).length) {
+    toast({
+      description: `当前密钥的分组没有可用的${models.mediaMode === 'video' ? '视频' : '图片'}模型,请退出后用对应分组的 API Key 登录`,
+      color: 'warning'
+    })
+    return
+  }
 
   const uploadedSources = state.files.map(item => item.file)
   const uploadedIds = state.files.map(item => item.id)

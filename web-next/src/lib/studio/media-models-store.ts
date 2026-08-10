@@ -5,13 +5,15 @@ import {
   clearApiKeyForGroup,
   getApiKeyForGroup,
   getModelsForGroup,
-  hasSub2apiToken
+  hasSub2apiToken,
+  modelsStore
 } from '@/lib/models-store'
 import {
   defaultGrokMediaGroupId,
   defaultImageModelId,
   defaultOpenaiMediaGroupId,
   defaultVideoModelId,
+  isMediaModelId,
   mediaApiKeyName,
   mediaModelCatalog,
   resolveMediaModelSpec,
@@ -33,6 +35,12 @@ export interface MediaModelsState {
   grokGroupId: number
   imageModel: string
   videoModel: string
+  /**
+   * 严格可用性模式(sk 直连):单 key 单分组,可用列表是权威的——
+   * 目录过滤为空时不回退到全目录,而是从 key 的真实模型里推断选项;
+   * JWT 模式保持宽松(分组瞬时失败不能误判不可用)。
+   */
+  strictAvailability: boolean
   /**
    * 按 provider 分开记录可用模型 id。null = 未知（未登录或该分组拉取失败）。
    * 某个分组瞬时失败时不能把它的模型判为"不可用"——否则会静默改写用户
@@ -76,7 +84,8 @@ function initialState(): MediaModelsState {
     videoModel: readStored(VIDEO_MODEL_KEY, defaultVideoModelId),
     openaiAvailableIds: null,
     grokAvailableIds: null,
-    loadingModels: false
+    loadingModels: false,
+    strictAvailability: false
   }
 }
 
@@ -90,7 +99,8 @@ export const mediaModelsStore = createStore<MediaModelsState>(initialState(), {
     videoModel: defaultVideoModelId,
     openaiAvailableIds: null,
     grokAvailableIds: null,
-    loadingModels: false
+    loadingModels: false,
+    strictAvailability: false
   }
 })
 
@@ -135,7 +145,27 @@ export function curatedMediaOptions(state: MediaModelsState, kind: MediaKind): M
     const available = spec.provider === 'grok' ? state.grokAvailableIds : state.openaiAvailableIds
     return !available || available.has(spec.id)
   })
-  return (filtered.length ? filtered : specs).map(toOption)
+  if (filtered.length) return filtered.map(toOption)
+
+  if (state.strictAvailability) {
+    // sk 直连:目录全军覆没时,从 key 真实模型里捞该类目的媒体模型(推断能力),仍无则如实返回空
+    const availableIds = new Set([
+      ...(state.openaiAvailableIds || []),
+      ...(state.grokAvailableIds || [])
+    ])
+    const seen = new Set<string>()
+    return [...availableIds]
+      .filter(id => isMediaModelId(id))
+      .map(id => resolveMediaModelSpec(id))
+      .filter((spec) => {
+        if (spec.kind !== kind || seen.has(spec.id)) return false
+        seen.add(spec.id)
+        return true
+      })
+      .map(toOption)
+  }
+
+  return specs.map(toOption)
 }
 
 export function activeMediaModel(state: MediaModelsState) {
@@ -170,7 +200,8 @@ export async function refreshGroupModels() {
     return
   }
 
-  mediaModelsStore.set(prev => ({ ...prev, loadingModels: true }))
+  const strict = Boolean(modelsStore.get().manualKey)
+  mediaModelsStore.set(prev => ({ ...prev, loadingModels: true, strictAvailability: strict }))
   try {
     // 只拉两个默认媒体分组（会按需为各分组自动创建 key），不做全分组扫描
     const [openaiResult, grokResult] = await Promise.allSettled([

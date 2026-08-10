@@ -504,15 +504,17 @@ export function logout() {
   patch({ token: '', manualKey: '', group: null, groups: [], models: MODELS, apiKey: '', error: '' })
 }
 
-/** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用 */
+/** 拉取指定分组的模型列表（带缓存；会按需自动创建该分组的 key）——创作台用。
+ *  sk 直连模式同样生效:凭证指纹用 manualKey,各分组返回的都是该 key 分组的真实列表 */
 export async function getModelsForGroup(groupId: number, keyName = 'chat'): Promise<ModelSelectItem[]> {
-  const { token } = modelsStore.get()
-  if (!token) return []
+  const { token, manualKey } = modelsStore.get()
+  const credential = manualKey || token
+  if (!credential) return []
 
   const cacheKey = String(groupId)
   const cache = readJson<Record<string, ModelsCacheItem>>(MODELS_CACHE_KEY, {})
   const cached = cache[cacheKey]
-  if (cached?.token === token && cached.items.length) {
+  if (cached?.token === credential && cached.items.length) {
     return cached.items
   }
 
@@ -520,7 +522,7 @@ export async function getModelsForGroup(groupId: number, keyName = 'chat'): Prom
   const response = await sub2apiFetch<unknown>('/v1/models', groupApiKey)
   const items = getItems<ModelItem>(response).map(toModelSelectItem)
   if (items.length) {
-    writeJson(MODELS_CACHE_KEY, { ...cache, [cacheKey]: { token, items } })
+    writeJson(MODELS_CACHE_KEY, { ...cache, [cacheKey]: { token: credential, items } })
   }
   return items
 }
