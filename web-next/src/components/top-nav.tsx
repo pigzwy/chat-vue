@@ -52,7 +52,7 @@ function BrandMark() {
     <span className="relative size-7 shrink-0" title={connectionDetail} onClick={onNoseClick}>
       <Image
         src="/logo-mark.jpg"
-        alt="pigcoder"
+        alt="pigcode"
         width={28}
         height={28}
         className="size-7 rounded-full object-cover"
@@ -142,7 +142,7 @@ export function TopNav() {
           className="glass-chip pointer-events-auto inline-flex items-center gap-2 p-1.5 transition-transform hover:-translate-y-0.5 sm:pr-3"
         >
           <BrandMark />
-          <span className="hidden text-sm font-bold tracking-tight sm:inline">pigcoder</span>
+          <span className="hidden text-sm font-bold tracking-tight sm:inline">pigcode</span>
         </Link>
       </div>
 

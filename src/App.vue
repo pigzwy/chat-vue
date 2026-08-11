@@ -8,9 +8,9 @@ const route = useRoute()
 const colorMode = useColorMode()
 const themeColor = computed(() => colorMode.value === 'dark' ? '#0b0c11' : '#f3f4f7')
 const title = computed(() => {
-  if (route.path.startsWith('/studio') || route.path.startsWith('/images')) return '创作台 - PIG Coder'
-  if (route.path.startsWith('/gallery')) return '灵感 - PIG Coder'
-  return '对话 - PIG Coder'
+  if (route.path.startsWith('/studio') || route.path.startsWith('/images')) return '创作台 - PIG Code'
+  if (route.path.startsWith('/gallery')) return '灵感 - PIG Code'
+  return '对话 - PIG Code'
 })
 
 useHead({

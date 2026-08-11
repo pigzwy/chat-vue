@@ -200,7 +200,7 @@ async function sub2apiFetch<T>(path: string, token: string): Promise<T> {
 function humanizeGatewayMessage(message: string) {
   if (message === 'Token has expired') return 'Token失效 请从主网站重新登录'
   if (/network fingerprint changed/i.test(message)) {
-    return '登录环境与 Token 不匹配,该会话已被网关注销。请到 sub2.pigcoder.com 重新登录,并在同一浏览器里粘贴新 Token'
+    return '登录环境与 Token 不匹配,该会话已被网关注销。请到 sub2.pigcode.com 重新登录,并在同一浏览器里粘贴新 Token'
   }
   return message
 }
@@ -638,7 +638,7 @@ export async function checkConnection() {
   }
 }
 
-/** 校验 sub2.pigcoder.com 会话 JWT：能拉到分组即视为有效 */
+/** 校验 sub2.pigcode.com 会话 JWT：能拉到分组即视为有效 */
 async function validateToken(token: string) {
   const response = await fetch('/sub2api/api/v1/groups/available', {
     headers: { Authorization: `Bearer ${token}` }
@@ -706,7 +706,7 @@ export async function loginWithApiKey(rawKey: string) {
 /** 登录：校验 JWT 有效后写入 token 并加载分组/模型；失败抛出可读错误，不落盘 */
 export async function login(rawToken: string) {
   const token = rawToken.trim().replace(/^Bearer\s+/i, '')
-  if (!token) throw new Error('请输入 sub2.pigcoder.com 的登录 Token')
+  if (!token) throw new Error('请输入 sub2.pigcode.com 的登录 Token')
 
   const result = await validateToken(token)
   if (!result.ok) throw new Error(result.message)

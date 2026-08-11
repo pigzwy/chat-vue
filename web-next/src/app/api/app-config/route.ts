@@ -18,7 +18,7 @@ export function GET() {
     },
     // 网关站点根:登录页的注册/忘记密码、余额胶囊的充值/明细都跳它
     gatewayOrigin: process.env.GATEWAY_ORIGIN || undefined,
-    // 网关免登录接力入口(可选,如 https://sub2.pigcoder.com/connect/studio)
+    // 网关免登录接力入口(可选,如 https://sub2.pigcode.com/connect/studio)
     ssoEntry: process.env.SSO_CONNECT_URL || undefined
   })
 }

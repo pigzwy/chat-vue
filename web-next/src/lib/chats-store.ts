@@ -1,7 +1,9 @@
 import type { UIMessage } from 'ai'
 import { createStore } from './store'
 
-const localChatsStorageKey = 'pigcoder-local-chats'
+const localChatsStorageKey = 'pigcode-local-chats'
+/** 品牌改名前的旧键(pigcoder 时代),读到即一次性迁移,老用户会话不丢 */
+const legacyChatsStorageKey = 'pigcoder-local-chats'
 
 export interface LocalVote {
   chatId: string
@@ -51,7 +53,11 @@ function readStoredChats(): LocalChatData[] {
   if (typeof window === 'undefined') return []
 
   try {
-    const raw = window.localStorage.getItem(localChatsStorageKey)
+    let raw = window.localStorage.getItem(localChatsStorageKey)
+    if (!raw) {
+      raw = window.localStorage.getItem(legacyChatsStorageKey)
+      if (raw) window.localStorage.setItem(localChatsStorageKey, raw)
+    }
     if (!raw) return []
 
     const parsed = JSON.parse(raw) as Partial<LocalChatData>[]

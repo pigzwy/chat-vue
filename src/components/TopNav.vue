@@ -22,10 +22,10 @@ const tabs = computed(() => [
     >
       <img
         src="/logo-mark.jpg"
-        alt="pigcoder"
+        alt="pigcode"
         class="size-7 shrink-0 rounded-full object-cover ring-2 ring-white/70 dark:ring-white/10"
       >
-      <span class="hidden text-sm font-bold tracking-tight text-highlighted sm:inline">pigcoder</span>
+      <span class="hidden text-sm font-bold tracking-tight text-highlighted sm:inline">pigcode</span>
     </ULink>
   </div>
 

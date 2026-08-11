@@ -64,7 +64,7 @@ interface PublicSettings {
   turnstile_site_key?: string
 }
 
-/** 登录页:Pigcoder 账号密码登录(经网关公开 auth API);手动贴凭证仅调试通道 */
+/** 登录页:Pigcode 账号密码登录(经网关公开 auth API);手动贴凭证仅调试通道 */
 export function LoginScreen({ initialError }: { initialError?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -118,7 +118,7 @@ export function LoginScreen({ initialError }: { initialError?: string }) {
         </div>
         <h1 className="text-center text-2xl font-bold tracking-tight">进入创作台</h1>
         <p className="mx-auto mt-2 max-w-xs text-center text-sm leading-6 opacity-60">
-          使用 Pigcoder 账号登录,余额与用量自动同步。
+          使用 Pigcode 账号登录,余额与用量自动同步。
         </p>
 
         {cfg === null || settings === null
@@ -185,7 +185,7 @@ export function LoginScreen({ initialError }: { initialError?: string }) {
             )}
 
         <p className="mt-4 text-center text-xs leading-5 opacity-45">
-          凭证只保存在本浏览器,所有用量计入你的 Pigcoder 账户。
+          凭证只保存在本浏览器,所有用量计入你的 Pigcode 账户。
         </p>
       </div>
     </div>
