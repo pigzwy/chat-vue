@@ -79,9 +79,9 @@ Studio 登录页直接用 **Pigcode 账号密码**登录:经 `/sub2api` 代理�
 auth API(`/auth/login`),拿 access+refresh token 后**自动静默续签**(过期前
 2 分钟换新;心跳遇 401 也会先试续签),等于登录一次永久在线。
 
-1. `.env` 配 `GATEWAY_ORIGIN=https://sub2.pigcode.com` 后 `docker compose up -d`
+1. `.env` 配 `GATEWAY_ORIGIN=https://sub2.pigcode.ai` 后 `docker compose up -d`
 2. 网关开了 Turnstile 时,到 Cloudflare Turnstile 控制台把 Studio 域名
-   (如 chat.pigcode.com)加进该 widget 的域名白名单,否则登录页人机验证
+   (如 chat.pigcode.ai)加进该 widget 的域名白名单,否则登录页人机验证
    加载失败无法提交
 3. 注册/忘记密码链接、顶栏余额胶囊(60s 心跳刷新)的充值/明细都跳网关
 
