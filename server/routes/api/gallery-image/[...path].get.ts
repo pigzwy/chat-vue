@@ -1,26 +1,32 @@
 import { defineHandler, HTTPError } from 'nitro'
 import { getRouterParam } from 'nitro/h3'
 
-const galleryRepo = 'jamez-bondos/awesome-gpt4o-images'
-const galleryBranch = 'main'
-const rawBase = `https://raw.githubusercontent.com/${galleryRepo}/${galleryBranch}`
-const cdnBase = `https://cdn.jsdelivr.net/gh/${galleryRepo}@${galleryBranch}`
-// 只允许 cases/<dir>/<file>.<图片扩展名>，杜绝开放代理
-const allowedPathPattern = /^cases\/[\w.-]+\/[\w.-]+\.(?:png|jpe?g|webp|gif)$/i
+// 双上游:cases/* → jamez-bondos 库;images/* → EvoLinkAI 历史库(原仓库已删,mageia 镜像存续)
+const sources = [
+  {
+    pattern: /^cases\/[\w.-]+\/[\w.-]+\.(?:png|jpe?g|webp|gif)$/i,
+    repo: 'jamez-bondos/awesome-gpt4o-images'
+  },
+  {
+    pattern: /^images\/[\w.-]+\/[\w.-]+\.(?:png|jpe?g|webp|gif)$/i,
+    repo: 'mageia/awesome-gpt-image-2-API-and-Prompts'
+  }
+] as const
 
 /**
  * 灵感墙图片代理：GitHub raw / jsDelivr 直链在部分网络不可达且直链可能失效，
- * 统一经本站转发并带长缓存。
+ * 统一经本站转发并带长缓存。路径白名单杜绝开放代理。
  */
 export default defineHandler(async (event) => {
   const path = getRouterParam(event, 'path') || ''
-  if (!allowedPathPattern.test(path) || path.includes('..')) {
+  const source = path.includes('..') ? undefined : sources.find(item => item.pattern.test(path))
+  if (!source) {
     throw new HTTPError({ statusCode: 404, statusMessage: 'Not Found' })
   }
 
-  let upstream = await fetch(`${rawBase}/${path}`).catch(() => null)
+  let upstream = await fetch(`https://raw.githubusercontent.com/${source.repo}/main/${path}`).catch(() => null)
   if (!upstream?.ok) {
-    upstream = await fetch(`${cdnBase}/${path}`).catch(() => null)
+    upstream = await fetch(`https://cdn.jsdelivr.net/gh/${source.repo}@main/${path}`).catch(() => null)
   }
   if (!upstream?.ok) {
     throw new HTTPError({ statusCode: 404, statusMessage: 'Image not found' })
