@@ -17,7 +17,11 @@ const notoSansSC = Noto_Sans_SC({
 })
 
 export const metadata: Metadata = {
-  title: '对话 - PIG Coder',
+  // 各分区(创作台/语音/灵感墙)经各自 layout 的 title 套进模板
+  title: {
+    default: '对话 · PIG Coder',
+    template: '%s · PIG Coder'
+  },
   description: 'PIG Coder：AI 对话与图片、视频创作工作台。'
 }
 
