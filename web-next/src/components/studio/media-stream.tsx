@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ChatConversation } from '@heroui-pro/react/chat-conversation'
 import { ChatMessage as ProChatMessage } from '@heroui-pro/react/chat-message'
 import { CircleAlert, Clapperboard, Copy, Download, Pencil, Quote, RotateCw, TimerOff, Trash2, WandSparkles } from 'lucide-react'
-import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
+import { GeminiIcon, GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import { StreamMinimap } from '@/components/studio/stream-minimap'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
 import { useCachedVideoUrl } from '@/lib/studio/video-cache'
@@ -64,6 +64,7 @@ function TurnActions({ task, selected }: { task: MediaTask, selected: boolean })
 /** 模型品牌图标(静态条件渲染,规避 static-components 规则) */
 function ModelBrandIcon({ model, className }: { model: string, className?: string }) {
   if (/grok/i.test(model)) return <GrokIcon className={className} />
+  if (/gemini|banana/i.test(model)) return <GeminiIcon className={className} />
   if (/gpt|dall|openai/i.test(model)) return <OpenaiIcon className={className} />
   return <WandSparkles className={className} />
 }

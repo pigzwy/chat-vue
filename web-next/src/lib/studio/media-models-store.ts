@@ -25,7 +25,7 @@ import {
 export interface MediaModelOption {
   label: string
   value: string
-  provider: 'openai' | 'grok'
+  provider: 'openai' | 'grok' | 'google'
   description?: string
   price?: string
 }
@@ -34,6 +34,8 @@ export interface MediaModelsState {
   mediaMode: MediaKind
   openaiGroupId: number
   grokGroupId: number
+  /** Nano Banana(google)分组;0=未配置,google 系模型不出现 */
+  nanobananaGroupId: number
   imageModel: string
   videoModel: string
   /**
@@ -49,6 +51,7 @@ export interface MediaModelsState {
    */
   openaiAvailableIds: Set<string> | null
   grokAvailableIds: Set<string> | null
+  googleAvailableIds: Set<string> | null
   loadingModels: boolean
 }
 
@@ -81,10 +84,12 @@ function initialState(): MediaModelsState {
     mediaMode: mode === 'video' ? 'video' : 'image',
     openaiGroupId: Number(readStored(OPENAI_GROUP_KEY, String(defaultOpenaiMediaGroupId))) || defaultOpenaiMediaGroupId,
     grokGroupId: Number(readStored(GROK_GROUP_KEY, String(defaultGrokMediaGroupId))) || defaultGrokMediaGroupId,
+    nanobananaGroupId: 0,
     imageModel: readStored(IMAGE_MODEL_KEY, defaultImageModelId),
     videoModel: readStored(VIDEO_MODEL_KEY, defaultVideoModelId),
     openaiAvailableIds: null,
     grokAvailableIds: null,
+    googleAvailableIds: null,
     loadingModels: false,
     strictAvailability: false
   }
@@ -96,10 +101,12 @@ export const mediaModelsStore = createStore<MediaModelsState>(initialState(), {
     mediaMode: 'image',
     openaiGroupId: defaultOpenaiMediaGroupId,
     grokGroupId: defaultGrokMediaGroupId,
+    nanobananaGroupId: 0,
     imageModel: defaultImageModelId,
     videoModel: defaultVideoModelId,
     openaiAvailableIds: null,
     grokAvailableIds: null,
+    googleAvailableIds: null,
     loadingModels: false,
     strictAvailability: false
   }
@@ -141,13 +148,22 @@ export function groupForModel(modelId: string) {
   const state = mediaModelsStore.get()
   const spec = resolveMediaModelSpec(modelId)
   if (spec.provider === 'grok') return state.grokGroupId
+  if (spec.provider === 'google') return state.nanobananaGroupId || resolveMediaGroupId('nanobanana')
   return spec.defaultGroupId ?? state.openaiGroupId
 }
 
+function availableIdsForProvider(state: MediaModelsState, provider: MediaModelSpec['provider']) {
+  if (provider === 'grok') return state.grokAvailableIds
+  if (provider === 'google') return state.googleAvailableIds
+  return state.openaiAvailableIds
+}
+
 export function curatedMediaOptions(state: MediaModelsState, kind: MediaKind): MediaModelOption[] {
-  const specs = mediaModelCatalog.filter(spec => spec.kind === kind)
+  // google 系依赖 MEDIA_GROUP_NANOBANANA 配置,未配不出现
+  const specs = mediaModelCatalog.filter(spec => spec.kind === kind
+    && (spec.provider !== 'google' || state.nanobananaGroupId > 0))
   const filtered = specs.filter((spec) => {
-    const available = spec.provider === 'grok' ? state.grokAvailableIds : state.openaiAvailableIds
+    const available = availableIdsForProvider(state, spec.provider)
     return !available || available.has(spec.id)
   })
   if (filtered.length) return filtered.map(toOption)
@@ -156,7 +172,8 @@ export function curatedMediaOptions(state: MediaModelsState, kind: MediaKind): M
     // sk 直连:目录全军覆没时,从 key 真实模型里捞该类目的媒体模型(推断能力),仍无则如实返回空
     const availableIds = new Set([
       ...(state.openaiAvailableIds || []),
-      ...(state.grokAvailableIds || [])
+      ...(state.grokAvailableIds || []),
+      ...(state.googleAvailableIds || [])
     ])
     const seen = new Set<string>()
     return [...availableIds]
@@ -208,14 +225,16 @@ export async function refreshGroupModels() {
   await loadAppConfig()
   const openaiGroupId = resolveMediaGroupId('openai')
   const grokGroupId = resolveMediaGroupId('grok')
+  const nanobananaGroupId = resolveMediaGroupId('nanobanana')
 
   const strict = Boolean(modelsStore.get().manualKey)
-  mediaModelsStore.set(prev => ({ ...prev, openaiGroupId, grokGroupId, loadingModels: true, strictAvailability: strict }))
+  mediaModelsStore.set(prev => ({ ...prev, openaiGroupId, grokGroupId, nanobananaGroupId, loadingModels: true, strictAvailability: strict }))
   try {
-    // 只拉两个默认媒体分组（会按需为各分组自动创建 key），不做全分组扫描
-    const [openaiResult, grokResult] = await Promise.allSettled([
+    // 只拉配置了的媒体分组（会按需为各分组自动创建 key），不做全分组扫描
+    const [openaiResult, grokResult, googleResult] = await Promise.allSettled([
       getModelsForGroup(openaiGroupId, mediaApiKeyName),
-      getModelsForGroup(grokGroupId, mediaApiKeyName)
+      getModelsForGroup(grokGroupId, mediaApiKeyName),
+      nanobananaGroupId ? getModelsForGroup(nanobananaGroupId, mediaApiKeyName) : Promise.resolve([])
     ])
     mediaModelsStore.set(prev => ({
       ...prev,
@@ -224,6 +243,9 @@ export async function refreshGroupModels() {
         : null,
       grokAvailableIds: grokResult.status === 'fulfilled' && grokResult.value.length
         ? new Set(grokResult.value.map(item => item.value))
+        : null,
+      googleAvailableIds: googleResult.status === 'fulfilled' && googleResult.value.length
+        ? new Set(googleResult.value.map(item => item.value))
         : null
     }))
     correctSelections()

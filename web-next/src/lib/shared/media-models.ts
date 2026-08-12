@@ -13,7 +13,7 @@ export interface MediaModelSpec {
   /** 模型选择器里的一句话说明 */
   description?: string
   kind: MediaKind
-  provider: 'openai' | 'grok'
+  provider: 'openai' | 'grok' | 'google'
   /** 支持 multipart 图片编辑（/images/edits） */
   supportsEdit?: boolean
   /** 支持 size/quality 参数与尺寸提示注入（gpt-image 系） */
@@ -47,7 +47,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'gpt-image-2',
     label: 'GPT Image 2',
-    description: '细节丰富，支持编辑与多参考图（4K 为尽力输出）',
+    description: '细节丰富，支持编辑与多参考图，4K 为尽力输出（gpt-image-2）',
     kind: 'image',
     provider: 'openai',
     supportsEdit: true,
@@ -57,9 +57,27 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     defaultGroupId: defaultOpenaiMediaGroupId
   },
   {
+    id: 'gemini-3.1-flash-image',
+    label: 'Nano Banana · 快速',
+    description: '谷歌 Gemini 文生图，出图快（gemini-3.1-flash-image）',
+    kind: 'image',
+    provider: 'google',
+    supportedAspectRatios: [],
+    costPerImage: 0.2
+  },
+  {
+    id: 'gemini-3-pro-image',
+    label: 'Nano Banana · Pro',
+    description: '谷歌 Gemini 高质量文生图（gemini-3-pro-image）',
+    kind: 'image',
+    provider: 'google',
+    supportedAspectRatios: [],
+    costPerImage: 0.2
+  },
+  {
     id: 'grok-imagine-image',
     label: 'Grok 画图 · 快速',
-    description: '出图快，支持以图生图（参考图最多 3 张）',
+    description: '出图快，支持以图生图，参考图最多 3 张（grok-imagine-image）',
     kind: 'image',
     provider: 'grok',
     supportsEdit: true,
@@ -70,7 +88,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'grok-imagine-image-quality',
     label: 'Grok 画图 · 高清',
-    description: '更高质量输出，支持以图生图',
+    description: '更高质量输出，支持以图生图（grok-imagine-image-quality）',
     kind: 'image',
     provider: 'grok',
     supportsEdit: true,
@@ -81,7 +99,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'grok-imagine-video',
     label: 'Grok 视频 · 标准',
-    description: '文生视频 / 图生视频，最长 15 秒',
+    description: '文生视频 / 图生视频，最长 15 秒（grok-imagine-video）',
     kind: 'video',
     provider: 'grok',
     supportsSourceImage: true,
@@ -93,7 +111,7 @@ export const mediaModelCatalog: MediaModelSpec[] = [
   {
     id: 'grok-imagine-video-1.5',
     label: 'Grok 视频 · 1.5',
-    description: '新版模型画质更好；纯文生视频会自动用标准版',
+    description: '新版画质更好；纯文生视频自动用标准版（grok-imagine-video-1.5）',
     kind: 'video',
     provider: 'grok',
     supportsSourceImage: true,
@@ -120,6 +138,9 @@ export function resolveMediaModelSpec(id: string): MediaModelSpec {
   if (/^gpt-image/.test(id)) {
     return { id, label: id, kind: 'image', provider: 'openai', supportsEdit: true, supportsSizeQuality: true, supportsStream: true, defaultGroupId: defaultOpenaiMediaGroupId }
   }
+  if (/^gemini-[\w.-]*image/.test(id)) {
+    return { id, label: id, kind: 'image', provider: 'google', supportedAspectRatios: [], costPerImage: 0.2 }
+  }
   if (isVideoMediaModelId(id)) {
     return { id, label: id, kind: 'video', provider: 'grok', supportsSourceImage: true, maxDurationSeconds: 15, costPerSecondByResolution: { '480p': 0.05, '720p': 0.05 }, defaultGroupId: defaultGrokMediaGroupId }
   }
@@ -130,7 +151,7 @@ export function resolveMediaModelSpec(id: string): MediaModelSpec {
 }
 
 export function isImageMediaModelId(id: string) {
-  return /^(gpt-image|grok-2-image|grok-imagine-image)/.test(id) || id === 'grok-imagine'
+  return /^(gpt-image|grok-2-image|grok-imagine-image)/.test(id) || /^gemini-[\w.-]*image/.test(id) || id === 'grok-imagine'
 }
 
 export function isVideoMediaModelId(id: string) {

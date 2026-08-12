@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Popover } from '@heroui/react'
 import { Check, ChevronUp, LoaderCircle } from 'lucide-react'
-import { GrokIcon, OpenaiIcon } from '@/components/brand-icons'
+import { GeminiIcon, GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import {
   activeMediaModel,
   curatedMediaOptions,
@@ -12,9 +12,10 @@ import {
 } from '@/lib/studio/media-models-store'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
 
-const providerIcons: Record<'openai' | 'grok', typeof OpenaiIcon> = {
+const providerIcons: Record<'openai' | 'grok' | 'google', typeof OpenaiIcon> = {
   openai: OpenaiIcon,
-  grok: GrokIcon
+  grok: GrokIcon,
+  google: GeminiIcon
 }
 
 /** 创作台模型菜单（含价格 / 说明，向上弹出）；className 供左轨形态拉伸触发器 */
