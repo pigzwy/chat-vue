@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { createClient, type Client } from '@libsql/client'
+import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 
 /**
  * 账号级生成历史(服务端,SQLite/.data 卷持久化):
@@ -10,8 +12,9 @@ import { createClient, type Client } from '@libsql/client'
  * 查询时客户端提交它手上的全部 key,服务端逐把哈希后取并集——
  * "持有 key 即可见对应历史",key 明文不落库。局限:换 key 后旧历史不可见。
  *
- * 建表:首次使用时 CREATE TABLE IF NOT EXISTS(不走 drizzle-kit 迁移,
- * standalone 镜像无需携带迁移目录)。
+ * 存储引擎用 Node 内置 node:sqlite(22.13+ 免 flag):零外部依赖、无原生
+ * 绑定,规避 @libsql/client 在 Alpine(musl)镜像上缺 native 包的打包坑;
+ * 建表走首次使用时 CREATE TABLE IF NOT EXISTS,无迁移目录需要随镜像分发。
  */
 
 export interface MediaHistoryEntry {
@@ -37,24 +40,14 @@ export function hashApiKey(apiKey: string) {
   return createHash('sha256').update(apiKey).digest('hex').slice(0, 32)
 }
 
-let _client: Client | null = null
+let _db: DatabaseSync | null = null
 
-// 与 server/utils/drizzle.ts 同源同库(file:.data/sqlite.db);自持客户端以保持
-// 本模块自包含(可被 node --experimental-strip-types 直接单测)
-function useHistoryClient() {
-  _client ??= createClient({
-    url: process.env.TURSO_DATABASE_URL || 'file:.data/sqlite.db',
-    authToken: process.env.TURSO_AUTH_TOKEN
-  })
-  return _client
-}
-
-let ensured: Promise<void> | null = null
-
-function ensureTable() {
-  ensured ??= (async () => {
-    const client = useHistoryClient()
-    await client.execute(`CREATE TABLE IF NOT EXISTS media_history (
+function useHistoryDb() {
+  if (!_db) {
+    const path = process.env.MEDIA_HISTORY_DB || '.data/media-history.db'
+    mkdirSync(dirname(path), { recursive: true })
+    _db = new DatabaseSync(path)
+    _db.exec(`CREATE TABLE IF NOT EXISTS media_history (
       id TEXT PRIMARY KEY,
       key_hash TEXT NOT NULL,
       kind TEXT NOT NULL,
@@ -65,11 +58,9 @@ function ensureTable() {
       cost_usd REAL,
       created_at INTEGER NOT NULL
     )`)
-    await client.execute(
-      'CREATE INDEX IF NOT EXISTS idx_media_history_key_created ON media_history (key_hash, created_at)'
-    )
-  })()
-  return ensured
+    _db.exec('CREATE INDEX IF NOT EXISTS idx_media_history_key_created ON media_history (key_hash, created_at)')
+  }
+  return _db
 }
 
 export interface RecordMediaHistoryInput {
@@ -85,12 +76,11 @@ export interface RecordMediaHistoryInput {
 /** 写入一条历史(尽力而为:失败仅记日志,绝不影响生成任务本身) */
 export async function recordMediaHistory(input: RecordMediaHistoryInput) {
   try {
-    await ensureTable()
     const now = input.completedAtMs ?? Date.now()
-    await useHistoryClient().execute({
-      sql: `INSERT INTO media_history (id, key_hash, kind, model, prompt, image_url, expires_at, cost_usd, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
+    useHistoryDb()
+      .prepare(`INSERT INTO media_history (id, key_hash, kind, model, prompt, image_url, expires_at, cost_usd, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(
         randomUUID(),
         hashApiKey(input.apiKey),
         input.kind,
@@ -100,8 +90,7 @@ export async function recordMediaHistory(input: RecordMediaHistoryInput) {
         now + mediaUrlTtlMs(),
         input.costUsd ?? null,
         now
-      ]
-    })
+      )
   } catch (error) {
     console.error('[media-history] record failed', error instanceof Error ? error.message : error)
   }
@@ -119,7 +108,6 @@ export async function queryMediaHistory(options: QueryMediaHistoryOptions): Prom
   if (!hashes.length) return []
   const limit = Math.min(Math.max(options.limit ?? 60, 1), 200)
 
-  await ensureTable()
   const placeholders = hashes.map(() => '?').join(',')
   const args: Array<string | number> = [...hashes]
   let where = `key_hash IN (${placeholders})`
@@ -129,13 +117,12 @@ export async function queryMediaHistory(options: QueryMediaHistoryOptions): Prom
   }
   args.push(limit)
 
-  const result = await useHistoryClient().execute({
-    sql: `SELECT id, key_hash, kind, model, prompt, image_url, expires_at, cost_usd, created_at
-          FROM media_history WHERE ${where} ORDER BY created_at DESC LIMIT ?`,
-    args
-  })
+  const rows = useHistoryDb()
+    .prepare(`SELECT id, key_hash, kind, model, prompt, image_url, expires_at, cost_usd, created_at
+              FROM media_history WHERE ${where} ORDER BY created_at DESC LIMIT ?`)
+    .all(...args) as Array<Record<string, unknown>>
 
-  return result.rows.map(row => ({
+  return rows.map(row => ({
     id: String(row.id),
     keyHash: String(row.key_hash),
     kind: (row.kind === 'video' ? 'video' : 'image'),

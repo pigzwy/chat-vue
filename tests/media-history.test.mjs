@@ -4,7 +4,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { rmSync } from 'node:fs'
 
-process.env.TURSO_DATABASE_URL = 'file:/tmp/media-history-test.db'
+process.env.MEDIA_HISTORY_DB = '/tmp/media-history-test.db'
 process.env.MEDIA_URL_TTL_HOURS = '168'
 rmSync('/tmp/media-history-test.db', { force: true })
 
