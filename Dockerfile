@@ -23,6 +23,10 @@ RUN addgroup -S app && adduser -S app -G app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 COPY --from=build --chown=app:app /app/.output ./.output
+# 预建数据目录并交给运行用户:named volume 首挂载会继承镜像内属主,
+# 否则 dockerd 以 root 建空目录,app 用户写不进(错误日志/历史库都会静默失败)。
+# 存量卷需一次性 docker exec -u root <容器> chown -R app:app /app/.data
+RUN mkdir -p /app/.data && chown app:app /app/.data
 
 USER app
 EXPOSE 3009

@@ -87,6 +87,13 @@ auth API(`/auth/login`),拿 access+refresh token 后**自动静默续签**(过�
 `SSO_CONNECT_URL`,登录页会多一个「已在网关登录?一键进入」。
 调试机用 `ALLOW_KEY_LOGIN=1` 打开手动贴凭证通道(sk/JWT)。
 
+## 启用异步生图 + 云端历史
+
+1. `.env` 加 `SUB2API_ASYNC_IMAGES=1`(前提:网关侧 S3 上传正常)
+2. **存量部署一次性执行**(数据卷属主修复,新装无需):
+   `docker exec -u root chat-vue chown -R app:app /app/.data`
+3. `docker compose pull && docker compose up -d`
+
 ## 回滚
 
 把 compose 里两个 image 换成 Docker Hub 上的历史 `sha-xxxxxxx` 标签再
