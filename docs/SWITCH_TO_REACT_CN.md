@@ -24,7 +24,6 @@ SUB2API_BASE_URL=http://<网关容器名>:8080   # 或保持你现有的地址�
 MEDIA_GROUP_OPENAI=25        # GPT Image 2 分组
 MEDIA_GROUP_GROK=66          # Grok 画图/视频分组
 MEDIA_GROUP_NANOBANANA=      # Nano Banana 分组 id(生成管线待接,先占位)
-LEGACY_PORT=3010             # Vue 界面的本机回滚口(新增)
 # APP_PORT 保持原值(反向代理指向它)
 ```
 
@@ -32,7 +31,6 @@ LEGACY_PORT=3010             # Vue 界面的本机回滚口(新增)
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/pigzwy/chat-vue/main/docker-compose.yml
-curl -fsSLO https://raw.githubusercontent.com/pigzwy/chat-vue/main/docker-compose.legacy.yml
 docker compose pull && docker compose up -d
 ```
 
@@ -91,11 +89,8 @@ auth API(`/auth/login`),拿 access+refresh token 后**自动静默续签**(过�
 
 ## 回滚
 
-```bash
-docker compose down && docker compose -f docker-compose.legacy.yml up -d
-```
-
-或把反向代理临时指回 `127.0.0.1:3010`。回滚编排同样声明了 app-shared,不会断网关。
+把 compose 里两个 image 换成 Docker Hub 上的历史 `sha-xxxxxxx` 标签再
+`docker compose up -d`(后端已不再暴露宿主端口,Vue 界面随旧镜像退役)。
 
 ## 数据说明
 

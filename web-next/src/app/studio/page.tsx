@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { Clapperboard, ImagePlus, LayoutGrid, Rows3, WandSparkles } from 'lucide-react'
 import { PresetRow } from '@/components/chat/preset-row'
+import { CloudHistoryPanel } from '@/components/studio/cloud-history-panel'
 import { ComposerBar } from '@/components/studio/composer-bar'
 import { appendPresetPrompt } from '@/components/studio/composer-parts'
 import { ConfirmDialog } from '@/components/studio/confirm-dialog'
@@ -130,6 +131,7 @@ export default function StudioPage() {
           <p className="label-mono">{statsText}</p>
         </div>
         <div className="flex items-center gap-2">
+          <CloudHistoryPanel />
           {state.queue.length > 0 && <ViewToggle view={state.studioView} />}
           <TaskBatchToolbar />
         </div>

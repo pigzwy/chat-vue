@@ -1,11 +1,19 @@
-import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { sub2apiBaseURL } from './sub2api'
+import { sub2apiBaseURL, sub2apiRootURL } from './sub2api'
 import { withImageRequestTimeout } from './imageUpstreamRequest'
+import { downloadImageAsBase64 } from './safeImageDownload'
+import {
+  AsyncImageUnsupportedError,
+  asyncImageMaxWaitMs,
+  pollAsyncImageResult,
+  resolveAsyncPollUrl,
+  submitAsyncImageGeneration
+} from './imageAsyncUpstream'
 import { buildImagePrompt, type ImageQuality, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
 import { defaultImageModelId, resolveMediaModelSpec } from '../../shared/utils/mediaModels'
 import { createJobStore, getElapsedMs, parseJson, toSafeError } from './mediaJobStore'
 import { recordMediaError } from './mediaErrorLog'
+import { recordMediaHistory } from './mediaHistory'
 import type { RequestError } from '../../shared/utils/errors'
 
 type ImageJobStatus = 'queued' | 'running' | 'completed' | 'error'
@@ -69,8 +77,10 @@ export interface ImageJob extends ImageJobInput {
   data?: GeneratedImage[]
   /** 上游返回的本次实际扣费（美元） */
   costUsd?: number
-  mode?: 'stream' | 'sync'
+  mode?: 'stream' | 'sync' | 'async'
   streamAttempts?: number
+  /** 异步模式:网关任务 id(排障用;进程内存存储,重启即失,同 mediaJobStore 取舍) */
+  upstreamTaskId?: string
 }
 
 const maxJobAgeMs = 1000 * 60 * 60
@@ -420,7 +430,98 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
   } satisfies ImageGenerationResponse
 }
 
+// ==================== 异步生图(网关 /images/generations/async) ====================
+// feature flag:SUB2API_ASYNC_IMAGES=1 开启;开启后仍带能力探测——提交遇 404/405
+// 记忆性降级(10 分钟内不再尝试),回落到原同步/流式路径,兼容未升级的网关。
+const asyncUnsupportedTtlMs = 10 * 60 * 1000
+let asyncUnsupportedUntil = 0
+
+export function isAsyncImagesEnabled() {
+  const flag = (process.env.SUB2API_ASYNC_IMAGES || '').toLowerCase()
+  return flag === '1' || flag === 'true'
+}
+
+export function isAsyncImageEligible(kind: ImageJobKind) {
+  // 契约只覆盖 generations;edits 维持原路径
+  return kind === 'generation' && isAsyncImagesEnabled() && Date.now() >= asyncUnsupportedUntil
+}
+
+async function callImageGenerationAsync(job: ImageJob, signal: AbortSignal) {
+  const startedAt = performance.now()
+  job.mode = 'async'
+  job.streamAttempts = 0
+
+  const aspectRatio = jobAspectRatio(job)
+  // 请求体与同步接口一致(去掉流式相关字段)
+  const requestBody = JSON.stringify({
+    model: jobModel(job),
+    prompt: buildJobPrompt(job),
+    ...(supportsSizeQuality(job) && { size: job.size, quality: job.quality }),
+    ...(aspectRatio && { aspect_ratio: aspectRatio }),
+    response_format: 'b64_json',
+    n: 1
+  })
+
+  logImageJob(job, 'async-submit-start', {
+    size: job.size,
+    quality: job.quality,
+    resolution: job.resolution,
+    ratio: job.ratio
+  })
+
+  const submitted = await submitAsyncImageGeneration({
+    baseUrl: sub2apiBaseURL(),
+    apiKey: job.apiKey,
+    body: requestBody,
+    signal
+  })
+  job.upstreamTaskId = submitted.taskId
+  const pollUrl = resolveAsyncPollUrl(submitted.pollUrl, sub2apiRootURL())
+  logImageJob(job, 'async-submitted', {
+    taskId: submitted.taskId,
+    retryAfterMs: submitted.retryAfterMs,
+    elapsedMs: getElapsedMs(startedAt)
+  })
+
+  const outcome = await pollAsyncImageResult({
+    pollUrl,
+    apiKey: job.apiKey,
+    initialIntervalMs: submitted.retryAfterMs,
+    signal,
+    onTick: ({ elapsedMs, status }) => {
+      // 每 30s 记录一次心跳,避免日志刷屏
+      if (elapsedMs % 30_000 < submitted.retryAfterMs) {
+        logImageJob(job, 'async-polling', { elapsedMs, status })
+      }
+    }
+  })
+
+  logImageJob(job, 'async-completed', {
+    elapsedMs: getElapsedMs(startedAt),
+    imageCount: outcome.data.length
+  })
+
+  return {
+    data: outcome.data.map(item => ({ url: item.url, revised_prompt: item.revised_prompt })),
+    usage: outcome.usage
+  } satisfies ImageGenerationResponse
+}
+
 async function requestImageGeneration(job: ImageJob, signal: AbortSignal) {
+  if (isAsyncImageEligible(job.kind)) {
+    try {
+      return await callImageGenerationAsync(job, signal)
+    } catch (error) {
+      if (error instanceof AsyncImageUnsupportedError) {
+        asyncUnsupportedUntil = Date.now() + asyncUnsupportedTtlMs
+        logImageJob(job, 'async-unsupported-fallback', { error: error.message })
+        // 落回原路径继续(提交未成功,不存在双扣费)
+      } else {
+        throw error
+      }
+    }
+  }
+
   if (typeof job.stream === 'boolean') {
     job.mode = job.stream ? 'stream' : 'sync'
     job.streamAttempts = job.stream ? 1 : 0
@@ -583,27 +684,43 @@ async function requestImageJob(job: ImageJob, signal: AbortSignal) {
   return requestImageGeneration(job, signal)
 }
 
-const maxRemoteImageBytes = 20 * 1024 * 1024
-
-// Grok 编辑等接口返回的是 xAI 临时直链（会过期），服务端拉下来转成 base64，
-// 让前端与其他图片一致地本地持久化
-async function materializeRemoteImages(job: ImageJob, result: ImageGenerationResponse, signal: AbortSignal) {
+// 上游返回的是临时直链(xAI 直链/S3 预签名,会过期),服务端拉下来转成 base64,
+// 让前端与其他图片一致地走 IndexedDB 本地持久化。下载经 safeImageDownload 加固
+// (https-only、私网 IP/重定向复验、流式大小上限、魔数校验)。
+// strict=false(同步/流式路径,存量行为):失败保留原始 URL,前端仍可短期展示;
+// strict=true(异步路径):S3 预签名只有时效,绝不能把它当成永久地址写进历史——
+// 带重试下载,最终失败让任务报错。
+async function materializeRemoteImages(
+  job: ImageJob,
+  result: ImageGenerationResponse,
+  signal: AbortSignal,
+  strict = false
+) {
   for (const image of result.data || []) {
     if (image.b64_json || !image.url || !/^https?:\/\//.test(image.url)) continue
 
-    try {
-      const response = await fetch(image.url, { signal })
-      if (!response.ok) continue
-      const buffer = Buffer.from(await response.arrayBuffer())
-      if (buffer.byteLength === 0 || buffer.byteLength > maxRemoteImageBytes) continue
+    const attempts = strict ? 3 : 1
+    let lastError: unknown
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        const downloaded = await downloadImageAsBase64(image.url, { signal })
+        image.b64_json = downloaded.base64
+        image.mime_type = downloaded.mimeType
+        image.url = undefined
+        logImageJob(job, 'remote-image-materialized', { bytes: downloaded.bytes, attempt, strict })
+        lastError = undefined
+        break
+      } catch (error) {
+        lastError = error
+        logImageJob(job, 'remote-image-materialize-failed', { attempt, strict, error: toSafeError(error) })
+        if (signal.aborted || attempt === attempts) break
+        await new Promise(resolve => setTimeout(resolve, attempt * 1500))
+      }
+    }
 
-      image.b64_json = buffer.toString('base64')
-      image.mime_type = response.headers.get('content-type')?.split(';')[0] || image.mime_type || 'image/jpeg'
-      image.url = undefined
-      logImageJob(job, 'remote-image-materialized', { bytes: buffer.byteLength })
-    } catch (error) {
-      // 拉取失败保留原始 URL，前端仍可短期展示
-      logImageJob(job, 'remote-image-materialize-failed', { error: toSafeError(error) })
+    if (strict && lastError) {
+      // 保留 URL 会让 168h 预签名地址被前端持久化,宁可报错让用户重试
+      throw new Error('图片已生成但服务端下载失败,请重试')
     }
   }
 }
@@ -678,13 +795,24 @@ export async function runImageJob(id: string) {
     const timeoutMessage = job.kind === 'edit'
       ? 'API 图片编辑超时，建议降低分辨率或稍后重试'
       : 'API 图片生成超时，建议降低分辨率或稍后重试'
+    // 异步任务上游允许跑满 30 分钟,总预算另加下载/回退余量;原路径维持 10 分钟
+    const asyncEligible = isAsyncImageEligible(job.kind)
+    const timeoutMs = asyncEligible ? asyncImageMaxWaitMs + 2 * 60 * 1000 : undefined
+    // 账号历史只存 URL(S3 预签名);materialize 会把 url 置空,先捕获
+    let historyUrls: string[] = []
     const result = await withImageRequestTimeout(
       async (signal) => {
         const response = await requestImageJob(job, signal)
-        await materializeRemoteImages(job, response, signal)
+        if (job.mode === 'async') {
+          historyUrls = (response.data || [])
+            .map(image => image.url)
+            .filter((url): url is string => Boolean(url && /^https?:\/\//.test(url)))
+        }
+        await materializeRemoteImages(job, response, signal, job.mode === 'async')
         return response
       },
-      timeoutMessage
+      timeoutMessage,
+      timeoutMs
     )
     const image = result.data?.[0]
     if (!image?.b64_json && !image?.url) {
@@ -704,6 +832,19 @@ export async function runImageJob(id: string) {
       elapsedMs: getElapsedMs(startedAt),
       completedAt: job.completedAt
     })
+
+    // 账号级历史(尽力而为,不影响任务):异步模式才有可留存的 URL
+    for (const url of historyUrls) {
+      void recordMediaHistory({
+        apiKey: job.apiKey,
+        kind: 'image',
+        model: jobModel(job),
+        prompt: job.prompt,
+        imageUrl: url,
+        completedAtMs: Date.now(),
+        costUsd: job.costUsd
+      })
+    }
   } catch (error) {
     const requestError = toRequestError(error) as RequestError
     job.status = 'error'

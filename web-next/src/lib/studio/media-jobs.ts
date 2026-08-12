@@ -50,7 +50,8 @@ export interface VideoJobRequest {
 
 const mediaRequestTimeoutMs = 300000
 const imageJobPollIntervalMs = 2500
-const imageJobPollMaxMs = 10 * 60 * 1000
+// 服务端接入网关异步生图后任务最长 30 分钟,客户端等待上限同步放宽(+余量)
+const imageJobPollMaxMs = 32 * 60 * 1000
 const videoJobPollIntervalMs = 5000
 const videoJobPollMaxMs = 20 * 60 * 1000
 

@@ -1,28 +1,19 @@
 ---
-# 生产编排:React 前端(web-next)对外承接原端口,Nitro(原 Vue 镜像)退居后端。
-# 服务器上更新:docker compose pull && docker compose up -d
-# 回滚到 Vue:docker compose down && docker compose -f docker-compose.legacy.yml up -d
-#   (或把反向代理临时指回 127.0.0.1:${LEGACY_PORT:-3010},Vue 界面仍在)
+# 生产编排:web(React 前端)对外,chat-vue(Nitro 后端)仅容器网络内可达。
+# 更新:docker compose pull && docker compose up -d
+# 回滚:把两个 image 换成 Docker Hub 上的历史 sha 标签再 up -d
 services:
   chat-vue:
     image: llpig/chat-vue:latest
     container_name: chat-vue
     restart: unless-stopped
-    ports:
-      # 仅本机回环保留 Vue 直连口,用于回滚与排障
-      - "127.0.0.1:${LEGACY_PORT:-3010}:3009"
     env_file:
       - .env
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3009
-    # SUB2API_BASE_URL 可写 docker 宿主地址(http://host.docker.internal:8080)
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    # 加入网关所在的共享网络,SUB2API_BASE_URL 可直接写网关容器名。
-    # 以前的 `docker network connect app-shared chat-vue` 是手动操作,容器一重建
-    # 就丢;声明在这里每次 up 都自动接上。没有该网络的环境删掉相关两处即可。
+    # 加入网关所在共享网络,SUB2API_BASE_URL 可直接写网关容器名
     networks:
       - default
       - app-shared
@@ -41,7 +32,7 @@ services:
       NODE_ENV: production
       # /api 与 /sub2api 经容器网络转发给 Nitro,再由 Nitro 按 .env 打到网关
       BACKEND_ORIGIN: http://chat-vue:3009
-      # 创作台分组 id(运行时经 /api/app-config 注入前端,改 .env 重启即生效)
+      # 创作台分组 id(运行时注入前端,改 .env 后 up -d 即生效)
       MEDIA_GROUP_OPENAI: ${MEDIA_GROUP_OPENAI:-}
       MEDIA_GROUP_GROK: ${MEDIA_GROUP_GROK:-}
       MEDIA_GROUP_NANOBANANA: ${MEDIA_GROUP_NANOBANANA:-}
