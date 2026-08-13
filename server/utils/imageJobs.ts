@@ -372,8 +372,10 @@ async function callImageGeneration(job: ImageJob, stream: boolean, signal: Abort
     })
 
     if (response.ok) break
-    // body 只能读一次：非 ok 先把错误文本拿出来，路径回退时再覆盖
-    errorText = await response.text().catch(() => '')
+    // body 只能读一次;保留第一次的错误文本——备用路径的裸 404(如 "404 page not found")
+    // 不如首个响应有信息量(例如网关的 "Images API is not supported for this platform")
+    const attemptText = await response.text().catch(() => '')
+    if (!errorText) errorText = attemptText
     if (!isPathFallbackStatus(response.status)) break
   }
 
@@ -607,8 +609,10 @@ async function callImageEdit(job: ImageJob, stream: boolean, signal: AbortSignal
     })
 
     if (response.ok) break
-    // body 只能读一次：非 ok 先把错误文本拿出来，路径回退时再覆盖
-    errorText = await response.text().catch(() => '')
+    // body 只能读一次;保留第一次的错误文本——备用路径的裸 404(如 "404 page not found")
+    // 不如首个响应有信息量(例如网关的 "Images API is not supported for this platform")
+    const attemptText = await response.text().catch(() => '')
+    if (!errorText) errorText = attemptText
     if (!isPathFallbackStatus(response.status)) break
   }
 
