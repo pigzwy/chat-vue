@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 import { sub2apiBaseURL, sub2apiRootURL } from './sub2api'
 import { withImageRequestTimeout } from './imageUpstreamRequest'
@@ -9,6 +10,7 @@ import {
   resolveAsyncPollUrl,
   submitAsyncImageGeneration
 } from './imageAsyncUpstream'
+import { buildGeminiImageBody, callGeminiImageGeneration, type GeminiReferenceImage } from './imageGeminiUpstream'
 import { buildImagePrompt, type ImageQuality, type ImageRatio, type ImageResolution } from '../../shared/utils/images'
 import { defaultImageModelId, resolveMediaModelSpec } from '../../shared/utils/mediaModels'
 import { createJobStore, getElapsedMs, parseJson, toSafeError } from './mediaJobStore'
@@ -443,8 +445,9 @@ export function isAsyncImagesEnabled() {
   return flag === '1' || flag === 'true'
 }
 
-export function isAsyncImageEligible(kind: ImageJobKind) {
-  // 契约只覆盖 generations;edits 维持原路径
+export function isAsyncImageEligible(kind: ImageJobKind, model?: string) {
+  // 契约只覆盖 generations;edits 维持原路径;gemini 走 v1beta 原生路径不适用
+  if (model && resolveMediaModelSpec(model).provider === 'google') return false
   return kind === 'generation' && isAsyncImagesEnabled() && Date.now() >= asyncUnsupportedUntil
 }
 
@@ -509,8 +512,61 @@ async function callImageGenerationAsync(job: ImageJob, signal: AbortSignal) {
   } satisfies ImageGenerationResponse
 }
 
+
+// ==================== Gemini(Nano Banana):v1beta generateContent ====================
+// 网关不给 gemini 开 /v1/images 端点;图片按图计费(单价×尺寸倍率×分组倍率),
+// imageSize 必须显式传(不传网关默认按 2K 计 ×1.5)。参考图以 inlineData 随 parts 提交。
+async function requestGeminiImageJob(job: ImageJob, signal: AbortSignal) {
+  const startedAt = performance.now()
+  job.mode = 'sync'
+  job.streamAttempts = 0
+
+  const spec = resolveMediaModelSpec(jobModel(job))
+  const allowed = spec.supportedAspectRatios
+  const aspectRatio = job.ratio && job.ratio !== 'Auto' && (!allowed || allowed.includes(job.ratio))
+    ? job.ratio
+    : undefined
+
+  const referenceImages: GeminiReferenceImage[] = []
+  for (const file of job.images || []) {
+    const buffer = Buffer.from(await file.arrayBuffer())
+    referenceImages.push({
+      mimeType: file.type?.split(';')[0] || 'image/png',
+      data: buffer.toString('base64')
+    })
+  }
+
+  logImageJob(job, 'gemini-request-start', {
+    imageSize: job.resolution,
+    aspectRatio,
+    referenceCount: referenceImages.length
+  })
+
+  const images = await callGeminiImageGeneration({
+    rootUrl: sub2apiRootURL(),
+    apiKey: job.apiKey,
+    model: jobModel(job),
+    body: buildGeminiImageBody({
+      prompt: job.prompt,
+      imageSize: job.resolution,
+      aspectRatio,
+      referenceImages
+    }),
+    signal
+  })
+
+  logImageJob(job, 'gemini-request-complete', {
+    elapsedMs: getElapsedMs(startedAt),
+    imageCount: images.length
+  })
+
+  return {
+    data: images.map(image => ({ b64_json: image.b64, mime_type: image.mimeType }))
+  } satisfies ImageGenerationResponse
+}
+
 async function requestImageGeneration(job: ImageJob, signal: AbortSignal) {
-  if (isAsyncImageEligible(job.kind)) {
+  if (isAsyncImageEligible(job.kind, jobModel(job))) {
     try {
       return await callImageGenerationAsync(job, signal)
     } catch (error) {
@@ -683,6 +739,9 @@ async function requestImageEditJob(job: ImageJob, signal: AbortSignal) {
 }
 
 async function requestImageJob(job: ImageJob, signal: AbortSignal) {
+  if (resolveMediaModelSpec(jobModel(job)).provider === 'google') {
+    return requestGeminiImageJob(job, signal)
+  }
   if (job.kind === 'edit') return requestImageEditJob(job, signal)
 
   return requestImageGeneration(job, signal)
@@ -800,7 +859,7 @@ export async function runImageJob(id: string) {
       ? 'API 图片编辑超时，建议降低分辨率或稍后重试'
       : 'API 图片生成超时，建议降低分辨率或稍后重试'
     // 异步任务上游允许跑满 30 分钟,总预算另加下载/回退余量;原路径维持 10 分钟
-    const asyncEligible = isAsyncImageEligible(job.kind)
+    const asyncEligible = isAsyncImageEligible(job.kind, jobModel(job))
     const timeoutMs = asyncEligible ? asyncImageMaxWaitMs + 2 * 60 * 1000 : undefined
     // 账号历史只存 URL(S3 预签名);materialize 会把 url 置空,先捕获
     let historyUrls: string[] = []

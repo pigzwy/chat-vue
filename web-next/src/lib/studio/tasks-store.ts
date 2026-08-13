@@ -449,7 +449,9 @@ export function isVideoMode() {
 
 export function currentUploadLimit() {
   if (isVideoMode()) return videoSourceImageLimit
-  return resolveMediaModelSpec(mediaModelsStore.get().imageModel).provider === 'grok' ? grokEditSourceLimit : uploadedImageLimit
+  const provider = resolveMediaModelSpec(mediaModelsStore.get().imageModel).provider
+  // grok/gemini 的参考图上限保守取 3;gpt-image 维持原上限
+  return provider === 'grok' || provider === 'google' ? grokEditSourceLimit : uploadedImageLimit
 }
 
 export function selectSelectedTask(state: StudioState) {

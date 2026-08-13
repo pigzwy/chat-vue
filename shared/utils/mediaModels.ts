@@ -17,6 +17,8 @@ export interface MediaModelSpec {
   supportsEdit?: boolean
   /** 支持 size/quality 参数与尺寸提示注入（gpt-image 系） */
   supportsSizeQuality?: boolean
+  /** 支持 imageConfig.imageSize 1K/2K/4K（gemini 系,决定计费档,必显式传） */
+  supportsImageSize?: boolean
   /** 支持 SSE 流式返回（不支持的模型强制走同步请求） */
   supportsStream?: boolean
   /** 支持图生视频源图 */
@@ -61,7 +63,9 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     description: '谷歌 Gemini 文生图，出图快（gemini-3.1-flash-image）',
     kind: 'image',
     provider: 'google',
-    supportedAspectRatios: [],
+    supportsEdit: true,
+    supportsImageSize: true,
+    supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'],
     costPerImage: 0.2
   },
   {
@@ -70,7 +74,9 @@ export const mediaModelCatalog: MediaModelSpec[] = [
     description: '谷歌 Gemini 高质量文生图（gemini-3-pro-image）',
     kind: 'image',
     provider: 'google',
-    supportedAspectRatios: [],
+    supportsEdit: true,
+    supportsImageSize: true,
+    supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'],
     costPerImage: 0.2
   },
   {
@@ -138,7 +144,7 @@ export function resolveMediaModelSpec(id: string): MediaModelSpec {
     return { id, label: id, kind: 'image', provider: 'openai', supportsEdit: true, supportsSizeQuality: true, supportsStream: true, defaultGroupId: defaultOpenaiMediaGroupId }
   }
   if (/^gemini-[\w.-]*image/.test(id)) {
-    return { id, label: id, kind: 'image', provider: 'google', supportedAspectRatios: [], costPerImage: 0.2 }
+    return { id, label: id, kind: 'image', provider: 'google', supportsEdit: true, supportsImageSize: true, supportedAspectRatios: ['1:1', '3:2', '16:9', '9:16', '4:3', '3:4'], costPerImage: 0.2 }
   }
   if (isVideoMediaModelId(id)) {
     return { id, label: id, kind: 'video', provider: 'grok', supportsSourceImage: true, maxDurationSeconds: 15, costPerSecondByResolution: { '480p': 0.05, '720p': 0.05 }, defaultGroupId: defaultGrokMediaGroupId }
