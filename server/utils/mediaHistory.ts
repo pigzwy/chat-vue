@@ -71,6 +71,8 @@ export interface RecordMediaHistoryInput {
   imageUrl: string
   completedAtMs?: number
   costUsd?: number
+  /** 显式过期时间(unix 毫秒,如网关 url_expires_at);缺省按 TTL 推算 */
+  expiresAtMs?: number
 }
 
 /** 写入一条历史(尽力而为:失败仅记日志,绝不影响生成任务本身) */
@@ -87,7 +89,7 @@ export async function recordMediaHistory(input: RecordMediaHistoryInput) {
         input.model,
         input.prompt.slice(0, 4000),
         input.imageUrl,
-        now + mediaUrlTtlMs(),
+        input.expiresAtMs && input.expiresAtMs > now ? input.expiresAtMs : now + mediaUrlTtlMs(),
         input.costUsd ?? null,
         now
       )

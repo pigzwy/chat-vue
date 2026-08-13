@@ -207,7 +207,7 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
                     <div className="flex flex-col items-start gap-2 rounded-2xl rounded-tl-md border border-black/5 bg-black/[0.03] px-4 py-3.5 dark:border-white/10 dark:bg-white/[0.06]">
                       <p className="flex items-center gap-1.5 text-sm opacity-70">
                         <TimerOff className="size-4" />
-                        视频已过期(链接随服务重启或 2 小时时效失效),请重新生成
+                        视频已过期(链接超出有效期或服务重启),请重新生成
                       </p>
                       <button
                         type="button"

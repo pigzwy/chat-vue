@@ -3,6 +3,7 @@ import { sub2apiBaseURL } from './sub2api'
 import { withImageRequestTimeout } from './imageUpstreamRequest'
 import { createJobStore, getElapsedMs, parseJson, toSafeError, type BaseJob } from './mediaJobStore'
 import { recordMediaError } from './mediaErrorLog'
+import { recordMediaHistory } from './mediaHistory'
 import type { RequestError } from '../../shared/utils/errors'
 
 export interface VideoJobInput {
@@ -23,6 +24,8 @@ export interface VideoJobInput {
 export interface GeneratedVideo {
   url?: string
   revised_prompt?: string
+  /** 网关已转存 S3 时的预签名过期时间(unix 毫秒,来自 url_expires_at) */
+  urlExpiresAtMs?: number
 }
 
 export interface VideoJob extends VideoJobInput, BaseJob {
@@ -104,6 +107,17 @@ function isPathFallbackStatus(status: number) {
 
 function extractVideoResult(payload: Record<string, any> | null | undefined): GeneratedVideo | null {
   if (!payload) return null
+
+  // 网关转存 S3 后在 completed 状态注入顶层 video_url(绝对地址,每次查询现签)
+  // 与 url_expires_at(毫秒)——优先于历史相对路径字段,拿到即免代理直链
+  if (typeof payload.video_url === 'string' && /^https?:\/\//.test(payload.video_url)) {
+    const expires = payload.url_expires_at
+    return {
+      url: payload.video_url,
+      revised_prompt: typeof payload.revised_prompt === 'string' ? payload.revised_prompt : undefined,
+      urlExpiresAtMs: typeof expires === 'number' && expires > 0 ? expires : undefined
+    }
+  }
 
   const candidates: Array<Record<string, any> | undefined> = [
     payload.data?.[0],
@@ -399,6 +413,20 @@ export async function runVideoJob(id: string) {
     job.data = [result]
     job.image = undefined
     logVideoJob(job, 'job-completed', { elapsedMs: getElapsedMs(startedAt), proxied: Boolean(job.contentPath) })
+
+    // 账号级云端历史:仅在拿到 S3 直链(绝对地址)时记录;代理地址短命,不入库
+    if (result.url && /^https?:\/\//.test(result.url)) {
+      void recordMediaHistory({
+        apiKey: job.apiKey,
+        kind: 'video',
+        model: job.model,
+        prompt: job.prompt,
+        imageUrl: result.url,
+        completedAtMs: Date.now(),
+        costUsd: job.costUsd,
+        expiresAtMs: result.urlExpiresAtMs
+      })
+    }
   } catch (error) {
     const requestError = toVideoRequestError(error) as RequestError
     // 网关的错误包装只剩一句 "xAI upstream returned status 400"，按失败阶段翻译成可行动的提示

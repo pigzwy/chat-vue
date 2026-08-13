@@ -62,7 +62,7 @@ export function CloudHistoryPanel() {
               <div>
                 <h2 className="text-lg font-bold">云端历史</h2>
                 <p className="mt-0.5 text-xs leading-5 opacity-55">
-                  跟账号走的生成记录(仅异步生成)。图片链接约 7 天有效,过期后可用提示词重新生成;本设备的图不受影响。
+                  跟账号走的生成记录(经 S3 转存的图片/视频)。链接约 7 天有效,过期后可用提示词重新生成;本设备的内容不受影响。
                 </p>
               </div>
             </div>
@@ -78,16 +78,26 @@ export function CloudHistoryPanel() {
                             <ImageOff className="size-5 opacity-40" />
                           </div>
                         )
-                      : (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.imageUrl}
-                            alt={item.prompt}
-                            loading="lazy"
-                            decoding="async"
-                            className="size-16 shrink-0 rounded-xl object-cover"
-                          />
-                        )}
+                      : item.kind === 'video'
+                        ? (
+                            <video
+                              src={item.imageUrl}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="size-16 shrink-0 rounded-xl bg-black/20 object-cover"
+                            />
+                          )
+                        : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={item.imageUrl}
+                              alt={item.prompt}
+                              loading="lazy"
+                              decoding="async"
+                              className="size-16 shrink-0 rounded-xl object-cover"
+                            />
+                          )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 text-xs leading-5">{item.prompt}</p>
                       <p className="label-mono mt-1 text-[10px] opacity-50">
@@ -103,8 +113,8 @@ export function CloudHistoryPanel() {
                           href={item.imageUrl}
                           target="_blank"
                           rel="noreferrer"
-                          aria-label="打开原图"
-                          title="打开原图"
+                          aria-label="打开原文件"
+                          title="打开原文件"
                           className="glass-pill p-1.5"
                         >
                           <CloudDownload className="size-3.5" />
