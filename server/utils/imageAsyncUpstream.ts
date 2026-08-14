@@ -21,6 +21,20 @@ export class AsyncImageUnsupportedError extends Error {
   }
 }
 
+/** gemini 模型走 images 管线失败时,哪些错误说明「网关不支持」应回退 v1beta 内联:
+ *  - 异步端点不存在(AsyncImageUnsupportedError / 404)
+ *  - 平台开关不认 gemini("not supported for this platform" / "404 page not found")
+ *  - 旧网关 images 口的模型校验直接拒掉 gemini 模型("requires an image model") */
+export function isGeminiAsyncFallbackError(error: unknown) {
+  if (error instanceof AsyncImageUnsupportedError) return true
+  const message = error instanceof Error ? error.message : ''
+  const status = (error as { status?: number }).status
+  return /not supported for this platform/i.test(message)
+    || /404 page not found/i.test(message)
+    || /requires an image model/i.test(message)
+    || status === 404
+}
+
 export interface AsyncSubmitResult {
   taskId: string
   pollUrl: string

@@ -6,6 +6,7 @@ import { Buffer } from 'node:buffer'
 
 const {
   AsyncImageUnsupportedError,
+  isGeminiAsyncFallbackError,
   pollAsyncImageResult,
   resolveAsyncPollUrl,
   submitAsyncImageGeneration
@@ -265,4 +266,16 @@ test('download:正常重定向可跟随并成功', async () => {
     }
   })
   assert.equal(result.mimeType, 'image/png')
+})
+
+test('isGeminiAsyncFallbackError:旧网关三类拒绝都触发回退,业务错误不触发', () => {
+  assert.equal(isGeminiAsyncFallbackError(new AsyncImageUnsupportedError(405)), true)
+  assert.equal(isGeminiAsyncFallbackError(new Error('this model is not supported for this platform')), true)
+  assert.equal(isGeminiAsyncFallbackError(new Error('404 page not found')), true)
+  assert.equal(isGeminiAsyncFallbackError(new Error('images endpoint requires an image model, got "gemini-3-pro-image"')), true)
+  const notFound = Object.assign(new Error('no such route'), { status: 404 })
+  assert.equal(isGeminiAsyncFallbackError(notFound), true)
+  const businessError = Object.assign(new Error('内容未通过审核'), { status: 400 })
+  assert.equal(isGeminiAsyncFallbackError(businessError), false)
+  assert.equal(isGeminiAsyncFallbackError(new Error('insufficient balance')), false)
 })

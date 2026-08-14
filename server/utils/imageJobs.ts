@@ -6,6 +6,7 @@ import { downloadImageAsBase64 } from './safeImageDownload'
 import {
   AsyncImageUnsupportedError,
   asyncImageMaxWaitMs,
+  isGeminiAsyncFallbackError,
   pollAsyncImageResult,
   resolveAsyncPollUrl,
   submitAsyncImageGeneration
@@ -458,15 +459,6 @@ export function isAsyncImageEligible(kind: ImageJobKind, model?: string) {
 }
 
 // 老网关对 gemini 的失败形态:提交 404/405,或任务执行失败带平台不支持信息
-function isGeminiAsyncFallbackError(error: unknown) {
-  if (error instanceof AsyncImageUnsupportedError) return true
-  const message = error instanceof Error ? error.message : ''
-  const status = (error as RequestError).status
-  return /not supported for this platform/i.test(message)
-    || /404 page not found/i.test(message)
-    || status === 404
-}
-
 async function callImageGenerationAsync(job: ImageJob, signal: AbortSignal) {
   const startedAt = performance.now()
   job.mode = 'async'
