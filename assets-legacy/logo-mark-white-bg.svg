@@ -12,6 +12,7 @@
     </linearGradient>
   </defs>
 
+  <rect width="512" height="512" rx="112" fill="#ffffff" />
   <path
     fill="#f6c515"
     stroke="#082f6b"

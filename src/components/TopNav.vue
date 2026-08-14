@@ -21,7 +21,7 @@ const tabs = computed(() => [
       class="glass-chip pointer-events-auto inline-flex items-center gap-2 py-1.5 pl-1.5 pr-3 transition-transform hover:-translate-y-0.5"
     >
       <img
-        src="/logo-mark.jpg"
+        src="/logo-mark.png"
         alt="pigcode"
         class="size-7 shrink-0 rounded-full object-cover ring-2 ring-white/70 dark:ring-white/10"
       >

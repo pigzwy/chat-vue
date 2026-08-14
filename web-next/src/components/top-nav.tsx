@@ -51,7 +51,7 @@ function BrandMark() {
   return (
     <span className="relative size-7 shrink-0" title={connectionDetail} onClick={onNoseClick}>
       <Image
-        src="/logo-mark.jpg"
+        src="/logo-mark.png"
         alt="pigcode"
         width={28}
         height={28}
