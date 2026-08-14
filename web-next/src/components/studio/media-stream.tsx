@@ -74,8 +74,10 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
   const spec = resolveMediaModelSpec(task.model)
   const selected = state.selectedTaskId === task.id
   const videoSrc = useCachedVideoUrl(task.id, task.videoUrl)
-  // 视频代理地址随后端重启/任务过期(2h)失效,黑播放器换成明确的过期状态
-  const [videoFailed, setVideoFailed] = useState(false)
+  // 视频地址(S3 预签名/代理)过期会加载失败,黑播放器换成明确的过期状态。
+  // 记录的是「哪个地址失败过」:换源(重试出新地址)后派生值自然复位,无需 effect
+  const [failedSrc, setFailedSrc] = useState('')
+  const videoFailed = Boolean(videoSrc) && failedSrc === videoSrc
 
   // 用户侧元信息:参数 + 时间
   const askMeta: string[] = []
@@ -219,16 +221,20 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
                       </button>
                     </div>
                   )
-                : (
-                    <video
-                      src={videoSrc}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      className="block max-h-[420px] w-auto max-w-full overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm dark:border-white/10"
-                      onError={() => setVideoFailed(true)}
-                    />
-                  )}
+                : videoSrc
+                  ? (
+                      <video
+                        src={videoSrc}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="block max-h-[420px] w-auto max-w-full overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm dark:border-white/10"
+                        onError={() => setFailedSrc(videoSrc)}
+                      />
+                    )
+                  : (
+                      <div className="shimmer-block aspect-video w-72 rounded-2xl rounded-tl-md" />
+                    )}
               <TurnActions task={task} selected={selected} />
             </>
           )}

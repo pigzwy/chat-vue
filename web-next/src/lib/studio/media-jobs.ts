@@ -8,6 +8,8 @@ export interface GeneratedMediaPayload {
   url?: string
   revised_prompt?: string
   mime_type?: string
+  /** 网关转存 S3 后预签名直链的过期时间(unix 毫秒);老代理地址无此字段 */
+  urlExpiresAtMs?: number
 }
 
 export interface MediaJobResponse {

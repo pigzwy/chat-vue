@@ -52,8 +52,10 @@ const tooltipClass = 'glass-panel rounded-full px-2.5 py-1 text-xs font-medium'
 export function MediaTaskCard({ task }: { task: MediaTask }) {
   const cachedVideoSrc = useCachedVideoUrl(task.id, task.videoUrl)
   const state = studioStore.useStore()
-  // 视频代理地址随任务过期（2h/服务重启）失效，加载失败时给出明确状态
-  const [videoFailed, setVideoFailed] = useState(false)
+  // 视频地址（S3 预签名/代理）过期会加载失败，给出明确状态。
+  // 记录的是「哪个地址失败过」：换源（重试出新地址）后派生值自然复位，无需 effect
+  const [failedSrc, setFailedSrc] = useState('')
+  const videoFailed = Boolean(cachedVideoSrc) && failedSrc === cachedVideoSrc
   const [menuOpen, setMenuOpen] = useState(false)
 
   const hasMedia = Boolean(task.imageUrl || task.videoUrl)
@@ -177,19 +179,23 @@ export function MediaTaskCard({ task }: { task: MediaTask }) {
               : (
                   <button type="button" className="block size-full text-left" onClick={onMediaClick}>
                     {isVideo && task.videoUrl
-                      ? (
-                          <video
-                            src={cachedVideoSrc}
-                            preload="metadata"
-                            muted
-                            playsInline
-                            loop
-                            className="size-full object-cover"
-                            onMouseEnter={onVideoEnter}
-                            onMouseLeave={onVideoLeave}
-                            onError={() => setVideoFailed(true)}
-                          />
-                        )
+                      ? cachedVideoSrc
+                        ? (
+                            <video
+                              src={cachedVideoSrc}
+                              preload="metadata"
+                              muted
+                              playsInline
+                              loop
+                              className="size-full object-cover"
+                              onMouseEnter={onVideoEnter}
+                              onMouseLeave={onVideoLeave}
+                              onError={() => setFailedSrc(cachedVideoSrc)}
+                            />
+                          )
+                        : (
+                            <div className="shimmer-block size-full" />
+                          )
                       : task.imageUrl
                         ? (
                             // eslint-disable-next-line @next/next/no-img-element

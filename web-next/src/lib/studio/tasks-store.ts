@@ -1061,7 +1061,15 @@ function applyCompletedResult(task: MediaTask, result: MediaJobResponse) {
       completedAt: result.completedAt ? new Date(result.completedAt) : new Date()
     })
     persistNow()
-    toast({ title: '视频生成完成', description: '视频链接约 2 小时内有效，请及时下载保存' })
+    // S3 直链(绝对地址)约 7 天有效且已进云端历史;老网关的代理地址才是 2 小时短命链接
+    if (/^https?:\/\//.test(payload.url)) {
+      const fallbackExpiry = Date.now() + 168 * 3600 * 1000
+      const expiresAt = payload.urlExpiresAtMs && payload.urlExpiresAtMs > Date.now() ? payload.urlExpiresAtMs : fallbackExpiry
+      const until = new Date(expiresAt)
+      toast({ title: '视频生成完成', description: `已存入云端历史，在线地址 ${until.getMonth() + 1} 月 ${until.getDate()} 日前有效` })
+    } else {
+      toast({ title: '视频生成完成', description: '视频链接约 2 小时内有效，请及时下载保存' })
+    }
     return
   }
 
