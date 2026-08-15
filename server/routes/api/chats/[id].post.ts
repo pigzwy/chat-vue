@@ -217,10 +217,12 @@ function getReasoningId(index: number) {
   return `think-reasoning-${index}`
 }
 
-function getPartialTagIndex(text: string, tag: string) {
+/** 文本尾部若是 tag 的前缀,返回该前缀起点(用于跨 chunk 的标签拼接);无则 undefined */
+function getPartialTagIndex(text: string, tag: string): number | undefined {
   for (let length = tag.length - 1; length > 0; length--) {
     if (text.endsWith(tag.slice(0, length))) return text.length - length
   }
+  return undefined
 }
 
 export default defineHandler(async (event) => {

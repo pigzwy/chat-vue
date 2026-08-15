@@ -6,10 +6,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint src",
+    "lint": "eslint src server shared scripts tests",
     "typecheck": "vue-tsc -p ./tsconfig.app.json",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "typecheck:server": "tsc -p tsconfig.server.json --noEmit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.69",
@@ -19,7 +19,6 @@
     "@ai-sdk/vue": "^3.0.161",
     "@comark/vue": "^0.2.1",
     "@iconify/vue": "^5.0.0",
-    "@libsql/client": "^0.17.2",
     "@nuxt/ui": "^4.6.1",
     "@shikijs/langs": "^4.0.2",
     "@unhead/vue": "^2.1.13",
@@ -27,7 +26,6 @@
     "@vueuse/core": "^14.2.1",
     "ai": "^6.0.161",
     "date-fns": "^4.1.0",
-    "drizzle-orm": "^0.45.2",
     "nitro": "^3.0.260311-beta",
     "ofetch": "^1.5.1",
     "shiki": "^4.0.2",
@@ -40,7 +38,6 @@
   "devDependencies": {
     "@types/node": "^24.12.2",
     "@vitejs/plugin-vue": "^6.0.6",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^10.2.0",
     "eslint-plugin-vue": "^10.8.0",
     "typescript": "^6.0.2",

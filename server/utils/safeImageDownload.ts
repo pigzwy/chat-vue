@@ -50,7 +50,8 @@ function sniffImageMime(head: Buffer): string | null {
 function isPrivateIPv4(address: string) {
   const parts = address.split('.').map(Number)
   if (parts.length !== 4 || parts.some(part => Number.isNaN(part))) return true
-  const [a, b] = parts
+  // 长度已校验,默认值只为满足 noUncheckedIndexedAccess,实际取不到
+  const [a = 0, b = 0] = parts
   return a === 0
     || a === 10
     || a === 127
@@ -62,10 +63,13 @@ function isPrivateIPv4(address: string) {
     || a >= 224 // 组播/保留
 }
 
+/** 定长 8 段,下标取值可证不为 undefined */
+type IPv6Words = [number, number, number, number, number, number, number, number]
+
 /** 把 IPv6 文本展开成 8 个 16 位段;无法解析返回 null(调用方按「拒绝」处理)。
  *  按数值判定而非字符串前缀——十六进制写法(::ffff:7f00:1)与点分写法
  *  (::ffff:127.0.0.1)是同一个地址,只认后者等于没防。 */
-function parseIPv6(address: string) {
+function parseIPv6(address: string): IPv6Words | null {
   let text = address.trim().toLowerCase()
   const zoneAt = text.indexOf('%') // fe80::1%eth0
   if (zoneAt !== -1) text = text.slice(0, zoneAt)
@@ -73,30 +77,33 @@ function parseIPv6(address: string) {
   // 末尾点分四段先折成两个 16 位段
   const dotted = text.match(/(\d{1,3}(?:\.\d{1,3}){3})$/)
   if (dotted && dotted.index !== undefined) {
-    const octets = dotted[1].split('.').map(Number)
-    if (octets.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return null
-    const hi = ((octets[0] << 8) | octets[1]).toString(16)
-    const lo = ((octets[2] << 8) | octets[3]).toString(16)
+    const [o0 = -1, o1 = -1, o2 = -1, o3 = -1] = (dotted[1] ?? '').split('.').map(Number)
+    if ([o0, o1, o2, o3].some(part => !Number.isInteger(part) || part < 0 || part > 255)) return null
+    const hi = ((o0 << 8) | o1).toString(16)
+    const lo = ((o2 << 8) | o3).toString(16)
     text = `${text.slice(0, dotted.index)}${hi}:${lo}`
   }
 
   const halves = text.split('::')
   if (halves.length > 2) return null
   const toWords = (part: string) => (part ? part.split(':').map(word => parseInt(word, 16)) : [])
-  const head = toWords(halves[0])
-  const tail = halves.length === 2 ? toWords(halves[1]) : []
+  const head = toWords(halves[0] ?? '')
+  const tail = halves.length === 2 ? toWords(halves[1] ?? '') : []
   if ([...head, ...tail].some(word => !Number.isInteger(word) || word < 0 || word > 0xFFFF)) return null
 
+  let words: number[]
   if (halves.length === 2) {
     const fill = 8 - head.length - tail.length
     if (fill < 0) return null
-    return [...head, ...Array(fill).fill(0), ...tail] as number[]
+    words = [...head, ...Array<number>(fill).fill(0), ...tail]
+  } else {
+    words = head
   }
-  return head.length === 8 ? head : null
+  return words.length === 8 ? (words as IPv6Words) : null
 }
 
 /** 各种把 IPv4 藏进 IPv6 的写法,取出内嵌地址交给 IPv4 规则判 */
-function embeddedIPv4(words: number[]) {
+function embeddedIPv4(words: IPv6Words) {
   const dotted = (hi: number, lo: number) => `${hi >> 8}.${hi & 0xFF}.${lo >> 8}.${lo & 0xFF}`
   // ::ffff:a.b.c.d(IPv4 映射)与 ::a.b.c.d(IPv4 兼容,已废弃但部分栈仍可路由)
   if (words.slice(0, 5).every(word => word === 0) && (words[5] === 0xFFFF || words[5] === 0)) {
@@ -202,7 +209,7 @@ export async function downloadImageAsBase64(
       throw new Error(`图片超出大小上限(${Math.round(declaredLength / 1024 / 1024)}MB > ${Math.round(maxBytes / 1024 / 1024)}MB)`)
     }
 
-    const headerMime = response.headers.get('content-type')?.split(';')[0].trim().toLowerCase() || ''
+    const headerMime = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() || ''
     if (headerMime && !headerMime.startsWith('image/') && headerMime !== 'application/octet-stream' && headerMime !== 'binary/octet-stream') {
       await response.body?.cancel().catch(() => {})
       throw new Error(`图片下载返回非图片类型:${headerMime}`)

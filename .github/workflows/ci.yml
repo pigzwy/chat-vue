@@ -39,6 +39,13 @@ jobs:
       - name: Typecheck
         run: pnpm run typecheck
 
+      # server/ 与 shared/ 是全部业务逻辑所在,此前既无类型检查也无测试
+      - name: Typecheck (server & shared)
+        run: pnpm run typecheck:server
+
+      - name: Test
+        run: pnpm run test
+
   web-next:
     runs-on: ubuntu-latest
 

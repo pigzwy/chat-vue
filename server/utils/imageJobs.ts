@@ -473,7 +473,7 @@ export function isAsyncImageEligible(kind: ImageJobKind, model?: string) {
 }
 
 // 老网关对 gemini 的失败形态:提交 404/405,或任务执行失败带平台不支持信息
-async function callImageGenerationAsync(job: ImageJob, signal: AbortSignal) {
+async function callImageGenerationAsync(job: ImageJob, signal: AbortSignal): Promise<ImageGenerationResponse> {
   const startedAt = performance.now()
   job.mode = 'async'
   job.streamAttempts = 0
@@ -538,7 +538,7 @@ async function callImageGenerationAsync(job: ImageJob, signal: AbortSignal) {
 // ==================== Gemini(Nano Banana):v1beta generateContent ====================
 // 网关不给 gemini 开 /v1/images 端点;图片按图计费(单价×尺寸倍率×分组倍率),
 // imageSize 必须显式传(不传网关默认按 2K 计 ×1.5)。参考图以 inlineData 随 parts 提交。
-async function requestGeminiImageJob(job: ImageJob, signal: AbortSignal) {
+async function requestGeminiImageJob(job: ImageJob, signal: AbortSignal): Promise<ImageGenerationResponse> {
   // 网关 0faf5caf9 起 gemini 支持异步 images 管线(S3 转存+预签名)——优先走它;
   // 老网关不支持时记忆性降级(仅 gemini),回落 v1beta 原生路径(内联 b64)
   if (isAsyncImageEligible(job.kind, jobModel(job))) {
@@ -772,7 +772,7 @@ async function requestImageEditJob(job: ImageJob, signal: AbortSignal) {
   }
 }
 
-async function requestImageJob(job: ImageJob, signal: AbortSignal) {
+async function requestImageJob(job: ImageJob, signal: AbortSignal): Promise<ImageGenerationResponse> {
   if (resolveMediaModelSpec(jobModel(job)).provider === 'google') {
     return requestGeminiImageJob(job, signal)
   }

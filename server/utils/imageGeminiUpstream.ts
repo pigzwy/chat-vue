@@ -68,7 +68,7 @@ export function extractGeminiImages(payload: GeminiGenerateResponse): GeminiGene
       const inline = part.inlineData || part.inline_data
       const data = inline?.data
       if (typeof data === 'string' && data.length > 0) {
-        const mime = (part.inlineData?.mimeType || part.inline_data?.mime_type || 'image/png').split(';')[0]
+        const mime = (part.inlineData?.mimeType || part.inline_data?.mime_type || 'image/png').split(';')[0] || 'image/png'
         images.push({ b64: data, mimeType: mime })
       }
     }

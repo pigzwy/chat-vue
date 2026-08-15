@@ -1,0 +1,26 @@
+{
+  // 服务端(Nitro routes/utils)、跨端共享层与脚本的类型检查。
+  // tsconfig.app.json 的 include 只有 src/,这部分业务逻辑此前完全没有类型覆盖。
+  "extends": ["nitro/tsconfig"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    // Nitro 跑在 Node 上但大量使用 Web 标准全局(fetch/Response/URL/AbortSignal),
+    // 故 DOM 与 node 类型都要,否则满屏都是「Cannot find name 'fetch'」的噪声
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "rootDir": ".",
+    "paths": {
+      "~/*": ["./*"]
+    }
+  },
+  "include": ["server/**/*.ts", "shared/**/*.ts", "scripts/**/*.mjs", "tests/**/*.mjs"]
+}
