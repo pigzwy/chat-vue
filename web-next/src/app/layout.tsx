@@ -1,20 +1,11 @@
 import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
-import { Noto_Sans_SC } from 'next/font/google'
 import Script from 'next/script'
 import { Toaster } from '@/components/toaster'
 import { AppInit } from '@/components/app-init'
 import { AppShell } from '@/components/app-shell'
 import './globals.css'
-
-/* 中文正文字体(Noto Sans SC,unicode-range 分片按需加载);拉丁走 Geist */
-const notoSansSC = Noto_Sans_SC({
-  variable: '--font-noto-sc',
-  weight: ['400', '500', '700'],
-  subsets: ['latin'],
-  preload: false
-})
 
 export const metadata: Metadata = {
   // 各分区(创作台/语音/灵感墙)经各自 layout 的 title 套进模板
@@ -40,7 +31,7 @@ export default function RootLayout({
           })()`}
         </Script>
       </head>
-      <body className={`${GeistSans.variable} ${GeistMono.variable} ${notoSansSC.variable} font-sans antialiased`}>
+      <body className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}>
         <AppInit />
         <Toaster />
         <AppShell>{children}</AppShell>

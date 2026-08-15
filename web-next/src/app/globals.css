@@ -1,5 +1,10 @@
 @import "tailwindcss";
 @import "@heroui/react/styles";
+/* 中文字体自托管(可变字重 100–900,101 个 unicode-range 分片按需加载)。
+ * 不用 next/font/google:那条路每次生产构建都要向 fonts.gstatic.com 串行发
+ * 100+ 个请求,而 Next 的下载器无重试、生产构建还没有超时——挂一次就整个构建失败
+ * (已发生过),连接悬挂时甚至会无限期卡住。改由 npm 分发,构建期零外网。 */
+@import "@fontsource-variable/noto-sans-sc";
 @import "./heroui-pro-chat.css";
 
 /* Pro 组件类名参与 Tailwind 扫描(工具类编译进其 JS) */
@@ -12,7 +17,8 @@
  * 整条声明"计算时无效"直接归空——字体永远不生效(此前 Inter 就死于此)。
  * inline 把变量链内联进工具类,在元素处求值,body 上的变量可见。 */
 @theme inline {
-  /* 拉丁 Geist(Vercel 官方字体),中文 Noto Sans SC 网络字体(分片按需加载),再回退系统 */
+  /* 拉丁 Geist(Vercel 官方字体),中文 Noto Sans SC 自托管(分片按需加载),再回退系统 */
+  --font-noto-sc: 'Noto Sans SC Variable';
   --font-sans: var(--font-geist-sans), var(--font-noto-sc), 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   --font-display: var(--font-geist-sans), var(--font-noto-sc), 'PingFang SC', ui-sans-serif, system-ui, sans-serif;
