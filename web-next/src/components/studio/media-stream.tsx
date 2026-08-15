@@ -7,7 +7,7 @@ import { CircleAlert, Clapperboard, Copy, Download, Pencil, Quote, RotateCw, Tim
 import { GeminiIcon, GrokIcon, OpenaiIcon } from '@/components/brand-icons'
 import { StreamMinimap } from '@/components/studio/stream-minimap'
 import { resolveMediaModelSpec } from '@/lib/shared/media-models'
-import { useCachedVideoUrl } from '@/lib/studio/video-cache'
+import { useCachedVideoUrl, warmCachedVideo } from '@/lib/studio/video-cache'
 import {
   copyRevisedPrompt,
   deleteMediaTask,
@@ -229,6 +229,7 @@ function StreamTurn({ task, state }: { task: MediaTask, state: StudioState }) {
                         playsInline
                         preload="metadata"
                         className="block max-h-[420px] w-auto max-w-full overflow-hidden rounded-2xl rounded-tl-md border border-black/5 shadow-sm dark:border-white/10"
+                        onPlay={() => warmCachedVideo(task.id, task.videoUrl)}
                         onError={() => setFailedSrc(videoSrc)}
                       />
                     )

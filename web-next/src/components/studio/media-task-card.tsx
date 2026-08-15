@@ -18,7 +18,7 @@ import {
   TimerOff,
   Trash
 } from 'lucide-react'
-import { useCachedVideoUrl } from '@/lib/studio/video-cache'
+import { useCachedVideoUrl, warmCachedVideo } from '@/lib/studio/video-cache'
 import {
   addTaskImageAsReference,
   copyImage,
@@ -107,6 +107,8 @@ export function MediaTaskCard({ task }: { task: MediaTask }) {
   }
 
   function onVideoEnter(event: React.MouseEvent<HTMLVideoElement>) {
+    // 悬停即播放预览 = 明确的观看意图,此时才把整段拉成 blob 供下次秒开
+    warmCachedVideo(task.id, task.videoUrl)
     void event.currentTarget.play().catch(() => {})
   }
 

@@ -59,8 +59,25 @@ function useHistoryDb() {
       created_at INTEGER NOT NULL
     )`)
     _db.exec('CREATE INDEX IF NOT EXISTS idx_media_history_key_created ON media_history (key_hash, created_at)')
+    _db.exec('CREATE INDEX IF NOT EXISTS idx_media_history_expires ON media_history (expires_at)')
   }
   return _db
+}
+
+const cleanupIntervalMs = 30 * 60 * 1000
+let lastCleanupAt = 0
+
+/** 删除已过期的行(URL 早已失效,留着只会拖慢查询)。
+ *  node:sqlite 是同步 API,每次写入都全表扫会阻塞事件循环,故限频执行。 */
+function cleanupExpired(db: DatabaseSync, now: number) {
+  if (now - lastCleanupAt < cleanupIntervalMs) return
+  lastCleanupAt = now
+  try {
+    const result = db.prepare('DELETE FROM media_history WHERE expires_at < ?').run(now)
+    if (result.changes) console.info('[media-history] cleaned expired rows', { removed: Number(result.changes) })
+  } catch (error) {
+    console.error('[media-history] cleanup failed', error instanceof Error ? error.message : error)
+  }
 }
 
 export interface RecordMediaHistoryInput {
@@ -79,7 +96,9 @@ export interface RecordMediaHistoryInput {
 export async function recordMediaHistory(input: RecordMediaHistoryInput) {
   try {
     const now = input.completedAtMs ?? Date.now()
-    useHistoryDb()
+    const db = useHistoryDb()
+    cleanupExpired(db, now)
+    db
       .prepare(`INSERT INTO media_history (id, key_hash, kind, model, prompt, image_url, expires_at, cost_usd, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(
@@ -110,18 +129,24 @@ export async function queryMediaHistory(options: QueryMediaHistoryOptions): Prom
   if (!hashes.length) return []
   const limit = Math.min(Math.max(options.limit ?? 60, 1), 200)
 
-  const placeholders = hashes.map(() => '?').join(',')
-  const args: Array<string | number> = [...hashes]
-  let where = `key_hash IN (${placeholders})`
-  if (options.before && Number.isFinite(options.before)) {
-    where += ' AND created_at < ?'
-    args.push(options.before)
-  }
+  // 每把 key 各取一个子查询再 UNION:key_hash 等值 + created_at 排序能整段吃
+  // (key_hash, created_at) 索引,各自只读 limit 行。写成 key_hash IN (...) 的话
+  // SQLite 无法沿索引出序,会退化成「读全该账号所有行 → 临时 B 树排序 → 再 LIMIT」,
+  // 而 node:sqlite 是同步 API,行数一多就把事件循环连同流式聊天一起卡住。
+  const columns = 'id, key_hash, kind, model, prompt, image_url, expires_at, cost_usd, created_at'
+  const hasCursor = Boolean(options.before && Number.isFinite(options.before))
+  const args: Array<string | number> = []
+  const branches = hashes.map((hash) => {
+    args.push(hash)
+    if (hasCursor) args.push(options.before as number)
+    args.push(limit)
+    // 分支自带 ORDER BY/LIMIT 必须各自包一层子查询,否则 SQLite 语法报错
+    return `SELECT * FROM (SELECT ${columns} FROM media_history WHERE key_hash = ?${hasCursor ? ' AND created_at < ?' : ''} ORDER BY created_at DESC LIMIT ?)`
+  })
   args.push(limit)
 
   const rows = useHistoryDb()
-    .prepare(`SELECT id, key_hash, kind, model, prompt, image_url, expires_at, cost_usd, created_at
-              FROM media_history WHERE ${where} ORDER BY created_at DESC LIMIT ?`)
+    .prepare(`SELECT ${columns} FROM (${branches.join(' UNION ALL ')}) ORDER BY created_at DESC LIMIT ?`)
     .all(...args) as Array<Record<string, unknown>>
 
   return rows.map(row => ({

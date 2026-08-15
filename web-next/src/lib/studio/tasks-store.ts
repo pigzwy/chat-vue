@@ -2,7 +2,7 @@
 // 持久化策略与 Vue 版完全一致：localStorage 存元数据（图片/视频各限 12 条），
 // IndexedDB（sub2api-image-assets）存图片 base64；恢复轮询按 id 合并回队列。
 import { createStore } from '@/lib/store'
-import { dropCachedVideo } from '@/lib/studio/video-cache'
+import { clearVideoCache, dropCachedVideo } from '@/lib/studio/video-cache'
 import { toast } from '@/lib/toast'
 import { requestConfirm } from '@/lib/confirm-store'
 import { clearApiKeyForGroup, getApiKeyForGroup } from '@/lib/models-store'
@@ -1553,4 +1553,6 @@ export function disposeStudio() {
   }
   sourceFilesByTaskId.clear()
   clearUploadedImages()
+  // blob 每段几十 MB,不释放会被 SPA 整个会话持有(切到聊天页也占着)
+  clearVideoCache()
 }

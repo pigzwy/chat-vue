@@ -25,7 +25,7 @@ export function MediaPreviewOverlay() {
   const open = Boolean(previewTask || previewUploadedImage)
 
   const previewVideoUrl = previewTask?.videoUrl || ''
-  const cachedPreviewVideo = useCachedVideoUrl(previewTask?.id || '', previewTask?.videoUrl)
+  const cachedPreviewVideo = useCachedVideoUrl(previewTask?.id || '', previewTask?.videoUrl, { eager: true })
   const previewImageUrl = previewTask?.imageUrl || previewUploadedImage?.previewUrl || ''
   const previewRevisedPrompt = previewTask?.revisedPrompt?.trim() || ''
 

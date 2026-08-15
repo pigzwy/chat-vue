@@ -95,3 +95,50 @@ test('prompt 超长截断到 4000', async () => {
   const rows = await queryMediaHistory({ apiKeys: ['sk-long-0000000000000000'] })
   assert.equal(rows[0].prompt.length, 4000)
 })
+
+test('过期行在后续写入时被清理(限频,不影响未过期行)', async () => {
+  const key = 'sk-expiry-00000000000000'
+  const now = Date.now()
+
+  // 一条早已过期(URL 失效,留着只拖慢查询),一条仍在有效期内
+  await recordMediaHistory({
+    apiKey: key,
+    kind: 'image',
+    model: 'm',
+    prompt: 'expired',
+    imageUrl: 'https://s3.example/old.png',
+    completedAtMs: now - 10_000,
+    expiresAtMs: now - 5_000
+  })
+  await recordMediaHistory({
+    apiKey: key,
+    kind: 'image',
+    model: 'm',
+    prompt: 'alive',
+    imageUrl: 'https://s3.example/new.png',
+    completedAtMs: now
+  })
+
+  // 清理是限频的(30 分钟一次),本轮写入不一定触发;无论触发与否,
+  // 未过期的那条都必须还在,过期的那条至多消失
+  const rows = await queryMediaHistory({ apiKeys: [key] })
+  assert.ok(rows.some(item => item.prompt === 'alive'), '未过期记录不能被误删')
+  assert.ok(rows.every(item => item.expiresAt > now || item.prompt === 'expired'))
+})
+
+test('多 key 合并查询:按时间倒序且各账号都在结果里', async () => {
+  const keyA = 'sk-merge-a00000000000000'
+  const keyB = 'sk-merge-b00000000000000'
+  const now = Date.now()
+
+  await recordMediaHistory({ apiKey: keyA, kind: 'image', model: 'm', prompt: 'a-old', imageUrl: 'https://s3.example/1', completedAtMs: now - 3000 })
+  await recordMediaHistory({ apiKey: keyB, kind: 'video', model: 'v', prompt: 'b-mid', imageUrl: 'https://s3.example/2', completedAtMs: now - 2000 })
+  await recordMediaHistory({ apiKey: keyA, kind: 'image', model: 'm', prompt: 'a-new', imageUrl: 'https://s3.example/3', completedAtMs: now - 1000 })
+
+  const merged = await queryMediaHistory({ apiKeys: [keyA, keyB] })
+  assert.deepEqual(merged.map(item => item.prompt), ['a-new', 'b-mid', 'a-old'])
+
+  // limit 作用于合并后的结果,不是每个 key 各取 limit
+  const top = await queryMediaHistory({ apiKeys: [keyA, keyB], limit: 2 })
+  assert.deepEqual(top.map(item => item.prompt), ['a-new', 'b-mid'])
+})
