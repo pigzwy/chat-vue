@@ -62,14 +62,63 @@ function isPrivateIPv4(address: string) {
     || a >= 224 // 组播/保留
 }
 
+/** 把 IPv6 文本展开成 8 个 16 位段;无法解析返回 null(调用方按「拒绝」处理)。
+ *  按数值判定而非字符串前缀——十六进制写法(::ffff:7f00:1)与点分写法
+ *  (::ffff:127.0.0.1)是同一个地址,只认后者等于没防。 */
+function parseIPv6(address: string) {
+  let text = address.trim().toLowerCase()
+  const zoneAt = text.indexOf('%') // fe80::1%eth0
+  if (zoneAt !== -1) text = text.slice(0, zoneAt)
+
+  // 末尾点分四段先折成两个 16 位段
+  const dotted = text.match(/(\d{1,3}(?:\.\d{1,3}){3})$/)
+  if (dotted && dotted.index !== undefined) {
+    const octets = dotted[1].split('.').map(Number)
+    if (octets.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return null
+    const hi = ((octets[0] << 8) | octets[1]).toString(16)
+    const lo = ((octets[2] << 8) | octets[3]).toString(16)
+    text = `${text.slice(0, dotted.index)}${hi}:${lo}`
+  }
+
+  const halves = text.split('::')
+  if (halves.length > 2) return null
+  const toWords = (part: string) => (part ? part.split(':').map(word => parseInt(word, 16)) : [])
+  const head = toWords(halves[0])
+  const tail = halves.length === 2 ? toWords(halves[1]) : []
+  if ([...head, ...tail].some(word => !Number.isInteger(word) || word < 0 || word > 0xFFFF)) return null
+
+  if (halves.length === 2) {
+    const fill = 8 - head.length - tail.length
+    if (fill < 0) return null
+    return [...head, ...Array(fill).fill(0), ...tail] as number[]
+  }
+  return head.length === 8 ? head : null
+}
+
+/** 各种把 IPv4 藏进 IPv6 的写法,取出内嵌地址交给 IPv4 规则判 */
+function embeddedIPv4(words: number[]) {
+  const dotted = (hi: number, lo: number) => `${hi >> 8}.${hi & 0xFF}.${lo >> 8}.${lo & 0xFF}`
+  // ::ffff:a.b.c.d(IPv4 映射)与 ::a.b.c.d(IPv4 兼容,已废弃但部分栈仍可路由)
+  if (words.slice(0, 5).every(word => word === 0) && (words[5] === 0xFFFF || words[5] === 0)) {
+    return dotted(words[6], words[7])
+  }
+  if (words[0] === 0x64 && words[1] === 0xFF9B) return dotted(words[6], words[7]) // 64:ff9b::/96 NAT64
+  if (words[0] === 0x2002) return dotted(words[1], words[2]) // 2002::/16 6to4
+  return null
+}
+
 function isPrivateIPv6(address: string) {
-  const lower = address.toLowerCase()
-  if (lower === '::' || lower === '::1') return true
-  if (lower.startsWith('fe8') || lower.startsWith('fe9') || lower.startsWith('fea') || lower.startsWith('feb')) return true // fe80::/10
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true // fc00::/7
-  // IPv4 映射(::ffff:a.b.c.d)按 IPv4 规则判
-  const mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
-  if (mapped) return isPrivateIPv4(mapped[1])
+  const words = parseIPv6(address)
+  if (!words) return true // 解析不了一律拒绝
+
+  const embedded = embeddedIPv4(words)
+  if (embedded) return isPrivateIPv4(embedded)
+
+  const first = words[0]
+  if ((first & 0xFF00) === 0xFF00) return true // ff00::/8 组播
+  if ((first & 0xFFC0) === 0xFE80) return true // fe80::/10 链路本地
+  if ((first & 0xFE00) === 0xFC00) return true // fc00::/7 唯一本地
+  if (first === 0x0100 && words.slice(1, 4).every(word => word === 0)) return true // 100::/64 丢弃前缀
   return false
 }
 

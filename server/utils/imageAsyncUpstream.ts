@@ -21,18 +21,29 @@ export class AsyncImageUnsupportedError extends Error {
   }
 }
 
+/** 提交阶段错误的标记:只有它们才可能意味着「网关不支持」。
+ *  轮询阶段的错误一律不带此标记——那时上游已开始生成并计费,重试即双扣费 */
+const submitStageFlag = 'isAsyncSubmitStage'
+
+function markSubmitStage<E extends Error>(error: E) {
+  Object.defineProperty(error, submitStageFlag, { value: true, enumerable: false })
+  return error
+}
+
 /** gemini 模型走 images 管线失败时,哪些错误说明「网关不支持」应回退 v1beta 内联:
- *  - 异步端点不存在(AsyncImageUnsupportedError / 404)
+ *  - 异步端点不存在(AsyncImageUnsupportedError,即提交阶段 404/405)
  *  - 平台开关不认 gemini("not supported for this platform" / "404 page not found")
- *  - 旧网关 images 口的模型校验直接拒掉 gemini 模型("requires an image model") */
+ *  - 旧网关 images 口的模型校验直接拒掉 gemini 模型("requires an image model")
+ *
+ *  一律要求错误来自**提交阶段**:轮询阶段的 404(任务不存在/过期、网关滚动重启)
+ *  说明上游已经受理并计费,此时回落 v1beta 会重新生成一张 = 同一次请求扣两次钱。 */
 export function isGeminiAsyncFallbackError(error: unknown) {
   if (error instanceof AsyncImageUnsupportedError) return true
+  if (!error || !(error as Record<string, unknown>)[submitStageFlag]) return false
   const message = error instanceof Error ? error.message : ''
-  const status = (error as { status?: number }).status
   return /not supported for this platform/i.test(message)
     || /404 page not found/i.test(message)
     || /requires an image model/i.test(message)
-    || status === 404
 }
 
 export interface AsyncSubmitResult {
@@ -68,9 +79,14 @@ function parsePayload(text: string): AsyncTaskPayload {
   }
 }
 
-function payloadErrorMessage(payload: AsyncTaskPayload, fallback: string) {
+/** 取最有信息量的一条错误文本:结构化字段 > 原始响应体 > 通用兜底。
+ *  网关的 404 页面、平台开关拒绝等都是纯文本(JSON.parse 失败),
+ *  丢掉它只剩「HTTP 400」会让排查无从下手 */
+function payloadErrorMessage(payload: AsyncTaskPayload, fallback: string, rawText = '') {
   if (typeof payload.error === 'string' && payload.error.trim()) return payload.error.trim()
   if (payload.error && typeof payload.error === 'object' && payload.error.message) return payload.error.message
+  const raw = rawText.trim()
+  if (raw && raw.length <= 500) return raw
   return fallback
 }
 
@@ -131,9 +147,9 @@ export async function submitAsyncImageGeneration(options: SubmitAsyncOptions): P
   }
   if (!response.ok) {
     const payload = parsePayload(errorText)
-    const error = new Error(payloadErrorMessage(payload, `异步生图提交失败:HTTP ${response.status}`)) as RequestError
+    const error = new Error(payloadErrorMessage(payload, `异步生图提交失败:HTTP ${response.status}`, errorText)) as RequestError
     error.status = response.status
-    throw error
+    throw markSubmitStage(error)
   }
 
   const payload = parsePayload(await response.text().catch(() => ''))
@@ -209,8 +225,9 @@ export async function pollAsyncImageResult(options: PollAsyncOptions): Promise<A
     const payload = parsePayload(text)
 
     if (!response.ok) {
-      // 轮询接口自身报错(404=任务不存在/过期等):直接失败,不重试同步以免双扣费
-      const error = new Error(payloadErrorMessage(payload, `异步任务查询失败:HTTP ${response.status}`)) as RequestError
+      // 轮询接口自身报错(404=任务不存在/过期等):直接失败,不重试同步以免双扣费。
+      // 注意此处**不**打 submit 标记——isGeminiAsyncFallbackError 据此拒绝回落
+      const error = new Error(payloadErrorMessage(payload, `异步任务查询失败:HTTP ${response.status}`, text)) as RequestError
       error.status = response.status
       throw error
     }

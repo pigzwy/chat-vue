@@ -416,6 +416,18 @@ export const studioStore = createStore<StudioState>(initialState(), {
 
 let durationTimer: ReturnType<typeof setInterval> | null = null
 let isUnmounted = false
+/** 已被用户删除的任务 id:轮询每轮自检,避免删掉后还空转最长 32 分钟,
+ *  更避免完成时对着一个已不存在的任务弹「生成完成」 */
+const cancelledTaskIds = new Set<string>()
+
+function stopPollingFor(taskId: string) {
+  cancelledTaskIds.add(taskId)
+}
+
+/** 轮询停止谓词:页面卸载 或 该任务已被删除 */
+function pollStopper(taskId: string) {
+  return () => isUnmounted || cancelledTaskIds.has(taskId)
+}
 let dragDepth = 0
 const sourceFilesByTaskId = new Map<string, File[]>()
 
@@ -431,6 +443,28 @@ function patch(partial: Partial<StudioState>) {
 function setQueue(next: MediaTask[]) {
   patch({ queue: next })
   persistTasks(next)
+  syncDurationTimer(next)
+}
+
+/** 计时器只为「生成中」的任务而跑。
+ *  store 是全量订阅(改一个字段唤醒全部 14 个订阅点、全项目无 memo),
+ *  所以空闲时每秒 patch 一次 = 整棵树每秒白重渲一遍;这里让它按需起停。 */
+function syncDurationTimer(queue: MediaTask[]) {
+  if (typeof window === 'undefined') return
+  const needed = queue.some(task => task.status === 'generating')
+
+  if (needed && !durationTimer) {
+    durationTimer = setInterval(() => {
+      patch({ timerNow: Date.now() })
+    }, 1000)
+    return
+  }
+  if (!needed && durationTimer) {
+    clearInterval(durationTimer)
+    durationTimer = null
+    // 停表前落一次终值,避免最后一秒的耗时显示停在旧数字上
+    patch({ timerNow: Date.now() })
+  }
 }
 
 // deep watcher 会随 scope 销毁（用户离开页面）而失效，
@@ -973,6 +1007,7 @@ export async function deleteMediaTask(task: MediaTask) {
   const next = [...state.queue]
   next.splice(index, 1)
   setQueue(next)
+  stopPollingFor(task.id)
   void deleteImageAsset(task.id).catch(() => {})
   dropCachedVideo(task.id)
 
@@ -1029,6 +1064,7 @@ export async function deleteSelectedTasks() {
   const selected = new Set(batchTasks.map(task => task.id))
   setQueue(get().queue.filter(task => !selected.has(task.id)))
   selected.forEach((id) => {
+    stopPollingFor(id)
     void deleteImageAsset(id).catch(() => {})
     dropCachedVideo(id)
   })
@@ -1245,13 +1281,13 @@ async function runImageTask(apiKey: string, task: MediaTask, editSources: File[]
     const job = await createImageEditJob(apiKey, imageJobRequest(task), editSources)
     updateTask(task.id, { jobId: job.id })
     persistNow()
-    return pollImageGenerationJob(job.id, () => isUnmounted)
+    return pollImageGenerationJob(job.id, pollStopper(task.id))
   }
 
   const job = await createImageGenerationJob(apiKey, imageJobRequest(task))
   updateTask(task.id, { jobId: job.id })
   persistNow()
-  return pollImageGenerationJob(job.id, () => isUnmounted)
+  return pollImageGenerationJob(job.id, pollStopper(task.id))
 }
 
 async function runVideoTask(apiKey: string, task: MediaTask, sourceImage?: File) {
@@ -1264,7 +1300,7 @@ async function runVideoTask(apiKey: string, task: MediaTask, sourceImage?: File)
   })
   updateTask(task.id, { jobId: job.id })
   persistNow()
-  return pollVideoGenerationJob(job.id, () => isUnmounted)
+  return pollVideoGenerationJob(job.id, pollStopper(task.id))
 }
 
 export async function submitStudioTask() {
@@ -1442,8 +1478,8 @@ async function resumeMediaTask(task: MediaTask) {
 
   try {
     const result = task.kind === 'video'
-      ? await pollVideoGenerationJob(task.jobId, () => isUnmounted)
-      : await pollImageGenerationJob(task.jobId, () => isUnmounted)
+      ? await pollVideoGenerationJob(task.jobId, pollStopper(task.id))
+      : await pollImageGenerationJob(task.jobId, pollStopper(task.id))
     applyCompletedResult(task, result)
   } catch (error) {
     if (isUnmounted) return
@@ -1498,12 +1534,13 @@ async function hydrateStoredImageAssets() {
 
 export function initStudio() {
   isUnmounted = false
+  // 上一轮删除的任务早已不在队列里,恢复轮询不会碰它们;顺手清掉防止会话内无限增长
+  cancelledTaskIds.clear()
   initMediaModels()
   void hydrateStoredImageAssets().catch(() => {})
   resumePendingTasks()
-  durationTimer ||= setInterval(() => {
-    patch({ timerNow: Date.now() })
-  }, 1000)
+  // 恢复出来的在途任务由 syncDurationTimer 自行决定是否需要起表
+  syncDurationTimer(get().queue)
 }
 
 export function disposeStudio() {

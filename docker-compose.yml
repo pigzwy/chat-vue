@@ -39,6 +39,8 @@ services:
       # 网关站点根(登录页注册/忘记密码、余额跳充值明细);SSO 接力入口可选
       GATEWAY_ORIGIN: ${GATEWAY_ORIGIN:-}
       SSO_CONNECT_URL: ${SSO_CONNECT_URL:-}
+      # 允许 iframe 嵌入本站的来源(CSP frame-ancestors);留空则取 GATEWAY_ORIGIN
+      FRAME_ANCESTORS: ${FRAME_ANCESTORS:-}
 
 volumes:
   chat-vue-data:

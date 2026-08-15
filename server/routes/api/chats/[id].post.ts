@@ -240,8 +240,16 @@ export default defineHandler(async (event) => {
   }).parse)
 
   const usesSub2api = Boolean(apiKey)
-  if (!usesSub2api && !MODELS.some(m => m.value === model)) {
-    throw new HTTPError({ statusCode: 400, statusMessage: 'Invalid model' })
+  if (!usesSub2api) {
+    // 不带 key 的请求会落到 AI Gateway,花的是**本服务**的 AI_GATEWAY_API_KEY,
+    // 而本路由无鉴权无限流——默认关掉,避免误配成一个公网开放的免费 AI 代理。
+    // 确需开放兜底(如内网自用)时显式设 ALLOW_ANONYMOUS_GATEWAY_CHAT=true。
+    if (process.env.ALLOW_ANONYMOUS_GATEWAY_CHAT !== 'true') {
+      throw new HTTPError({ statusCode: 401, statusMessage: '请先登录后再发起对话' })
+    }
+    if (!MODELS.some(m => m.value === model)) {
+      throw new HTTPError({ statusCode: 400, statusMessage: 'Invalid model' })
+    }
   }
 
   // SQL 聊天存储已停用：会话、标题、消息和投票都由前端 localStorage 管理。

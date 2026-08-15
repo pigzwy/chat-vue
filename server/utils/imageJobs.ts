@@ -272,31 +272,42 @@ async function readImageGenerationStream(response: Response, job: ImageJob, star
   let firstChunkMs: number | null = null
   let finalImageMs: number | null = null
 
-  while (true) {
-    const { value, done } = await reader.read()
-    if (value) {
-      chunkCount++
-      firstChunkMs ??= getElapsedMs(startedAt)
-      buffer += decoder.decode(value, { stream: true })
-      const blocks = buffer.split(/\r?\n\r?\n/)
-      buffer = blocks.pop() || ''
+  // 中途断流时已落袋的最终图必须保住:丢了会触发「流式→同步」重试,
+  // 而上游那张图已经计过费,重试等于同一次请求扣两次钱
+  let streamError: unknown = null
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (value) {
+        chunkCount++
+        firstChunkMs ??= getElapsedMs(startedAt)
+        buffer += decoder.decode(value, { stream: true })
+        const blocks = buffer.split(/\r?\n\r?\n/)
+        buffer = blocks.pop() || ''
 
-      for (const block of blocks) {
-        const event = parseStreamEvent(extractStreamData(block))
-        if (!event) continue
+        for (const block of blocks) {
+          const event = parseStreamEvent(extractStreamData(block))
+          if (!event) continue
 
-        eventCount++
-        if (event.usage) usage = event.usage
-        const image = toStreamImage(event)
-        if (image) {
-          completedImage = image
-          finalImageMs = getElapsedMs(startedAt)
-          logImageJob(job, 'stream-final-image', { elapsedMs: finalImageMs, eventCount, chunkCount })
+          eventCount++
+          if (event.usage) usage = event.usage
+          const image = toStreamImage(event)
+          if (image) {
+            completedImage = image
+            finalImageMs = getElapsedMs(startedAt)
+            logImageJob(job, 'stream-final-image', { elapsedMs: finalImageMs, eventCount, chunkCount })
+          }
         }
       }
-    }
 
-    if (done) break
+      if (done) break
+    }
+  } catch (error) {
+    streamError = error
+  } finally {
+    // 失败路径不 cancel 的话 response.body 被锁死且未排空,undici 连接要等 GC 才回池;
+    // 而「流式失败→同步降级」是代码显式预期的高频路径,不释放会把连接池耗干
+    void reader.cancel().catch(() => {})
   }
 
   const tail = parseStreamEvent(extractStreamData(buffer))
@@ -309,16 +320,19 @@ async function readImageGenerationStream(response: Response, job: ImageJob, star
     logImageJob(job, 'stream-final-image-tail', { elapsedMs: finalImageMs, eventCount, chunkCount })
   }
 
-  logImageJob(job, 'stream-done', {
+  logImageJob(job, streamError ? 'stream-interrupted' : 'stream-done', {
     elapsedMs: getElapsedMs(startedAt),
     firstChunkMs,
     finalImageMs,
     eventCount,
     chunkCount,
-    hasCompletedImage: Boolean(completedImage)
+    hasCompletedImage: Boolean(completedImage),
+    ...(streamError ? { error: toSafeError(streamError) } : {})
   })
 
   if (!completedImage) {
+    // 真的没拿到图才让它按原样失败(交由上层决定是否降级同步重试)
+    if (streamError) throw streamError
     throw new Error('图片流未返回最终图片')
   }
 
@@ -782,11 +796,13 @@ async function materializeRemoteImages(
   for (const image of result.data || []) {
     if (image.b64_json || !image.url || !/^https?:\/\//.test(image.url)) continue
 
+    // 先取出源地址:下载成功后 image.url 会被置空,重试轮次不能再从它读
+    const sourceUrl = image.url
     const attempts = strict ? 3 : 1
     let lastError: unknown
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        const downloaded = await downloadImageAsBase64(image.url, { signal })
+        const downloaded = await downloadImageAsBase64(sourceUrl, { signal })
         image.b64_json = downloaded.base64
         image.mime_type = downloaded.mimeType
         image.url = undefined

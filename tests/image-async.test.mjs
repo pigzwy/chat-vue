@@ -218,6 +218,34 @@ test('download:域名解析到私网 IP 拒绝', async () => {
   )
 })
 
+test('download:IPv6 私网判定按数值展开(十六进制/NAT64/6to4 写法均拦截)', () => {
+  // 同一个 127.0.0.1 的各种 IPv6 写法——只认点分形式等于没防
+  for (const address of [
+    '::ffff:127.0.0.1',
+    '::ffff:7f00:1', // 十六进制映射
+    '::7f00:1', // IPv4 兼容(已废弃仍可路由)
+    '64:ff9b::7f00:1', // NAT64
+    '2002:7f00:1::1' // 6to4
+  ]) {
+    assert.equal(isPrivateAddress(address, 6), true, `应拒绝 ${address}`)
+  }
+
+  // 云元数据地址 169.254.169.254 的映射写法(SSRF 的头号目标)
+  assert.equal(isPrivateAddress('::ffff:a9fe:a9fe', 6), true)
+  assert.equal(isPrivateAddress('::ffff:169.254.169.254', 6), true)
+
+  // 其余私有/特殊段
+  assert.equal(isPrivateAddress('fe80::1%eth0', 6), true, 'zone id 不应绕过')
+  assert.equal(isPrivateAddress('ff02::1', 6), true, '组播')
+  assert.equal(isPrivateAddress('100::1', 6), true, '丢弃前缀')
+  assert.equal(isPrivateAddress('not-an-address', 6), true, '解析失败一律拒绝')
+
+  // 公网 IPv6 不能误伤
+  assert.equal(isPrivateAddress('2001:4860:4860::8888', 6), false)
+  assert.equal(isPrivateAddress('2606:4700:4700::1111', 6), false)
+  assert.equal(isPrivateAddress('2002:5db8:d822::1', 6), false, '6to4 内嵌公网 IPv4 应放行')
+})
+
 test('download:字面私网 IP / IPv6 环回拒绝', async () => {
   assert.equal(isPrivateAddress('192.168.1.1', 4), true)
   assert.equal(isPrivateAddress('172.20.3.4', 4), true)
@@ -268,14 +296,49 @@ test('download:正常重定向可跟随并成功', async () => {
   assert.equal(result.mimeType, 'image/png')
 })
 
-test('isGeminiAsyncFallbackError:旧网关三类拒绝都触发回退,业务错误不触发', () => {
+/** 提交阶段的「网关不支持」错误:必须带上 submit 标记才认。
+ *  直接构造 Error 是拿不到标记的,这里复用真实提交路径产出带标记的错误。 */
+async function submitStageError(status, body) {
+  try {
+    await submitAsyncImageGeneration({
+      baseUrl: 'https://gw.test',
+      apiKey: 'sk-test-key-000000000000000000',
+      body: '{}',
+      paths: ['/images/generations/async'],
+      fetchImpl: async () => new Response(body, { status })
+    })
+  } catch (error) {
+    return error
+  }
+  throw new Error('提交本应失败')
+}
+
+test('isGeminiAsyncFallbackError:提交阶段三类拒绝触发回退,业务错误不触发', async () => {
   assert.equal(isGeminiAsyncFallbackError(new AsyncImageUnsupportedError(405)), true)
-  assert.equal(isGeminiAsyncFallbackError(new Error('this model is not supported for this platform')), true)
-  assert.equal(isGeminiAsyncFallbackError(new Error('404 page not found')), true)
-  assert.equal(isGeminiAsyncFallbackError(new Error('images endpoint requires an image model, got "gemini-3-pro-image"')), true)
-  const notFound = Object.assign(new Error('no such route'), { status: 404 })
-  assert.equal(isGeminiAsyncFallbackError(notFound), true)
-  const businessError = Object.assign(new Error('内容未通过审核'), { status: 400 })
-  assert.equal(isGeminiAsyncFallbackError(businessError), false)
+  assert.equal(isGeminiAsyncFallbackError(await submitStageError(400, 'this model is not supported for this platform')), true)
+  assert.equal(isGeminiAsyncFallbackError(await submitStageError(500, '404 page not found')), true)
+  assert.equal(isGeminiAsyncFallbackError(await submitStageError(400, 'images endpoint requires an image model, got "gemini-3-pro-image"')), true)
+  assert.equal(isGeminiAsyncFallbackError(await submitStageError(400, '内容未通过审核')), false)
   assert.equal(isGeminiAsyncFallbackError(new Error('insufficient balance')), false)
+})
+
+test('isGeminiAsyncFallbackError:轮询阶段错误一律不回退(防同一请求双扣费)', async () => {
+  // 上游已受理并开始计费,此时任务过期/网关重启返 404——回落会再生成一张
+  let pollError
+  try {
+    await pollAsyncImageResult({
+      pollUrl: 'https://gw.test/v1/images/tasks/t1',
+      apiKey: 'sk-test-key-000000000000000000',
+      fetchImpl: async () => new Response('404 page not found', { status: 404 }),
+      sleepImpl: async () => {}
+    })
+  } catch (error) {
+    pollError = error
+  }
+  assert.equal(pollError.status, 404)
+  assert.equal(isGeminiAsyncFallbackError(pollError), false, '轮询 404 绝不能触发 v1beta 重生成')
+
+  // 轮询阶段哪怕带着与提交阶段同样的措辞,也不认
+  const lookalike = Object.assign(new Error('this model is not supported for this platform'), { status: 400 })
+  assert.equal(isGeminiAsyncFallbackError(lookalike), false)
 })
