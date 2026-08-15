@@ -1,4 +1,5 @@
-// 自 shared/utils/mediaModels.ts 全量移植：媒体模型目录（能力/价格/默认分组的单一事实源）
+// 由 scripts/sync-shared.mjs 从 shared/utils/mediaModels.ts 自动同步,请勿直接编辑此文件。
+// 改动请改源文件后运行:node scripts/sync-shared.mjs
 import type { ImageRatio, ImageResolution } from './images'
 
 export type MediaKind = 'image' | 'video'

@@ -46,6 +46,10 @@ jobs:
       - name: Test
         run: pnpm run test
 
+      # shared/utils 与 web-next 的副本必须一致:价格字段漂移不报错,只会算错钱
+      - name: Check shared layer sync
+        run: pnpm run sync:shared:check
+
   web-next:
     runs-on: ubuntu-latest
 

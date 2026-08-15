@@ -9,7 +9,9 @@
     "lint": "eslint src server shared scripts tests",
     "typecheck": "vue-tsc -p ./tsconfig.app.json",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "typecheck:server": "tsc -p tsconfig.server.json --noEmit"
+    "typecheck:server": "tsc -p tsconfig.server.json --noEmit",
+    "sync:shared": "node scripts/sync-shared.mjs",
+    "sync:shared:check": "node scripts/sync-shared.mjs --check"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.69",

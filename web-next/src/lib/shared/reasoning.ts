@@ -1,3 +1,5 @@
+// 由 scripts/sync-shared.mjs 从 shared/utils/reasoning.ts 自动同步,请勿直接编辑此文件。
+// 改动请改源文件后运行:node scripts/sync-shared.mjs
 // 服务端接受的思考强度全集（各模型实际支持的子集由网关 /v1/models 元数据声明，
 // UI 按模型动态渲染；auto = 不向上游附加思考强度参数）
 export const reasoningEffortValues = ['auto', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
