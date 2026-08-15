@@ -1,7 +1,7 @@
 import { createStore } from './store'
 import { MODELS } from './shared/models'
 import { isMediaModelId } from './shared/media-models'
-import { loadAppConfig, resolveMediaGroupId } from './runtime-config'
+import { loadAppConfig, resolveMediaGroupId, ssoEntryUrl } from './runtime-config'
 import type { ReasoningEffort } from './shared/reasoning'
 import { csrfHeaderName, getCsrfToken } from './csrf'
 
@@ -255,6 +255,17 @@ function readTokenFromUrl() {
   return token
 }
 
+/** 本标签页是否已做过零点击探测(含网关弹回 ?sso=miss 与主动登出),防跳转死循环 */
+const SSO_PROBED_KEY = 'sub2api-sso-probed'
+
+function readSsoMissFromUrl() {
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('sso') !== 'miss') return false
+  url.searchParams.delete('sso')
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+  return true
+}
+
 let initialized = false
 
 export async function initModels() {
@@ -263,6 +274,8 @@ export async function initModels() {
 
   const storedToken = readString(TOKEN_KEY)
   const urlToken = readTokenFromUrl()
+  // 网关接力点弹回「未登录」:记住本标签页已探测过,直接展示密码登录页
+  if (readSsoMissFromUrl()) window.sessionStorage.setItem(SSO_PROBED_KEY, '1')
   let token = storedToken
   if (urlToken) {
     if (urlToken !== storedToken) {
@@ -302,6 +315,17 @@ export async function initModels() {
   }
 
   if (!token) {
+    // 零点击 SSO:无会话且配置了网关接力入口 → 每个标签页跳去探测一次。
+    // 已登录网关的用户会带 ?token= 秒弹回来;未登录带 ?sso=miss 回来走密码登录
+    if (!window.sessionStorage.getItem(SSO_PROBED_KEY)) {
+      await loadAppConfig()
+      const ssoEntry = ssoEntryUrl()
+      if (ssoEntry) {
+        window.sessionStorage.setItem(SSO_PROBED_KEY, '1')
+        window.location.replace(ssoEntry)
+        return
+      }
+    }
     patch({ authChecked: true })
     return
   }
@@ -728,9 +752,13 @@ export function logout() {
   writeString(TOKEN_KEY, '')
   writeString(REFRESH_KEY, '')
   writeString(EXPIRES_AT_KEY, '')
-  if (typeof window !== 'undefined' && refreshTimer) {
-    window.clearTimeout(refreshTimer)
-    refreshTimer = null
+  if (typeof window !== 'undefined') {
+    // 主动登出后本标签页不再自动探测网关,否则网关会话还在时永远退不出去
+    window.sessionStorage.setItem(SSO_PROBED_KEY, '1')
+    if (refreshTimer) {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
   }
   writeString(MANUAL_KEY_KEY, '')
   writeString(MANUAL_IMAGE_KEY_KEY, '')
