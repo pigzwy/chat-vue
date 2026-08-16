@@ -1,8 +1,25 @@
-# Chat Vue Sub2API
+# chat-vue
 
-基于 `nuxt-ui-templates/chat-vue` 改造的 AI 工作台：玻璃拟态 UI，包含聊天、统一创作台（图片 + 视频生成）和案例观摩馆，接入 Sub2API 的分组和模型选择。
+PIG Code Studio 的 **Nitro 后端**:前端所有请求经此代理到 sub2api 网关,并承载媒体任务管线
+(图片/视频生成、异步轮询、S3 直链物化)与账号级生成历史(node:sqlite)。
 
-## 功能
+> **本仓库不含前端。** React 前端在 [`pigzwy/pig-studio`](https://github.com/pigzwy/pig-studio),
+> 镜像 `llpig/pig-studio`。原 Vue 前端(`src/`)自 2026-08-16 起移除——它在 React 上线后
+> 已无入口访问,留着只会与前端仓库的共享层互相漂移。历史版本仍可在 git 历史里检出。
+
+拓扑:
+
+```
+浏览器 ──▶ web 容器(llpig/pig-studio,Next.js)
+              │  /api、/sub2api 经容器网络转发
+              ▼
+           chat-vue 容器(本仓库,llpig/chat-vue)
+              │
+              ▼
+           sub2api 网关(pigcode.ai)──▶ 上游模型 / S3
+```
+
+## 能力
 
 - Sub2API 分组选择和分组下模型选择
 - OpenAI-compatible `/v1/chat/completions` 流式对话，reasoning 展示和消息操作

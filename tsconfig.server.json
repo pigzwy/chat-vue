@@ -1,6 +1,6 @@
 {
   // 服务端(Nitro routes/utils)、跨端共享层与脚本的类型检查。
-  // tsconfig.app.json 的 include 只有 src/,这部分业务逻辑此前完全没有类型覆盖。
+  // 本仓库全部业务逻辑所在(Vue 前端已移除,React 前端在 pigzwy/pig-studio)。
   "extends": ["nitro/tsconfig"],
   "compilerOptions": {
     "target": "ES2022",

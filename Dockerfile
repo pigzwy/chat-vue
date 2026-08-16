@@ -9,9 +9,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
-ARG NUXT_UI_PRO_LICENSE
-ENV NUXT_UI_PRO_LICENSE=$NUXT_UI_PRO_LICENSE
 COPY . .
+# 只构建 Nitro 后端(Vue 前端已移除,React 前端在 pigzwy/pig-studio)
 RUN pnpm vite build
 
 FROM base AS runtime

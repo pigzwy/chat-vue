@@ -11,9 +11,6 @@ jobs:
         os: [ubuntu-latest]
         node: [22]
 
-    env:
-      NUXT_UI_PRO_LICENSE: ${{ secrets.NUXT_UI_PRO_LICENSE }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -36,12 +33,9 @@ jobs:
       - name: Build
         run: pnpm vite build
 
+      # server/ 与 shared/ 即本仓库全部业务逻辑(Vue 前端已移除)
       - name: Typecheck
         run: pnpm run typecheck
-
-      # server/ 与 shared/ 是全部业务逻辑所在,此前既无类型检查也无测试
-      - name: Typecheck (server & shared)
-        run: pnpm run typecheck:server
 
       - name: Test
         run: pnpm run test
