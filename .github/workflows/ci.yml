@@ -46,43 +46,8 @@ jobs:
       - name: Test
         run: pnpm run test
 
-      # shared/utils 与 web-next 的副本必须一致:价格字段漂移不报错,只会算错钱
+      # 共享层副本一致性由前端仓库 pigzwy/pig-studio 的 check-shared-sync 反向校验
+      # (它经 GitHub API 拉本仓库 shared/utils 比对);本仓库不 checkout 前端,
+      # 这里跑到的是"未找到前端仓库→跳过"分支,留着是为了本地开发时能用同一条命令
       - name: Check shared layer sync
         run: pnpm run sync:shared:check
-
-  web-next:
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: web-next
-
-    env:
-      # @heroui-pro/react 的 postinstall 需要它拉取 Pro 组件源码(仓库 Secrets 配置)
-      HEROUI_AUTH_TOKEN: ${{ secrets.HEROUI_AUTH_TOKEN }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v5
-
-      - name: Install node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: web-next/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Lint
-        run: pnpm exec eslint src --max-warnings=0
-
-      - name: Typecheck
-        run: pnpm exec tsc --noEmit
-
-      - name: Build
-        run: pnpm run build

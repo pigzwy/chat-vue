@@ -1,0 +1,3 @@
+module.exports=[73422,a=>{"use strict";a.s(["default",()=>b]);let b=(0,a.i(80918).registerClientReference)(function(){throw Error("Attempted to call the default export of [project]/web-next/src/app/not-found.tsx from the server, but it's on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.")},"[project]/web-next/src/app/not-found.tsx","default")},38781,a=>{"use strict";var b=a.i(73422);a.n(b)},40847,function(a){a.n(a.i(38781))}];
+
+//# sourceMappingURL=web-next_src_app_not-found_tsx_0hd9gkw._.js.map

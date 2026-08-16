@@ -2,7 +2,8 @@
 
 镜像由 GitHub Actions 自动构建推送,服务器只拉不建:
 
-- `llpig/chat-vue-next:latest` — React 前端(对外承接原端口)
+- `llpig/pig-studio:latest` — React 前端(对外承接原端口),由独立仓库 pigzwy/pig-studio 构建
+  (2026-08-16 前叫 `llpig/chat-vue-next`,出自本仓库的 web-next 目录)
 - `llpig/chat-vue:latest` — Nitro 后端(原 Vue 镜像,退居内部:/api、/sub2api、媒体任务)
 
 > **不是"只改镜像"**:是单容器 → 双容器拓扑(web 对外 + 原镜像退居后端),

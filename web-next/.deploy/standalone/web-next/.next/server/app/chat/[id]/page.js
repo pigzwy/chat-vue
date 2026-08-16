@@ -1,0 +1,13 @@
+var R=require("../../../chunks/ssr/[turbopack]_runtime.js")("server/app/chat/[id]/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__03c8y82._.js")
+R.c("server/chunks/ssr/18_9_next_dist_02jwrqi._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__094-oe9._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__1b5iptb._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0p8ngx_._.js")
+R.c("server/chunks/ssr/web-next_src_app_not-found_tsx_0hd9gkw._.js")
+R.c("server/chunks/ssr/18_9_next_dist_client_components_16jcuh5._.js")
+R.c("server/chunks/ssr/18_9_next_dist_client_components_builtin_unauthorized_0c64z1-.js")
+R.c("server/chunks/ssr/18_9_next_dist_client_components_builtin_global-error_1o0pdfs.js")
+R.c("server/chunks/ssr/web-next__next-internal_server_app_chat_[id]_page_actions_0af1-9e.js")
+R.m(66602)
+module.exports=R.m(66602).exports

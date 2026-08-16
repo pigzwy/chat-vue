@@ -1,9 +1,0 @@
-node_modules
-.next
-.deploy
-.env
-.env.*
-!.env.example
-npm-debug.log*
-.DS_Store
-.git

@@ -2,7 +2,9 @@
 // 用法：node scripts/sync-gallery.mjs
 // 图片走本站代理 /api/gallery-image/*（server/routes/api/gallery-image/[...path].get.ts），
 // 兜底 jsDelivr 直链。上游按 cases/<n>/case.yml 逐个探测，连续 miss 15 个即认为到底。
-import { writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import process from 'node:process'
 import { parse as parseYaml } from 'yaml'
 
 const REPO = 'jamez-bondos/awesome-gpt4o-images'
@@ -123,6 +125,16 @@ const interfaceBlock = `export interface GalleryCase {
 
 const content = `${banner}\n${interfaceBlock}\nexport const galleryCases: GalleryCase[] = ${JSON.stringify(cases, null, 2)}\n`
 writeFileSync(OUTPUT, content)
-// React 版（web-next）用同一份数据，双写保持同步
-writeFileSync(new URL('../web-next/src/data/gallery-cases.ts', import.meta.url), content)
-console.log(`完成：${cases.length} 条案例写入 src/data/galleryCases.ts 与 web-next/src/data/gallery-cases.ts`)
+// React 版(独立仓库 pigzwy/pig-studio)用同一份数据,双写保持同步。
+// 默认写兄弟目录 ../pig-studio,可用 PIG_STUDIO_DIR 覆盖;不存在则只写本仓库。
+const studioGallery = process.env.PIG_STUDIO_DIR
+  ? new URL(`${process.env.PIG_STUDIO_DIR.replace(/\/?$/, '/')}src/data/gallery-cases.ts`, `file://${process.cwd()}/`)
+  : new URL('../../pig-studio/src/data/gallery-cases.ts', import.meta.url)
+
+if (existsSync(fileURLToPath(studioGallery))) {
+  writeFileSync(studioGallery, content)
+  console.log(`完成:${cases.length} 条案例写入 src/data/galleryCases.ts 与 pig-studio/src/data/gallery-cases.ts`)
+} else {
+  console.log(`完成:${cases.length} 条案例写入 src/data/galleryCases.ts`)
+  console.log(`前端仓库未找到(${fileURLToPath(studioGallery)}),请在 pig-studio 侧同步该文件。`)
+}

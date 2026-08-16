@@ -21,7 +21,9 @@ services:
       - chat-vue-data:/app/.data
 
   web:
-    image: llpig/chat-vue-next:latest
+    # React 前端,由独立仓库 pigzwy/pig-studio 构建推送
+    # (旧名 llpig/chat-vue-next 出自 chat-vue 仓库,已停用;回滚就是把这行改回去)
+    image: llpig/pig-studio:latest
     container_name: chat-vue-web
     restart: unless-stopped
     depends_on:

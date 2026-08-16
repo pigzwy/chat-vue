@@ -1,0 +1,3 @@
+{
+  "/sub2api/[...path]/route": "app/sub2api/[...path]/route.js"
+}
